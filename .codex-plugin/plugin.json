@@ -1,0 +1,31 @@
+{
+  "name": "agent-voice-studio",
+  "version": "0.1.0",
+  "description": "A voice-production process an AI agent runs from raw recordings to a verified speaking voice: mine distinct speaking styles out of hours of audio, gate every reference clip through six automatic checks, build profiles whose emotion is switched by markers inside the script, and apply a Vietnamese pronunciation ruleset measured by round-trip ASR.",
+  "author": {
+    "name": "Duc Nguyen",
+    "url": "https://ducnguyen.vn"
+  },
+  "homepage": "https://github.com/ducnguyen221/agent-voice-studio",
+  "license": "MIT",
+  "keywords": [
+    "tts",
+    "voice-cloning",
+    "speech-synthesis",
+    "vietnamese",
+    "voice-profile",
+    "prosody",
+    "asr-verification"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agent Voice Studio",
+    "shortDescription": "Build and run a verified speaking voice from your own recordings",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Read",
+      "Write"
+    ]
+  }
+}

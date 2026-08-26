@@ -1,0 +1,89 @@
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # Chỉ kiểm cú pháp. Engine TTS nặng vài GB và cần GPU — CI không cài,
+      # và cũng không nên: repo này cố ý chạy được mà không có engine cho tới
+      # lúc thật sự tổng hợp giọng.
+      - name: Compile every script
+        run: python -m compileall -q studio
+
+      # Cổng chống rò. Repo dạy cách tạo giọng, nó KHÔNG chứa giọng.
+      # Danh sách này chặn hai thứ: file nhị phân của giọng/model, và dấu vết
+      # danh tính của máy người viết.
+      - name: No audio or model binaries committed
+        run: |
+          hits=$(git ls-files | grep -Ei '\.(wav|mp3|m4a|flac|ogg|opus|pt|ckpt|onnx|safetensors)$' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Binary voice/model files must never be committed:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "OK — no audio or model binaries tracked."
+
+      - name: No machine paths or personal identifiers
+        run: |
+          # Chỉ quét file được git theo dõi, và bỏ qua chính file workflow này
+          # (nó buộc phải chứa các mẫu để quét).
+          files=$(git ls-files | grep -v '^\.github/workflows/verify\.yml$')
+          hits=$(grep -REn 'C:\\Users\\|/home/[a-z]+/|%USERPROFILE%' $files || true)
+          if [ -n "$hits" ]; then
+            echo "::error::Absolute machine paths leaked into the repo:"
+            echo "$hits"
+            exit 1
+          fi
+          echo "OK — no absolute machine paths."
+
+      - name: Plugin manifests are valid JSON and agree on version
+        run: |
+          python - <<'PY'
+          import json, sys
+          m = json.load(open('.claude-plugin/marketplace.json'))
+          c = json.load(open('.claude-plugin/plugin.json'))
+          x = json.load(open('.codex-plugin/plugin.json'))
+          vers = {
+              'marketplace': m['plugins'][0]['version'],
+              'claude-plugin': c['version'],
+              'codex-plugin': x['version'],
+          }
+          if len(set(vers.values())) != 1:
+              print(f"::error::Version mismatch across manifests: {vers}")
+              sys.exit(1)
+          names = {m['name'], m['plugins'][0]['name'], c['name'], x['name']}
+          if len(names) != 1:
+              print(f"::error::Name mismatch across manifests: {names}")
+              sys.exit(1)
+          print(f"OK — {names.pop()} {vers['claude-plugin']} consistent across 3 manifests.")
+          PY
+
+      - name: Skill references all exist
+        run: |
+          python - <<'PY'
+          import os, re, sys
+          skill = 'skills/voice-routing/SKILL.md'
+          text = open(skill, encoding='utf-8').read()
+          refs = set(re.findall(r'references/([a-z0-9\-]+\.md)', text))
+          have = set(os.listdir('skills/voice-routing/references'))
+          missing = refs - have
+          orphan = have - refs
+          if missing:
+              print(f"::error::SKILL.md points at references that do not exist: {sorted(missing)}")
+              sys.exit(1)
+          if orphan:
+              print(f"::warning::References never routed to from SKILL.md: {sorted(orphan)}")
+          print(f"OK — {len(refs)} references resolved.")
+          PY

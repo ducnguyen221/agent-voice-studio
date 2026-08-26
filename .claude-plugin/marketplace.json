@@ -1,0 +1,21 @@
+{
+  "name": "agent-voice-studio",
+  "description": "A voice-studio process for AI agents — recordings to a verified, controllable speaking voice.",
+  "owner": {
+    "name": "Duc Nguyen",
+    "url": "https://ducnguyen.vn"
+  },
+  "plugins": [
+    {
+      "name": "agent-voice-studio",
+      "description": "Mine speaking styles out of long recordings, gate every reference clip with automatic checks, build multi-marker voice profiles, and write scripts a TTS engine reads correctly in Vietnamese.",
+      "version": "0.1.0",
+      "source": "./",
+      "license": "MIT",
+      "author": {
+        "name": "Duc Nguyen",
+        "url": "https://ducnguyen.vn"
+      }
+    }
+  ]
+}
