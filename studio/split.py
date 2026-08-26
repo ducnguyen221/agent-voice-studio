@@ -1,7 +1,7 @@
 """
 split.py — tách một profile đa biến thể thành NHIỀU profile độc lập.
 
-  python split.py --from narrator --prefix duc
+  python split.py --from narrator --prefix solo
 
 Mỗi marker thành một profile lối cũ (`voices/<prefix>-<marker>.wav` + `.txt`), dùng được
 ngay với mọi pipeline hiện có mà không cần biết gì về manifest hay marker.
@@ -34,7 +34,7 @@ import vlab
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--from", dest="src", required=True, help="Profile nguồn, vd narrator.")
-    ap.add_argument("--prefix", required=True, help="Tiền tố tên profile mới, vd duc.")
+    ap.add_argument("--prefix", required=True, help="Tiền tố tên profile mới, vd solo.")
     ap.add_argument("--only", nargs="*", default=[], help="Chỉ tách các marker này.")
     ap.add_argument("--force", action="store_true",
                     help="Cho phép ghi đè profile cùng tên đã tồn tại.")
