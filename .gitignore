@@ -57,3 +57,6 @@ tmp/
 !docs/example/**/*.png
 !docs/example/**/*.json
 !docs/example/**/*.md
+
+# Plan/thiet ke noi bo -> quan ly tap trung o ~/.opcos/repo/<repo>/plans/ (repo opc-os, PRIVATE)
+docs/plans/
