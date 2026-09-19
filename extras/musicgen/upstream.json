@@ -1,0 +1,28 @@
+{
+  "_doc": "Nguồn và giấy phép của thứ mà extras/musicgen gọi tới. Repo KHÔNG chứa weights hay code upstream; script tải weights lúc chạy. Kiểm lại license mỗi khi đổi model id.",
+  "components": [
+    {
+      "name": "MusicGen weights",
+      "ids": ["facebook/musicgen-small", "facebook/musicgen-medium", "facebook/musicgen-large"],
+      "source": "https://huggingface.co/facebook/musicgen-large",
+      "license": "CC-BY-NC-4.0",
+      "commercial_use": false,
+      "checked": "2026-09-20",
+      "evidence": "Thẻ model trên Hugging Face: metadata `license: cc-by-nc-4.0`; phần mô tả ghi code MIT, weights CC-BY-NC 4.0.",
+      "bundled": false
+    },
+    {
+      "name": "MusicGen code (audiocraft)",
+      "license": "MIT",
+      "checked": "2026-09-20",
+      "evidence": "Cùng thẻ model: code phát hành theo MIT. Script ở đây không chép code audiocraft — chỉ gọi lớp của transformers.",
+      "bundled": false
+    },
+    {
+      "name": "transformers",
+      "license": "Apache-2.0",
+      "checked": "[chưa kiểm lại ngày 2026-09-20 — ghi theo hiểu biết chung, xác minh trước khi phát hành]",
+      "bundled": false
+    }
+  ]
+}

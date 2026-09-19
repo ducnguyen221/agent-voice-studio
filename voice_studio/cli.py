@@ -23,9 +23,12 @@ COMMANDS = {
     "doctor":       ("voice_studio.doctor", "kiểm trạm giọng, chỉ bước cài còn thiếu"),
     "mcp":          ("voice_studio.mcp_server", "chạy MCP server (stdio) cho agent"),
     "lab":          (None, "bộ dựng profile đa sắc thái: mine | build | split | organize"),
-    "init":         (None, "dựng cây trạm + station.json"),
-    "export":       (None, "đóng gói giọng cá nhân để chuyển máy"),
-    "import":       (None, "nhập gói giọng cá nhân"),
+    "init":         ("voice_studio.station:init_main", "dựng trạm (embedded | separate) + station.json"),
+    "export":       ("voice_studio.station:export_main", "đóng gói giọng cá nhân để chuyển máy (--personal)"),
+    "import":       ("voice_studio.station:import_main", "nhập gói giọng cá nhân"),
+    "backup":       ("voice_studio.station:backup_main", "zip cả trạm (không venv/cache/out)"),
+    "migrate":      ("voice_studio.station:migrate_main", "chuyển trạm embedded ra ngoài repo"),
+    "update":       ("voice_studio.station:update_main", "cập nhật repo (git pull --ff-only)"),
 }
 LAB = {
     "mine": "voice_studio.lab.mine",
@@ -33,7 +36,6 @@ LAB = {
     "split": "voice_studio.lab.split",
     "organize": "voice_studio.lab.organize",
 }
-NOT_YET = ("init", "export", "import")
 
 
 def _console_utf8():
@@ -55,12 +57,13 @@ def usage():
     return "\n".join(lines)
 
 
-def _call(module, argv):
+def _call(target, argv):
+    module, _, func = target.partition(":")
     mod = importlib.import_module(module)
     if module == "voice_studio.mcp_server":
         mod.main()
         return contract.OK
-    rc = mod.main(argv)
+    rc = getattr(mod, func or "main")(argv)
     return contract.OK if rc is None else int(rc)
 
 
@@ -76,9 +79,6 @@ def main(argv=None):
     cmd, rest = argv[0], argv[1:]
     if cmd not in COMMANDS:
         contract.log(f"lệnh lạ: '{cmd}'\n\n{usage()}")
-        return contract.CONTRACT_ERROR
-    if cmd in NOT_YET:
-        contract.log(f"`voice-studio {cmd}` chưa có trong bản này (đang phát triển).")
         return contract.CONTRACT_ERROR
     if cmd == "lab":
         if not rest or rest[0] in ("-h", "--help") or rest[0] not in LAB:

@@ -3,7 +3,9 @@
     voice-studio doctor            # bảng người đọc (stderr) + tóm tắt
     voice-studio doctor --json     # một dòng JSON cuối stdout cho bên gọi (marketing, trạm video)
 
-Kiểm: python · trạm (`VOICE_STATION`, tên cũ `OMNIVOICE_DIR` bị nhắc đổi) · kho giọng + profile
+Kiểm: python · trạm (`VOICE_STATION`, tên cũ `OMNIVOICE_DIR` bị nhắc đổi) · `station.json` ·
+hai chế độ cài (F17: ĐỎ khi vừa có <repo>/workspace/ vừa có trạm ngoài; embedded: workspace/.env
+không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám mây, quyền .env) · kho giọng + profile
 mặc định · thư viện nhạc nền · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
 trong cache (chạy offline được). Không tải gì, không nạp model.
 
@@ -13,6 +15,7 @@ engine) — kèm hướng dẫn cài phần còn thiếu.
 import argparse
 import importlib
 import os
+import subprocess
 import sys
 
 from . import API_VERSION, _env, contract, engine
@@ -37,6 +40,89 @@ def _hf_cache_has(model_id):
     return os.path.isdir(os.path.join(home, "models--" + model_id.replace("/", "--"))), home
 
 
+CLOUD_MARKERS = ("onedrive", "google drive", "googledrive", "my drive", "icloud", "dropbox",
+                 "mobile documents", "cloudstorage")
+
+
+def _major(v):
+    try:
+        return int(str(v).split(".")[0])
+    except (TypeError, ValueError):
+        return None
+
+
+def station_checks(st):
+    """station.json + phần F17 (hai nguồn, rào của chế độ embedded)."""
+    out = []
+    sj = os.path.join(st, _env.STATION_FILE)
+    if os.path.isdir(st):
+        info, err = _env.read_json(sj)
+        if err:
+            out.append(_check("station-json", False, err,
+                              hint="sửa hoặc xoá rồi `voice-studio init --existing`"))
+        elif not os.path.isfile(sj):
+            out.append(_check("station-json", False, sj, level="warn",
+                              hint="trạm chưa có station.json — `voice-studio init --existing`"))
+        elif _major(info.get("contract")) != _major(API_VERSION):
+            out.append(_check("station-json", False, f"contract {info.get('contract')} ≠ {API_VERSION}",
+                              level="warn", hint="trạm dựng bởi bản hợp đồng khác — kiểm lại rồi chạy init"))
+        else:
+            out.append(_check("station-json", True, f"{sj} (contract {info.get('contract')})"))
+
+    repo = _env.repo_root()
+    if not repo or not os.path.isdir(repo):
+        return out
+    ws = os.path.join(repo, _env.WORKSPACE)
+    _, src = _env.resolve_station()
+    local = _env.local_config(repo)
+    if os.path.isdir(ws):
+        others = []
+        if _env.env("VOICE_STATION"):
+            others.append("VOICE_STATION")
+        if _env.env("OMNIVOICE_DIR"):
+            others.append("OMNIVOICE_DIR")
+        if local.get("mode") == "separate":
+            others.append("studio.local.json=separate")
+        if _env.has_marker(_env.default_station()):
+            others.append("~/.voice")
+        out.append(_check("two-sources", not others,
+                          f"{ws} + {', '.join(others)}" if others else ws,
+                          hint="hai nguồn sự thật cho một repo: giữ MỘT trạm — gộp dữ liệu rồi xoá "
+                               "workspace/ hoặc gỡ biến/trạm ngoài (`voice-studio migrate --to separate`)"))
+    embedded = src == _env.WORKSPACE or local.get("mode") == "embedded"
+    if not embedded:
+        return out
+    tracked = _git_tracked(repo)
+    if tracked is not None:
+        out.append(_check("git-tracked", not tracked, ", ".join(tracked) or "workspace/, .env sạch",
+                          hint="dữ liệu trạm/secret đang bị git theo dõi — `git rm --cached` ngay, "
+                               "kiểm .gitignore"))
+    low = repo.lower()
+    cloud = [m for m in CLOUD_MARKERS if m in low]
+    out.append(_check("cloud-sync", not cloud, repo, level="warn",
+                      hint="repo nằm trong thư mục đồng bộ đám mây — giọng và .env sẽ lên cloud; "
+                           "dời repo ra ngoài"))
+    env_file = os.path.join(repo, ".env")
+    if os.name == "posix" and os.path.isfile(env_file):
+        mode = os.stat(env_file).st_mode & 0o777
+        out.append(_check("env-perm", not (mode & 0o077), oct(mode), level="warn",
+                          hint="chmod 600 .env"))
+    return out
+
+
+def _git_tracked(repo):
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return None
+    try:
+        r = subprocess.run(["git", "-C", repo, "ls-files", "--", _env.WORKSPACE, ".env",
+                            _env.LOCAL_CONFIG], capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if r.returncode != 0:
+        return None
+    return [ln for ln in r.stdout.splitlines() if ln.strip()]
+
+
 def run_checks():
     checks = [_check("python", sys.version_info >= (3, 10), sys.version.split()[0],
                      hint="cần Python ≥ 3.10")]
@@ -44,6 +130,7 @@ def run_checks():
     st = _env.station_dir()
     checks.append(_check("station", os.path.isdir(st), st,
                          hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
+    checks += station_checks(st)
     if _env.env("OMNIVOICE_DIR") and not _env.env("VOICE_STATION"):
         checks.append(_check("env-name", False, "OMNIVOICE_DIR", level="warn",
                              hint="tên biến cũ — đặt VOICE_STATION=<gốc trạm> (OMNIVOICE_DIR vẫn đọc được)"))

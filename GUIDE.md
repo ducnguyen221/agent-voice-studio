@@ -25,10 +25,12 @@ constraint is selection, never volume.
 
 ## 1. Install
 
-See [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md). One
-environment variable, `OMNIVOICE_DIR`, connects these scripts to your engine. Point
-`VOICE_STUDIO_WORK` somewhere **outside this repository** so generated audio can never be
-committed.
+See [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md): venv →
+torch for your OS → `omnivoice==0.2.1` → `pip install -e <repo>` → `voice-studio init` →
+`voice-studio doctor`. `init` asks where the **voice station** lives — inside the repo
+(`embedded`, the default) or outside it (`separate`); every station folder is explained in
+[`docs/WORKSPACE.md`](docs/WORKSPACE.md). Output goes to the station, never into the repo's code,
+so generated audio can never be committed.
 
 ## 2. Clean — only if you need to
 
@@ -45,7 +47,7 @@ Details and the two-environment install trap:
 ## 3. Mine
 
 ```bash
-python studio/mine.py --dir recordings/ --name narrator
+voice-studio lab mine --dir recordings/ --name narrator
 ```
 
 Cuts the audio into utterance-bounded windows, measures prosody, clusters within the speaker,
@@ -60,7 +62,7 @@ found to be clustering by *recording gain* rather than by delivery.
 ## 4. Build
 
 ```bash
-python studio/build.py --name narrator --mode new
+voice-studio lab build --name narrator --mode new
 ```
 
 Runs six gates over every candidate and keeps the first that passes. Expect rejections —
@@ -88,7 +90,7 @@ The full measured table:
 ## 6. Speak
 
 ```bash
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Splits at markers, then at sentences, pins the seed, normalises levels, fades the joins.

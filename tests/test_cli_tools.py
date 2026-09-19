@@ -35,10 +35,9 @@ def test_unknown_command_is_2(capsys):
     assert run(capsys, "noi-bua")[0] == 2
 
 
-@pytest.mark.parametrize("cmd", cli.NOT_YET)
-def test_unfinished_commands_say_so(cmd, capsys):
-    rc, _, err = run(capsys, cmd)
-    assert rc == 2 and "chưa có" in err
+@pytest.mark.parametrize("cmd", ["init", "export", "import", "backup", "migrate", "update"])
+def test_station_commands_help_is_0(cmd, capsys):
+    assert run(capsys, cmd, "--help")[0] == 0
 
 
 @pytest.mark.parametrize("cmd", ["speak", "narrate", "make-profile", "clone", "reftext", "tts",

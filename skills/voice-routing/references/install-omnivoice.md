@@ -1,85 +1,167 @@
-# Installing the speech engine
+# Cài trạm giọng và engine
 
-This repo brings the method and the scripts. **You bring the engine and your own voice.**
+Repo mang **phương pháp + mã** (package `voice_studio`, lệnh `voice-studio`). **Bạn mang engine và
+giọng của chính mình** — chúng sống ở *trạm giọng*, ngoài git.
 
-Reference engine: **OmniVoice** (k2-fsa, Apache-2.0) — offline, multilingual, zero-shot voice
-cloning. Everything here was measured against it. Another engine can be substituted; the
-`vietnamese-tts-script.md` rules will still apply in shape, though the exact failures differ.
+Engine tham chiếu: **OmniVoice 0.2.1** (k2-fsa) — chạy offline, đa ngôn ngữ, clone giọng zero-shot.
+Mọi số đo trong bộ tài liệu này đo trên nó. Thay engine khác được; luật ở
+`vietnamese-tts-script.md` vẫn đúng về hình dạng, còn lỗi cụ thể sẽ khác.
 
----
+## ⚠️ Giấy phép — đọc trước khi cài
 
-## What you need
+| Thành phần | Giấy phép | Ghi chú |
+|---|---|---|
+| Code OmniVoice | Apache-2.0 | |
+| **Weights OmniVoice** | **CC-BY-NC** (không thương mại) | tải từ Hugging Face lúc chạy lần đầu; repo không phát hành |
+| Repo này | MIT | |
 
-- **Python 3.12**
-- **An NVIDIA GPU** for practical speed. CPU works but is slow enough to change how you work.
-- **~4 GB of disk** for model weights, cached on first run.
-- Internet **once** — for the model download and, if you use automatic transcription, the ASR
-  model. After that it runs offline.
+Audio sinh ra từ weights không thương mại dùng cho **kênh kiếm tiền, quảng cáo, sản phẩm bán** là
+rủi ro giấy phép bạn phải tự cân nhắc. Giấy phép weights đi đường riêng với giấy phép code và hay
+đổi âm thầm hơn — kiểm lại mỗi lần nâng engine.
 
-## Install
+## Cần gì
+
+- **Python 3.10+** (đã đo trên 3.12).
+- GPU **NVIDIA** cho tốc độ dùng được. Apple Silicon chạy qua **MPS** `[chưa đo tốc độ]`. CPU chạy
+  được nhưng chậm tới mức đổi cả cách làm việc.
+- **~4 GB** đĩa cho weights (cache Hugging Face, lần chạy đầu).
+- Internet **một lần** — tải weights và (nếu dùng phiên âm tự động) model ASR. Sau đó chạy offline.
+- `ffmpeg` trên PATH (hoặc `FFMPEG_DIR`) — cho mp3 và ghép video.
+
+## Cài — sáu bước
+
+**Ngoại lệ có chủ đích:** hướng dẫn chung của họ repo này khuyên *không* `pip install -e`. Repo
+giọng là ngoại lệ: nó là package có `pyproject.toml` chuẩn, phải chạy **bằng chính venv của
+engine** (torch nằm ở đó), và `-e` giữ cho `git pull` là đủ để cập nhật — không phải cài lại.
+
+**1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
+phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspace/`).
+
+**2. Clone repo và tạo venv engine.** Đường venv chuẩn là `<trạm>/omnivoice/.venv`; `init` in đúng
+lệnh cho máy bạn — có thể chạy `init` trước (bước 5) rồi quay lại đây.
 
 ```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-
-pip install torch --index-url https://download.pytorch.org/whl/cu126   # match your CUDA
-pip install omnivoice
-pip install librosa soundfile scikit-learn
+git clone <địa chỉ repo agent-voice-studio>
+python -m venv <trạm>/omnivoice/.venv
+# Windows:          <trạm>\omnivoice\.venv\Scripts\activate
+# macOS / Linux:    source <trạm>/omnivoice/.venv/bin/activate
 ```
 
-**Torch must be recent enough.** The engine pulls a transformers version that needs a dtype
-introduced in torch 2.7; older torch fails at import with an error that does not obviously
-point at the version.
+**3. Cài torch theo hệ điều hành** — pip không tự chọn đúng bản:
 
-**Do not install the optional text-normalisation extra on Windows.** One of its dependencies
-has no wheel and needs a full MSVC build chain. You do not want that extra anyway — see the
-normaliser warning in `vietnamese-tts-script.md`.
+```bash
+pip install torch --index-url https://download.pytorch.org/whl/cu126   # Windows/Linux + NVIDIA (khớp CUDA)
+pip install torch --index-url https://download.pytorch.org/whl/cpu     # không GPU
+pip install torch                                                      # macOS Apple Silicon (MPS)
+```
 
-## Point the scripts at it
+**Torch phải đủ mới.** Engine kéo một bản transformers cần một kiểu dtype có từ torch 2.7; torch
+cũ hơn sập lúc import với lỗi không chỉ rõ là do phiên bản.
 
-The scripts find the engine through `OMNIVOICE_DIR`, which must contain the engine's
-`voice_profiles.py`:
+**4. Cài engine và package:**
+
+```bash
+pip install omnivoice==0.2.1
+pip install -e <thư mục repo>              # lệnh voice-studio
+pip install -e "<thư mục repo>[mcp,lab]"   # tuỳ chọn: MCP server, bộ đào giọng (librosa, scikit-learn)
+```
+
+Nhóm tuỳ chọn khác: `[ui]` (gradio), `[clone]` (faster-whisper, yt-dlp). **Đừng cài phần phụ
+chuẩn hoá văn bản của engine trên Windows** — một phụ thuộc không có wheel, đòi cả bộ build MSVC;
+và bạn cũng không muốn nó (xem cảnh báo bộ chuẩn hoá trong `vietnamese-tts-script.md`).
+
+**5. Dựng trạm:**
+
+```bash
+voice-studio init                 # hỏi embedded / separate (Enter = embedded)
+voice-studio init --dry-run       # chỉ xem sẽ làm gì
+voice-studio init --station ~/.voice          # separate, không hỏi
+voice-studio init --station <trạm cũ> --existing   # nhận trạm đang chạy: chỉ ghi station.json
+```
+
+`init` dựng `station.json`, `omnivoice/voices/`, `assets/bgm/` (khung thư viện nhạc nền, không
+mp3), `out/`, `cache/`. Nó **không** tạo venv, không tải model — chỉ in lệnh.
+
+**6. Tải weights lần đầu và kiểm:**
+
+```bash
+OMNIVOICE_ONLINE=1 voice-studio doctor    # PowerShell: $env:OMNIVOICE_ONLINE=1; voice-studio doctor
+voice-studio doctor                       # các lần sau: offline
+```
+
+Mặc định engine chạy **offline** (`HF_HUB_OFFLINE=1`) để lịch chạy không bao giờ treo vì mạng;
+`OMNIVOICE_ONLINE=1` mở mạng đúng một lần. `doctor` thoát mã 3 kèm hướng dẫn nếu còn thiếu gì.
+
+Thử cả chuỗi không cần ghi âm ai: làm theo `omnivoice/voices/_example/README.md` trong trạm
+(tạo giọng `sample` bằng thiết kế giọng, rồi `voice-studio speak`).
+
+## Biến môi trường
+
+Chế độ `embedded` không cần đặt biến nào. Chế độ `separate` nên đặt `VOICE_STATION` ở mức người
+dùng (mọi harness, shell, lịch chạy đều thừa hưởng):
 
 ```powershell
-setx OMNIVOICE_DIR "C:\path\to\omnivoice"
+setx VOICE_STATION "<đường trạm>"
 ```
 ```bash
-export OMNIVOICE_DIR=/path/to/omnivoice
+echo 'export VOICE_STATION=<đường trạm>' >> ~/.zshrc
 ```
 
-A user-scope variable is deliberate: every agent harness, shell and scheduler inherits it,
-and nothing has to be reconfigured per tool.
-
-Optional:
-
-| Variable | Meaning | Default |
+| Biến | Nghĩa | Mặc định |
 |---|---|---|
-| `VOICES_DIR` | where profiles live | `<engine>/voices` |
-| `VOICE_STUDIO_WORK` | scratch output | `./out` |
+| `VOICE_STATION` | gốc trạm giọng | theo thứ tự trong `docs/WORKSPACE.md` |
+| `OMNIVOICE_DIR` | **tên cũ** — trỏ thư mục engine (`<trạm>/omnivoice`); vẫn đọc được, `doctor` nhắc đổi | — |
+| `VOICES_DIR` | kho profile | `<trạm>/omnivoice/voices` |
+| `VOICE_DEFAULT_PROFILE` | profile mặc định khi không có `_default.txt` | — |
+| `OMNIVOICE_DEVICE` | ép thiết bị `cuda` / `mps` / `cpu` | tự chọn `cuda → mps → cpu` |
+| `OMNIVOICE_ONLINE` | `1` = cho phép tải từ Hugging Face | tắt (offline) |
+| `VOICE_BGM_DIR`, `VOICE_BGM`, `VOICE_BGM_VOL` | thư viện nhạc nền · file nhạc cho một lần ghép · âm lượng | `<trạm>/assets/bgm` · — · 0.10 |
+| `VOICE_STUDIO_WORK` | output tạm + chỗ làm việc của `lab` | `<trạm>/out` |
+| `FFMPEG_DIR` | thư mục chứa ffmpeg/ffprobe | PATH |
 
-**Set `VOICE_STUDIO_WORK` somewhere outside this repository.** Generated audio is real
-voice data; keeping it out of the working tree removes any chance of committing it.
+Tên biến nhạc nền của bản cũ vẫn đọc được một phiên bản, kèm cảnh báo; `doctor` chỉ ra tên cần đổi.
+**Đặt `VOICE_STUDIO_WORK` ngoài repo** (mặc định đã vậy): output là dữ liệu giọng thật.
 
-Without the variable the scripts search upward from the current directory and from their own
-location for a folder containing `voice_profiles.py`, then try a couple of conventional
-locations, then fail with instructions. They never guess.
+## Gọi từ pipeline khác
 
-## Verify
+Hai đường, cùng một venv engine:
+
+**CLI — cho việc một lần** (đọc một bài, lồng tiếng một video). Hợp đồng ổn định: file ở `--out`,
+**một dòng JSON cuối stdout** với `--json`, log ra stderr, mã thoát `0` ok · `1` lỗi engine (thử lại
+được) · `2` gọi sai (thiếu profile, text rỗng — sửa cấu hình) · `3` trạm/engine chưa cài.
 
 ```bash
-python studio/verify.py --wav some-clip.wav
+<venv>/python -m voice_studio speak --file bai.txt --profile narrator --out bai.mp3 --json
+<venv>/python -m voice_studio narrate --video cam.mp4 --file loi.txt --out ra.mp4 --bgm neutral --json
 ```
 
-Loads the engine, builds a clone prompt, synthesizes, transcribes back. If that works, the
-whole toolkit works.
+Bên gọi đọc **mã thoát và dòng JSON cuối**, không đọc log. Bẫy PowerShell 5.1: đừng `2>&1` khi gọi
+lệnh native (mỗi dòng stderr thành lỗi, `$?` sai dù mã 0) — đọc `$LASTEXITCODE`.
 
-## Keep your voices out of version control
+**In-process — cho việc đọc hàng trăm câu** (sách nói, video nhiều đoạn), vì CLI mỗi câu là nạp
+model lại mỗi lần:
 
-Reference clips are biometric-adjacent personal data. Whatever store you use, either keep it
-private or exclude it. This repository blocks the entire audio family by default — see
-`.gitignore` — and its public example ships **no audio at all**, deliberately.
+```python
+from voice_studio import engine, profiles, av
+model = engine.load()                         # cuda → mps → cpu
+prompt = profiles.get_clone_prompt(model)     # profile mặc định
+wav, sr = engine.synth("Xin chào.", prompt, seed=42)
+engine.save(wav, "a.mp3", sr)
+```
 
-**Clone only your own voice, or one whose owner agreed in writing.**
+Ghim phiên bản hợp đồng bằng `voice_studio.API_VERSION` (semver — đổi số đầu là đổi chữ ký).
+
+## Trạm video gọi giọng
+
+Repo dựng video cùng họ (`agent-video-studio`) lồng tiếng bằng `voice_studio` **in-process**:
+cài nó vào **cùng venv engine** của trạm giọng — `pip install -e <thư mục agent-video-studio>` —
+để hai package dùng chung torch và model chỉ nạp một lần. Lệch phiên bản hợp đồng thì `doctor` của
+mỗi bên báo.
+
+## Giữ giọng ngoài version control
+
+Clip tham chiếu là dữ liệu gần với sinh trắc học. Repo chặn cả họ audio mặc định (`.gitignore`),
+chế độ `embedded` thêm hook `pre-commit` chặn `workspace/` và `.env`, và ví dụ công khai **không có
+audio nào** — cố ý.
+
+**Chỉ clone giọng của chính bạn, hoặc giọng mà chủ nhân đã đồng ý bằng văn bản.**

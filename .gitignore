@@ -28,10 +28,25 @@ work/
 _archive/
 voices/
 
+# ── trạm giọng chế độ embedded + secret + lựa chọn cài (F17) — test cổng: tests/test_repo_gates.py
+/workspace/
+.env
+.env.*
+!.env.example
+studio.local.json
+
+# ── cây mẫu trạm: mở ĐÚNG HAI thư mục (không mở file). Luật *.wav/*.pt/... ở trên vẫn chặn
+# mọi audio/model bên trong, vì dòng `!` dưới đây chỉ khớp thư mục chứ không khớp file.
+!/templates/workspace/out/
+!/templates/workspace/omnivoice/voices/
+
 # ── Python
 __pycache__/
 *.pyc
 .venv/
+*.egg-info/
+build/
+dist/
 venv/
 
 # ── OS / editor

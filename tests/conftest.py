@@ -23,7 +23,7 @@ CONTRACT_VARS = (
     "VOICE_BGM", "VOICE_BGM_VOL", "VOICE_BGM_DIR",
     "NEWS_BGM", "NEWS_BGM_VOL", "NEWS_BGM_DIR",
     "FFMPEG_DIR", "VOICE_STUDIO_WORK", "VOICE_CLEAN_DIR", "HF_HOME", "HF_HUB_CACHE",
-    "STUDIO_PORT",
+    "STUDIO_PORT", "VOICE_STUDIO_REPO",
 )
 
 
@@ -34,6 +34,9 @@ def _clean_contract_env(monkeypatch, tmp_path):
     # Trạm mặc định (~/.voice) cũng không được là trạm thật của máy chạy test.
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
+    # Bản clone đang chạy test có thể có workspace/ hoặc studio.local.json thật (chế độ
+    # embedded của người phát triển) — trỏ "repo" sang một thư mục tạm rỗng.
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(tmp_path / "no-repo"))
     yield
 
 

@@ -1,72 +1,70 @@
-# Six gates every reference clip must pass
+# Sáu cổng mọi clip tham chiếu phải qua
 
-A reference clip is not one input among many — **it is the voice**. Everything generated
-from it inherits its faults. These gates exist because there is usually no human available
-to listen, and because listening does not scale to dozens of candidates anyway.
+Clip tham chiếu không phải một input trong nhiều input — **nó chính là giọng**. Mọi thứ sinh
+ra từ nó đều thừa hưởng lỗi của nó. Các cổng này tồn tại vì thường không có người ngồi nghe,
+và vì nghe bằng tai cũng không mở rộng được cho hàng chục ứng viên.
 
-Implemented in `studio/verify.py`. A clip failing **any** gate is rejected and the next
-candidate is tried.
+Chạy bằng `voice-studio verify` (mã ở `voice_studio/lab/verify.py`). Clip trượt **bất kỳ**
+cổng nào đều bị loại và ứng viên kế tiếp được thử.
 
 ---
 
-| # | Gate | Rejects when | Catches |
+| # | Cổng | Loại khi | Bắt được |
 |---|---|---|---|
-| 1 | Clipping | peak ≥ −0.5 dB | distorted recording |
-| 2 | Too quiet | RMS < −34 dB | unusable signal-to-noise |
-| 3 | Pitch tracking | > 35 % of frames fail | leftover music, or two people talking over each other |
-| 4 | **Silent tail** | last 250 ms not ≥ 18 dB below clip RMS | clip ends mid-word |
-| 5 | Round trip | synthesize 2 probe sentences, ASR back, CER > 0.25 | clip that produces garbled speech |
-| 6 | Leak probe | first syllable of output equals last syllable of the reference | the bug gate 4 prevents, caught directly |
+| 1 | Clipping | peak ≥ −0.5 dB | bản ghi bị méo |
+| 2 | Quá nhỏ | RMS < −34 dB | tỉ lệ tín hiệu/nhiễu không dùng được |
+| 3 | Bám cao độ | > 35 % frame thất bại | còn sót nhạc nền, hoặc hai người nói chồng lên nhau |
+| 4 | **Đuôi lặng** | 250 ms cuối không thấp hơn RMS của clip ít nhất 18 dB | clip kết thúc giữa chừng một từ |
+| 5 | Round trip | tổng hợp 2 câu thăm dò, ASR ngược lại, CER > 0.25 | clip sinh ra lời nói bị méo |
+| 6 | Leak probe | âm tiết đầu của output trùng âm tiết cuối của clip tham chiếu | đúng lỗi mà cổng 4 ngăn, bắt trực tiếp |
 
-Gates 1–4 are cheap; run them first and skip the GPU work when they fail.
+Cổng 1–4 rẻ; chạy chúng trước và bỏ qua phần việc GPU nếu đã trượt.
 
-## Why gate 4 replaced an obvious-looking check
+## Vì sao cổng 4 thay cho một phép kiểm tưởng hiển nhiên
 
-The first version tested whether the **transcript** ended with punctuation, reasoning that a
-clip ending mid-sentence is a clip cut badly.
+Bản đầu tiên kiểm tra xem **transcript** có kết thúc bằng dấu câu không, với lập luận rằng
+clip dừng giữa câu là clip cắt hỏng.
 
-It rejected an entire cluster — three of three candidates — and stopped the build.
+Nó loại sạch một cụm — ba trên ba ứng viên — và làm dừng cả quá trình build.
 
-The cause: Vietnamese ASR routinely omits a final full stop. The gate measured **the
-transcriber's punctuation habit**, not the clip. The thing actually worth measuring is
-whether the audio *ends in silence*, and audio can be measured directly. Rewritten as gate
-4, it immediately rejected three genuinely bad clips across three different clusters —
-which is what a gate is for.
+Nguyên nhân: ASR tiếng Việt thường xuyên bỏ dấu chấm cuối câu. Cổng đó đo **thói quen chấm
+câu của bộ phiên âm**, không phải clip. Thứ thực sự đáng đo là audio có *kết thúc trong im
+lặng* hay không, và audio thì đo trực tiếp được. Viết lại thành cổng 4, nó lập tức loại ba
+clip hỏng thật ở ba cụm khác nhau — đúng việc một cổng phải làm.
 
-**The lesson generalises:** when a gate proxies for the property you care about, check what
-it is really measuring. A missing full stop is a fact about the transcriber. Silence at the
-end is a fact about the clip.
+**Bài học áp dụng rộng:** khi một cổng đo gián tiếp (proxy) cho thuộc tính bạn quan tâm, hãy
+kiểm xem thực chất nó đang đo gì. Thiếu dấu chấm là sự thật về bộ phiên âm. Im lặng ở cuối
+là sự thật về clip.
 
-## Gates 5 and 6 — the bug worth naming
+## Cổng 5 và 6 — lỗi đáng gọi tên
 
-If a reference clip stops **mid-word or mid-phrase**, the model treats generation as a
-continuation of that unfinished sound, and splices the leftover syllable onto the front of
-**every clip it ever generates from that profile**. One bad reference, and every future
-render opens with a stray syllable.
+Nếu clip tham chiếu dừng **giữa từ hoặc giữa cụm từ**, model coi việc generate là phần nối
+tiếp của âm thanh dở dang đó, và ghép âm tiết thừa vào đầu **mọi clip nó từng sinh ra từ
+profile đó**. Một clip tham chiếu hỏng, và mọi bản render sau này đều mở đầu bằng một âm
+tiết lạc.
 
-It is easy to miss when you listen casually and impossible to miss once you know the shape.
-Gate 4 prevents it structurally; gate 6 tests for it directly. Keep both — gate 4 can be
-satisfied by silence that still follows a clipped word.
+Nghe qua loa thì dễ bỏ sót, nhưng đã biết hình dạng của nó thì không thể bỏ sót. Cổng 4 ngăn
+nó về mặt cấu trúc; cổng 6 kiểm tra nó trực tiếp. Giữ cả hai — cổng 4 vẫn có thể được thoả
+mãn bởi một khoảng lặng nằm ngay sau một từ bị cắt cụt.
 
-## Cutting clips so they pass
+## Cắt clip sao cho qua cổng
 
-- Open and close on **utterance boundaries** — a pause of at least 250 ms on both sides.
-- Add a short lead-in (~0.15 s) and a silent tail.
-- **Tail must never exceed the real gap.** A fixed 0.40 s tail is longer than a 0.25 s pause
-  threshold, so with a short gap the tail swallows the first sound of the next sentence —
-  recreating the exact bug the gates exist to prevent. Measure the actual following gap and
-  take `min(0.40, gap − 0.05)`.
-- Target **16–19 seconds**. Shorter clips degrade everything; longer ones stop helping.
-- Internal pauses are fine and natural. Only the two ends matter.
+- Mở và đóng tại **ranh giới phát ngôn** — khoảng dừng ít nhất 250 ms ở cả hai phía.
+- Thêm một đoạn dẫn ngắn (~0.15 s) và một đuôi lặng.
+- **Đuôi không bao giờ được dài hơn khoảng lặng thật.** Đuôi cố định 0.40 s dài hơn ngưỡng
+  dừng 0.25 s, nên khi khoảng lặng ngắn, đuôi sẽ nuốt mất âm đầu của câu kế tiếp — tái tạo
+  đúng lỗi mà các cổng sinh ra để ngăn. Đo khoảng lặng thực tế phía sau rồi lấy
+  `min(0.40, gap − 0.05)`.
+- Nhắm **16–19 giây**. Clip ngắn hơn làm giảm chất lượng mọi thứ; dài hơn thì hết giúp ích.
+- Khoảng dừng bên trong clip là bình thường và tự nhiên. Chỉ hai đầu là quan trọng.
 
-## Transcript quality matters less than you expect
+## Chất lượng transcript ít quan trọng hơn bạn nghĩ
 
-Reference text should match the audio, and hand-correcting obvious ASR errors is worth the
-minute it takes. But a clip cut from fast, energetic speech — where ASR does noticeably
-worse — still cloned cleanly, passing round-trip at CER 0.00. **Boundaries first,
-transcript second.**
+Văn bản tham chiếu nên khớp với audio, và sửa tay các lỗi ASR hiển nhiên đáng bỏ ra một phút.
+Nhưng một clip cắt từ lời nói nhanh, nhiều năng lượng — nơi ASR kém đi rõ rệt — vẫn clone
+sạch, qua round trip với CER 0.00. **Ranh giới trước, transcript sau.**
 
-## Do not wave clips through
+## Đừng cho clip qua cho có
 
-Rejecting a candidate is cheap: take the next one. Accepting a bad one is expensive: every
-downstream render carries the fault, and you find out weeks later on published audio.
+Loại một ứng viên thì rẻ: lấy cái tiếp theo. Nhận một clip hỏng thì đắt: mọi bản render phía
+sau đều mang lỗi, và bạn chỉ phát hiện ra vài tuần sau trên audio đã xuất bản.

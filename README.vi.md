@@ -39,12 +39,18 @@ git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
 ```
 
-Cài engine rồi trỏ đúng một biến vào đó. Các bước đầy đủ, kèm hai cạm bẫy từng tốn thời gian
-thật, nằm ở [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
+Tạo venv, cài torch theo hệ điều hành + `omnivoice==0.2.1`, rồi cài package và dựng trạm giọng.
+Các bước đầy đủ, kèm cảnh báo giấy phép weights (CC-BY-NC) và hai cạm bẫy từng tốn thời gian thật,
+nằm ở [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
-```powershell
-setx OMNIVOICE_DIR "C:\duong\dan\toi\engine"
+```bash
+pip install -e .          # trong venv engine — lệnh voice-studio
+voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến nghị) hay ngoài (separate)
+voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
+
+Trạm giọng là nơi chứa venv, giọng, nhạc nền, output của anh — từng thư mục giải thích ở
+[`docs/WORKSPACE.md`](docs/WORKSPACE.md). Nhạc nền tự sinh: [`docs/bgm-generation.md`](docs/bgm-generation.md).
 
 Cài như plugin cho agent:
 
@@ -56,14 +62,14 @@ claude plugin install agent-voice-studio@agent-voice-studio
 ## Dùng
 
 ```bash
-python studio/mine.py  --dir recordings/ --name narrator   # tìm các sắc thái
-python studio/build.py --name narrator --mode new          # chấm clip, dựng profile
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio lab mine  --dir recordings/ --name narrator   # tìm các sắc thái
+voice-studio lab build --name narrator --mode new          # chấm clip, dựng profile
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Đào và dựng làm **một lần** cho mỗi giọng. Viết và đọc thì làm mỗi lần.
 
-### Lệnh `voice-studio` (package `voice_studio`, đang phát triển)
+### Lệnh `voice-studio` (package `voice_studio`)
 
 Cùng bộ công cụ, gom về một lệnh chạy bằng python của venv engine
 (`python -m voice_studio …` khi chưa cài lệnh):
@@ -76,6 +82,8 @@ voice-studio clone --file talk.m4a --name narrator --consent
 voice-studio clean ghi_am.mp3                    # tách giọng + khử tạp âm (xem voice_studio/clean/README.md)
 voice-studio lab mine|build|split|organize …     # bộ dựng đa sắc thái ở trên
 voice-studio doctor                              # thiếu gì thì chỉ bước cài tiếp
+voice-studio export --personal --out giong.zip   # chuyển máy: giọng + nhạc nền + station.json
+voice-studio backup --out tram.zip               # sao lưu trạm · update = git pull --ff-only
 ```
 
 `speak`/`narrate` là **hợp đồng ổn định** cho pipeline khác: `--json` in đúng một dòng JSON

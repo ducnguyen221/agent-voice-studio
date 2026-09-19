@@ -1,82 +1,104 @@
-# Cleaning recordings — and when not to
+# Làm sạch bản ghi — và khi nào không nên
 
-Only for recordings with **music or noise under the voice**. A two-stage chain: separate the
-voice from everything else, then denoise and de-reverb what is left.
+Chỉ dành cho bản ghi có **nhạc hoặc tạp âm nằm dưới giọng nói**. Chuỗi hai tầng: tách giọng
+khỏi mọi thứ còn lại, rồi khử nhiễu và khử vang phần giọng còn lại.
 
-- **Stage 1** — `python-audio-separator` (MIT), a BS-Roformer model, pulls the voice out of a
-  mix.
-- **Stage 2** — `ClearerVoice-Studio` (Apache-2.0), a 48 kHz speech-enhancement model,
-  removes remaining noise and room.
+- **Tầng 1** — `python-audio-separator` (MIT), model BS-Roformer, tách giọng ra khỏi bản mix.
+- **Tầng 2** — `ClearerVoice-Studio` (Apache-2.0), model tăng cường tiếng nói 48 kHz, khử nốt
+  tạp âm và tiếng vang phòng.
+
+Công cụ: `voice-studio clean` (mã ở `voice_studio/clean/clean_voice.py` và
+`voice_studio/clean/cv_enhance.py`). Lệnh cài chi tiết, vị trí thư mục công cụ và cách chuyển
+model sang máy khác: `voice_studio/clean/README.md`.
 
 ---
 
-## Decide before you install
+## Quyết định trước khi cài
 
-Measure the source first:
+Đo nguồn trước:
 
-- **Noise floor.** Around −60 dB or lower with real silences between phrases → already clean.
-- **Silence gaps.** Continuous audio with *no* silent gaps at a −45 dB threshold means
-  something is playing underneath.
+- **Nền nhiễu (noise floor).** Khoảng −60 dB hoặc thấp hơn, có khoảng lặng thật giữa các câu
+  → đã sạch.
+- **Khoảng lặng.** Âm thanh liền mạch, *không* có khoảng lặng nào ở ngưỡng −45 dB nghĩa là có
+  thứ gì đó đang phát bên dưới.
 
-**Do not clean audio that is already clean.** These models smooth, and smoothing removes the
-character you are trying to capture. A source measured at −67 dB was deliberately left alone
-and produced one of the better profiles.
+**Không làm sạch audio đã sạch.** Các model này làm mượt, và làm mượt xoá đi chính chất giọng
+bạn đang muốn giữ. Một nguồn đo được −67 dB đã được cố ý để nguyên và cho ra một trong những
+profile tốt hơn cả.
 
-**Measure at several points.** Long recordings are often mixed — music through the first
-half, clean in the second. A clean stretch needs no cleaning at all, which is faster *and*
-better.
+**Đo ở nhiều điểm.** Bản ghi dài thường lẫn lộn — nửa đầu có nhạc, nửa sau sạch. Đoạn sạch thì
+không cần làm sạch gì cả, vừa nhanh hơn *vừa* tốt hơn.
 
-## The install trap: two virtual environments, not one
+## Bẫy khi cài: hai môi trường ảo, không phải một
 
-The two stages have **irreconcilable dependencies**. One requires a major numpy version the
-other pins against, plus conflicting versions of a shared helper library. Installed together,
-pip quietly downgrades and stage 1 breaks — without an obvious error.
+Hai tầng có **phụ thuộc không thể dung hoà**. Một bên cần một major version numpy mà bên kia
+ghim chặn (tầng 1 cần numpy ≥ 2, tầng 2 cần numpy < 2), kèm xung đột phiên bản của một thư viện
+phụ trợ dùng chung. Cài chung một chỗ, pip lặng lẽ hạ phiên bản và tầng 1 hỏng — không có lỗi
+nào rõ ràng.
 
-Build **two separate environments** and have stage 1 invoke stage 2 as a subprocess. This is
-not tidiness; it is the only arrangement that works.
+Dựng **hai venv riêng**; tầng 1 gọi tầng 2 dưới dạng tiến trình con. Đây không phải chuyện gọn
+gàng; đó là cách sắp xếp duy nhất chạy được. Không cài chung vào venv của engine giọng.
+
+| Tầng | Venv | Python trong venv (Windows) | Python trong venv (macOS / Linux) |
+|---|---|---|---|
+| 1 — tách giọng | `.venv-sep` | `.venv-sep/Scripts/python.exe` | `.venv-sep/bin/python` |
+| 2 — tăng cường | `.venv-cv` | `.venv-cv/Scripts/python.exe` | `.venv-cv/bin/python` |
 
 ```bash
-python -m venv .venv-sep    # separation
-python -m venv .venv-enh    # enhancement
+python -m venv <dir>/.venv-sep    # tách giọng
+python -m venv <dir>/.venv-cv     # tăng cường
 ```
 
-Each gets its own torch build. Expect several GB per environment.
+`<dir>` là thư mục công cụ làm sạch, nằm **ngoài repo**: `--clean-dir` → biến
+`VOICE_CLEAN_DIR` → `$VOICE_STATION/voice-clean` → `~/.voice/voice-clean`. Lệnh `pip install`
+đầy đủ cho từng venv ở `voice_studio/clean/README.md`.
 
-## Two more traps worth knowing before you hit them
+Mỗi venv có bản torch riêng. Dự trù vài GB cho mỗi môi trường. `voice-studio clean` tự chạy lại
+bằng python của `.venv-sep` nếu venv hiện tại không có `audio-separator`, và gọi tầng 2 bằng
+python của `.venv-cv` — người dùng không phải tự chuyển venv.
 
-**A loose dependency pin can break the separator.** A permissive range let a major version of
-an audio library in that had removed a keyword argument the separator still used — separation
-completed, then died while writing the file, with a message about a missing output rather
-than about the library. Pin that dependency below the breaking major, and re-check the pin
-after any upgrade.
+Trên macOS: **[chưa kiểm]** — bộ lệnh cài chưa được chạy thật trên máy Mac; nếu `clearvoice`
+không có bản dựng sẵn cho arm64 thì xem trang dự án của nó trước khi cài.
 
-**The enhancement model may resolve its checkpoint relative to the working directory.** Run
-it from elsewhere and it re-downloads a few hundred megabytes into whatever folder you
-happened to be in. Force the working directory before invoking it.
+## Model không nằm trong repo
 
-## Throughput
+Lần chạy đầu cần mạng: tầng 1 tải checkpoint vào `<dir>/models/`, tầng 2 tải vào
+`<dir>/checkpoints/`. Các lần sau chạy offline. Chuyển máy thì chép nguyên hai thư mục này
+sang, không cần tải lại. Không bao giờ commit file model vào repo.
 
-Roughly **0.25–0.4× realtime on a mid-range GPU** — an hour of audio in fifteen to
-twenty-five minutes. Run sequentially, not in parallel: both stages want the GPU, and
-overlapping them is slower.
+## Hai cái bẫy nữa, nên biết trước khi dính
 
-## Verify the cleaning worked
+**Ghim phụ thuộc lỏng có thể làm hỏng bộ tách.** Một khoảng phiên bản quá rộng đã để lọt một
+major version của thư viện audio, bản này bỏ mất một keyword argument mà bộ tách vẫn dùng — tách
+xong xuôi rồi chết lúc ghi file, với thông báo nói về file output bị thiếu chứ không nói gì về
+thư viện. Ghim phụ thuộc đó dưới major gây vỡ, và kiểm lại chỗ ghim sau mỗi lần nâng cấp.
 
-Do not trust the absence of errors. Re-measure:
+**Model tăng cường có thể phân giải checkpoint theo thư mục làm việc hiện tại.** Chạy nó từ chỗ
+khác là nó tải lại vài trăm MB vào bất kỳ thư mục nào bạn đang đứng. Ép thư mục làm việc trước
+khi gọi: `cv_enhance.py` nhận `--workdir` và `chdir` vào đó, còn `voice-studio clean` luôn
+truyền `--workdir` trỏ về thư mục công cụ.
 
-- **Silence gaps should reappear.** In one case a horror-narration recording went from *zero*
-  detected silences in a two-minute sample to **nineteen** — the background had genuinely
-  gone.
-- **RMS should barely move.** Measured −18.1 dB before, −18.1 after. A large drop means the
-  voice was attenuated along with the noise, and the clip is now worse, not better.
+## Tốc độ xử lý
 
-Then listen to a short before/after pair. Machine checks confirm the noise left; only a
-person can confirm the *character* survived — and for expressive material such as shouting or
-whispered narration, that is exactly what is at risk.
+Khoảng **0,25–0,4× realtime trên GPU tầm trung** — một giờ audio mất mười lăm đến hai mươi lăm
+phút. Chạy tuần tự, không song song: cả hai tầng đều cần GPU, chạy chồng lên nhau còn chậm hơn.
 
-## Model licences differ from code licences
+## Kiểm tra việc làm sạch có hiệu quả
 
-The wrapper code is permissively licensed. **Model weights are licensed separately**, and some
-separation variants are non-commercial. Check the licence of every checkpoint you download
-before using its output commercially. Weight licences also change more quietly than code
-licences, so re-check after updates.
+Đừng tin vào chuyện không có lỗi. Đo lại:
+
+- **Khoảng lặng phải xuất hiện trở lại.** Trong một trường hợp, một bản đọc truyện kinh dị từ
+  *không* khoảng lặng nào trong mẫu hai phút lên **mười chín** — nền đã thật sự biến mất.
+- **RMS gần như không đổi.** Đo được −18,1 dB trước, −18,1 dB sau. Tụt mạnh nghĩa là giọng bị
+  giảm theo cùng tạp âm, và clip giờ tệ hơn chứ không tốt hơn.
+
+Sau đó nghe một cặp trước/sau ngắn. Kiểm bằng máy chỉ xác nhận tạp âm đã đi; chỉ con người mới
+xác nhận được *chất giọng* còn giữ — và với chất liệu biểu cảm như tiếng hét hay giọng kể thì
+thầm, đó chính là thứ đang bị đe doạ.
+
+## Giấy phép model khác giấy phép code
+
+Code bọc ngoài có giấy phép thoáng. **Trọng số model có giấy phép riêng**, và một số biến thể
+model tách giọng là phi thương mại. Kiểm giấy phép của mọi checkpoint bạn tải về trước khi dùng
+output cho mục đích thương mại. Giấy phép trọng số cũng đổi âm thầm hơn giấy phép code, nên kiểm
+lại sau mỗi lần cập nhật.

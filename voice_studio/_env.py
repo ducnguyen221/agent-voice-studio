@@ -19,12 +19,23 @@ Biến hợp đồng (tên mới trước, tên cũ đọc được để tươn
 `NEWS_BGM`, `NEWS_BGM_VOL`, `NEWS_BGM_DIR` là tên cũ của ba biến BGM: vẫn đọc được trong
 MỘT phiên bản, kèm DeprecationWarning, rồi sẽ bị bỏ.
 
-Thứ tự đầy đủ của chế độ cài hai kiểu (`--station` → biến → studio.local.json →
-<repo>/workspace/ → ~/.voice) do `voice-studio init` bổ sung vào đúng file này sau.
+Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — `resolve_station()`:
+
+    --station (lệnh đặt VOICE_STATION trong tiến trình) → VOICE_STATION → OMNIVOICE_DIR (cha)
+    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ nếu có → ~/.voice
+
+`<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
+`VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ bỏ hai tầng giữa.
+`station.json` ở gốc trạm có thể khai `engine_dir`, `bgm_dir` (tương đối theo gốc trạm).
 """
+import json
 import os
 import shutil
 import warnings
+
+LOCAL_CONFIG = "studio.local.json"
+WORKSPACE = "workspace"
+STATION_FILE = "station.json"
 
 _LEGACY = {
     "VOICE_BGM": "NEWS_BGM",
@@ -56,26 +67,93 @@ def _expand(p):
     return os.path.abspath(os.path.expanduser(p))
 
 
-def station_dir():
-    """Gốc trạm giọng: VOICE_STATION → cha của OMNIVOICE_DIR → ~/.voice."""
-    st = env("VOICE_STATION")
-    if st:
-        return _expand(st)
-    eng = env("OMNIVOICE_DIR")
-    if eng:
-        return os.path.dirname(_expand(eng))
+def repo_root():
+    """Gốc bản clone repo nếu package được cài `-e` từ đó (hoặc VOICE_STUDIO_REPO); không thì None."""
+    r = env("VOICE_STUDIO_REPO")
+    if r:
+        return _expand(r)
+    here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if (os.path.isfile(os.path.join(here, "pyproject.toml"))
+            and os.path.isdir(os.path.join(here, "voice_studio"))):
+        return here
+    return None
+
+
+def read_json(path):
+    """-> (dict, lỗi|None). File không có ⇒ ({}, None); JSON hỏng ⇒ ({}, thông báo)."""
+    if not path or not os.path.isfile(path):
+        return {}, None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError) as e:
+        return {}, f"{path}: {e}"
+    if not isinstance(data, dict):
+        return {}, f"{path}: không phải object JSON"
+    return data, None
+
+
+def local_config(repo=None):
+    """Nội dung `<repo>/studio.local.json` (lựa chọn chế độ cài), {} nếu không có."""
+    repo = repo or repo_root()
+    return read_json(os.path.join(repo, LOCAL_CONFIG))[0] if repo else {}
+
+
+def default_station():
     return os.path.join(os.path.expanduser("~"), ".voice")
 
 
-def engine_dir():
-    """Thư mục engine (venv + voices): $VOICE_STATION/omnivoice → OMNIVOICE_DIR → ~/.voice/omnivoice."""
+def has_marker(path):
+    """Thư mục có phải một trạm giọng không: có station.json hoặc omnivoice/voices/."""
+    return bool(path) and (os.path.isfile(os.path.join(path, STATION_FILE)) or
+                           os.path.isdir(os.path.join(path, "omnivoice", "voices")))
+
+
+def resolve_station():
+    """-> (gốc trạm, nguồn). Nguồn ∈ VOICE_STATION · OMNIVOICE_DIR · studio.local.json ·
+    workspace · default. Đọc lại mỗi lần gọi."""
     st = env("VOICE_STATION")
     if st:
-        return os.path.join(_expand(st), "omnivoice")
+        return _expand(st), "VOICE_STATION"
     eng = env("OMNIVOICE_DIR")
     if eng:
-        return _expand(eng)
-    return os.path.join(station_dir(), "omnivoice")
+        return os.path.dirname(_expand(eng)), "OMNIVOICE_DIR"
+    repo = repo_root()
+    if repo:
+        sp = (local_config(repo).get("station_path") or "").strip()
+        if sp:
+            sp = os.path.expanduser(sp)
+            return (sp if os.path.isabs(sp) else os.path.abspath(os.path.join(repo, sp))), LOCAL_CONFIG
+        ws = os.path.join(repo, WORKSPACE)
+        if os.path.isdir(ws):
+            return ws, WORKSPACE
+    return default_station(), "default"
+
+
+def station_dir():
+    """Gốc trạm giọng theo thứ tự F17.3 (xem docstring module)."""
+    return resolve_station()[0]
+
+
+def station_info(station=None):
+    """Nội dung `station.json` của trạm ({} nếu chưa có hoặc hỏng)."""
+    return read_json(os.path.join(station or station_dir(), STATION_FILE))[0]
+
+
+def _from_station(key, default_rel):
+    st = station_dir()
+    rel = station_info(st).get(key) or default_rel
+    rel = os.path.expanduser(str(rel))
+    return rel if os.path.isabs(rel) else os.path.join(st, *rel.replace("\\", "/").split("/"))
+
+
+def engine_dir():
+    """Thư mục engine (venv + voices): OMNIVOICE_DIR nếu đó là nguồn trạm; không thì
+    `station.json: engine_dir` → <trạm>/omnivoice."""
+    st, src = resolve_station()
+    if src == "OMNIVOICE_DIR":
+        return _expand(env("OMNIVOICE_DIR"))
+    return _from_station("engine_dir", "omnivoice")
 
 
 def voices_dir():
@@ -85,9 +163,10 @@ def voices_dir():
 
 
 def bgm_dir():
-    """Thư viện nhạc nền: VOICE_BGM_DIR (tên cũ NEWS_BGM_DIR) → $VOICE_STATION/assets/bgm."""
+    """Thư viện nhạc nền: VOICE_BGM_DIR (tên cũ NEWS_BGM_DIR) → station.json: bgm_dir →
+    <trạm>/assets/bgm."""
     d = env("VOICE_BGM_DIR")
-    return _expand(d) if d else os.path.join(station_dir(), "assets", "bgm")
+    return _expand(d) if d else _from_station("bgm_dir", "assets/bgm")
 
 
 def work_dir():

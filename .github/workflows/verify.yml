@@ -20,7 +20,7 @@ jobs:
       # và cũng không nên: repo này cố ý chạy được mà không có engine cho tới
       # lúc thật sự tổng hợp giọng.
       - name: Compile every script
-        run: python -m compileall -q studio
+        run: python -m compileall -q studio voice_studio extras tests
 
       # Cổng chống rò. Repo dạy cách tạo giọng, nó KHÔNG chứa giọng.
       # Danh sách này chặn hai thứ: file nhị phân của giọng/model, và dấu vết

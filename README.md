@@ -42,12 +42,19 @@ git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
 ```
 
-Install a speech engine and point one variable at it. Full steps, including two traps that
-cost real time, are in [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
+Create a venv, install torch for your OS plus `omnivoice==0.2.1`, then install the package and
+set up a voice station. Full steps (Vietnamese), including the weights licence warning
+(CC-BY-NC) and two traps that cost real time, are in
+[`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
 ```bash
-export OMNIVOICE_DIR=/path/to/engine      # Windows: setx OMNIVOICE_DIR "C:\path\to\engine"
+pip install -e .          # inside the engine venv — provides the voice-studio command
+voice-studio init         # asks: station inside the repo (embedded, recommended) or outside (separate)
+voice-studio doctor       # tells you what is still missing
 ```
+
+The station holds your venv, voices, background music and output — every folder is described in
+[`docs/WORKSPACE.md`](docs/WORKSPACE.md). Generating background music: [`docs/bgm-generation.md`](docs/bgm-generation.md).
 
 As an agent plugin:
 
@@ -64,14 +71,14 @@ codex plugin install agent-voice-studio@agent-voice-studio
 ## Use
 
 ```bash
-python studio/mine.py  --dir recordings/ --name narrator   # find the speaking styles
-python studio/build.py --name narrator --mode new          # gate clips, build the profile
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio lab mine  --dir recordings/ --name narrator   # find the speaking styles
+voice-studio lab build --name narrator --mode new          # gate clips, build the profile
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Mining and building happen once per voice. Writing and speaking happen every time.
 
-### The `voice-studio` command (package `voice_studio`, in progress)
+### The `voice-studio` command (package `voice_studio`)
 
 The same tools behind one command, run with the engine venv's python
 (`python -m voice_studio …` until the command is installed):
@@ -84,6 +91,8 @@ voice-studio clone --file talk.m4a --name narrator --consent
 voice-studio clean recording.mp3                 # isolate voice + denoise (see voice_studio/clean/README.md)
 voice-studio lab mine|build|split|organize …     # the multi-style builder above
 voice-studio doctor                              # tells you what is still missing
+voice-studio export --personal --out voices.zip  # move machines: voices + music + station.json
+voice-studio backup --out station.zip            # back up the station · update = git pull --ff-only
 ```
 
 `speak`/`narrate` are the **stable contract** for other pipelines: `--json` prints exactly one

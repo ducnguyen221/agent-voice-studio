@@ -1,0 +1,10 @@
+{
+  "_doc": "Mẫu station.json. `voice-studio init` tự viết bản thật ở gốc trạm (bỏ các khoá bắt đầu bằng _). Đường dẫn tương đối tính theo gốc trạm. Xem docs/WORKSPACE.md.",
+  "contract": "1.0.0",
+  "mode": "embedded",
+  "device": null,
+  "default_profile": null,
+  "venv": "omnivoice/.venv",
+  "engine_dir": "omnivoice",
+  "bgm_dir": "assets/bgm"
+}

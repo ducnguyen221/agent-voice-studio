@@ -1,15 +1,15 @@
-# Profiles with more than one speaking style
+# Profile có nhiều phong cách nói
 
-A profile is **one voice identity holding several reference clips**, switched by markers
-inside the text. Whoever writes a script sees a single name; the delivery changes where the
-script says it should.
+Một profile là **một danh tính giọng chứa nhiều clip tham chiếu**, chuyển đổi bằng marker nằm
+trong văn bản. Người viết kịch bản chỉ thấy một cái tên; cách đọc thay đổi đúng chỗ kịch bản
+bảo.
 
-This shape is forced by the engine, not chosen for elegance: one generate call uses exactly
-one clip, and there is no emotion parameter. See `engine-limits.md`.
+Hình dạng này do engine ép, không phải chọn cho đẹp: một lần gọi generate dùng đúng một clip,
+và không có tham số cảm xúc. Xem `engine-limits.md`.
 
 ---
 
-## On disk
+## Trên đĩa
 
 ```
 voices/
@@ -19,79 +19,76 @@ voices/
         <marker>.wav  .txt  .prompt.pt
 ```
 
-**The neutral clip stays flat in `voices/`.** Simple loaders read exactly
-`voices/<name>.wav` + `.txt`, and pipelines pin voices by name. Keeping that contract means a
-multi-style profile also works everywhere a plain profile works — it just speaks in its
-neutral voice. Profile subfolders do not pollute the profile list, because listing scans for
-`*.wav` at the top level only.
+**Clip trung tính nằm phẳng trong `voices/`.** Loader đơn giản đọc đúng `voices/<name>.wav` +
+`.txt`, và pipeline ghim giọng theo tên. Giữ hợp đồng đó nghĩa là profile nhiều phong cách vẫn
+chạy được ở mọi nơi profile thường chạy — chỉ là nó nói bằng giọng trung tính. Thư mục con của
+profile không làm bẩn danh sách profile, vì việc liệt kê chỉ quét `*.wav` ở cấp trên cùng.
 
-Manifest per variant: relative wav path, its transcript, an optional speed, the source
-(file and offset), the measured features, and a build timestamp. Source and timestamp matter
-more than they look — months later they are the only way to answer "where did this clip come
-from, and which batch added it".
+Manifest cho mỗi variant: đường dẫn wav tương đối, transcript của nó, speed tuỳ chọn, nguồn
+(file và offset), các đặc trưng đã đo, và dấu thời gian build. Nguồn và dấu thời gian quan
+trọng hơn vẻ ngoài của chúng — nhiều tháng sau, đó là cách duy nhất trả lời "clip này từ đâu ra,
+và đợt nào thêm nó vào".
 
-## Speed defaults to 1.0 and should stay there
+## Speed mặc định 1.0 và nên giữ nguyên
 
-The clip already carries its own tempo. Adding a speed factor counts it twice. The field
-exists for hand-tuning after listening, not for the builder to guess at.
+Clip đã mang sẵn nhịp của nó. Thêm hệ số speed là tính hai lần. Trường này tồn tại để chỉnh tay
+sau khi nghe, không phải để builder đoán.
 
-## Synthesis
+## Tổng hợp
 
-Split the text at markers; each span uses its marker's clip; unmarked text uses the neutral
-clip. **Split every span into sentences and generate them one at a time** — matching how
-production narration pipelines already work, and avoiding a single call swallowing a long
-passage.
+Tách văn bản tại các marker; mỗi đoạn dùng clip của marker tương ứng; văn bản không có marker
+dùng clip trung tính. **Tách mỗi đoạn thành câu và generate từng câu một** — khớp với cách các
+pipeline đọc lời dẫn thực tế đang làm, và tránh việc một lần gọi nuốt trọn một đoạn dài.
 
-Joining spans needs three things:
+Nối các đoạn cần ba thứ:
 
-- **Normalise each span's level to the neutral clip's RMS.** Different clips have different
-  loudness; without this the joins step audibly.
-- **Fade ~30 ms at each span edge before inserting silence.** A synthesized sentence usually
-  ends at non-zero amplitude, so butting it against a block of zeros is a discontinuity — a
-  click on *every* join of *every* render. This one was shipped as dead code once: the
-  crossfade branch was written but could never execute, because a gap was always inserted
-  first. Verify such a branch actually runs.
-- **Insert a longer silence when the marker changes** than between sentences sharing one.
+- **Chuẩn hoá mức âm của mỗi đoạn về RMS của clip trung tính.** Mỗi clip có độ to khác nhau;
+  thiếu bước này thì chỗ nối nghe rõ bậc thang.
+- **Fade ~30 ms ở mỗi mép đoạn trước khi chèn khoảng lặng.** Một câu tổng hợp thường kết thúc ở
+  biên độ khác không, nên áp nó sát vào một khối số không là một chỗ gián đoạn — một tiếng click
+  ở *mọi* chỗ nối của *mọi* lần render. Lỗi này từng được ship dưới dạng code chết: nhánh
+  crossfade đã viết nhưng không bao giờ chạy được, vì khoảng lặng luôn được chèn trước. Hãy kiểm
+  rằng nhánh như vậy thực sự chạy.
+- **Chèn khoảng lặng dài hơn khi marker đổi** so với giữa các câu cùng một marker.
 
-## Unknown markers must be stripped, never spoken
+## Marker lạ phải bị gỡ, không bao giờ được đọc lên
 
-A marker not in the manifest has to disappear from the text. The worst outcome is a bracketed
-word being read aloud in a published file. Strip it, fall back to whatever is in effect, and
-report it — but do not let it through.
+Marker không có trong manifest phải biến mất khỏi văn bản. Kết cục tệ nhất là một từ trong
+ngoặc bị đọc to trong file đã phát hành. Gỡ nó, quay về marker đang có hiệu lực, và báo lại —
+nhưng không để nó lọt qua.
 
-Engine-native inline tags are the opposite: leave them in place, the engine consumes them.
+Tag nội tuyến gốc của engine thì ngược lại: để nguyên tại chỗ, engine sẽ tự xử lý.
 
-## Adding styles later
+## Thêm phong cách về sau
 
-Build supports an **add** mode from the start: merge new variants into an existing manifest
-without touching existing clips and without changing the neutral clip unless explicitly told.
+Build (`voice-studio lab build`) hỗ trợ chế độ **add** ngay từ đầu: gộp variant mới vào
+manifest đã có mà không đụng các clip hiện có và không đổi clip trung tính trừ khi được bảo rõ.
 
-Write that mode before you need it. The second batch of recordings always arrives, and
-retrofitting merge semantics into a builder that only knows how to start from scratch is the
-kind of rework worth avoiding once.
+Viết chế độ đó trước khi cần. Đợt ghi âm thứ hai lúc nào cũng tới, và vá thêm ngữ nghĩa gộp vào
+một builder chỉ biết làm từ đầu là loại việc làm lại đáng tránh ngay từ lần đầu.
 
-Two guards belong in add mode:
+Chế độ add cần hai rào chắn:
 
-- Overwriting an existing marker requires an explicit force flag.
-- Force-overwriting the **neutral** marker without also updating the flat copy would leave two
-  divergent base voices — the marker-aware path reading one, plain loaders reading the other,
-  silently. Refuse it.
+- Ghi đè một marker đã có đòi hỏi cờ force tường minh.
+- Force-ghi đè marker **trung tính** mà không cập nhật luôn bản phẳng sẽ để lại hai giọng gốc
+  lệch nhau — đường có marker đọc một bản, loader thường đọc bản kia, không ai hay biết. Từ chối
+  trường hợp này.
 
-## Build atomically
+## Build nguyên tử
 
-Stage everything, then commit in one move. A build that writes variants as it goes and then
-aborts — because the neutral cluster failed, say — leaves new clips on disk beside an old
-manifest that describes different ones. Nothing warns you; the manifest simply lies.
+Dàn dựng mọi thứ trước, rồi commit trong một bước. Một lần build ghi variant dần dần rồi bỏ
+giữa chừng — chẳng hạn vì cụm trung tính không đạt — sẽ để lại clip mới trên đĩa cạnh một
+manifest cũ mô tả các clip khác. Không gì cảnh báo; manifest cứ thế nói sai.
 
-## Guard the existing voice store
+## Bảo vệ kho giọng hiện có
 
-Refuse to overwrite a name that already exists as a plain profile without a manifest. Voice
-stores are usually not in version control, so a mistyped name is unrecoverable, and pipelines
-pin voices by exactly the name a typo would destroy.
+Từ chối ghi đè một tên đã tồn tại dưới dạng profile thường không có manifest. Kho giọng thường
+không nằm trong version control, nên gõ nhầm tên là mất không lấy lại được, và pipeline ghim
+giọng theo đúng cái tên mà lỗi gõ đó sẽ phá hỏng.
 
-## Standalone profiles from variants
+## Profile độc lập từ variant
 
-Sometimes you want the styles as separate named profiles instead — to pick one per run, or to
-compare them. Extract each variant into a plain profile; the multi-style original stays
-intact. The two shapes serve different needs: **markers** change delivery *within* one piece;
-**separate profiles** choose a voice *for* a piece.
+Đôi khi bạn muốn các phong cách thành những profile có tên riêng — để chọn một cái mỗi lần chạy,
+hoặc để so sánh. Tách mỗi variant thành một profile thường; bản gốc nhiều phong cách vẫn nguyên
+vẹn. Hai hình dạng phục vụ nhu cầu khác nhau: **marker** đổi cách đọc *bên trong* một tác phẩm;
+**profile riêng** chọn giọng *cho* một tác phẩm.
