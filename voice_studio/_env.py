@@ -14,6 +14,7 @@ Biến hợp đồng (tên mới trước, tên cũ đọc được để tươn
     VOICE_BGM          file nhạc nền cho lần ghép hiện tại (rỗng = không trộn)
     VOICE_BGM_VOL      âm lượng nhạc nền              (mặc định 0.10)
     FFMPEG_DIR         thư mục chứa ffmpeg/ffprobe    (rỗng = tìm trên PATH)
+    VOICE_STUDIO_WORK  scratch / output tạm            (mặc định $VOICE_STATION/out)
 
 `NEWS_BGM`, `NEWS_BGM_VOL`, `NEWS_BGM_DIR` là tên cũ của ba biến BGM: vẫn đọc được trong
 MỘT phiên bản, kèm DeprecationWarning, rồi sẽ bị bỏ.
@@ -87,6 +88,21 @@ def bgm_dir():
     """Thư viện nhạc nền: VOICE_BGM_DIR (tên cũ NEWS_BGM_DIR) → $VOICE_STATION/assets/bgm."""
     d = env("VOICE_BGM_DIR")
     return _expand(d) if d else os.path.join(station_dir(), "assets", "bgm")
+
+
+def work_dir():
+    """Thư mục làm việc/scratch: VOICE_STUDIO_WORK → $VOICE_STATION/out.
+
+    CỐ Ý nằm ở trạm, không bao giờ trong repo hay trong package đã cài: output ở đây là
+    audio giọng thật, một lệnh `git add` ẩu là đẩy nó lên public.
+    """
+    w = env("VOICE_STUDIO_WORK")
+    return _expand(w) if w else os.path.join(station_dir(), "out")
+
+
+def lab_dir(*parts):
+    """Chỗ làm việc của bộ công cụ dựng giọng (đào clip, dựng profile): <work>/lab/…"""
+    return os.path.join(work_dir(), "lab", *parts)
 
 
 def _tool(name):

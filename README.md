@@ -71,6 +71,27 @@ python studio/speak.py --file script.txt --profile narrator --out out.mp3
 
 Mining and building happen once per voice. Writing and speaking happen every time.
 
+### The `voice-studio` command (package `voice_studio`, in progress)
+
+The same tools behind one command, run with the engine venv's python
+(`python -m voice_studio …` until the command is installed):
+
+```bash
+voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # for other pipelines
+voice-studio narrate --video silent.mp4 --file script.txt --out final.mp4 --json
+voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
+voice-studio clone --file talk.m4a --name narrator --consent
+voice-studio clean recording.mp3                 # isolate voice + denoise (see voice_studio/clean/README.md)
+voice-studio lab mine|build|split|organize …     # the multi-style builder above
+voice-studio doctor                              # tells you what is still missing
+```
+
+`speak`/`narrate` are the **stable contract** for other pipelines: `--json` prints exactly one
+JSON line as the last line of stdout, logs go to stderr, exit codes `0` ok · `1` engine error ·
+`2` bad call/config (missing profile, empty text) · `3` station/engine not installed. The old
+`python studio/*.py` commands still work (they are aliases). `clone` and `make-profile` are for
+**consented** voices only — see rule 4.
+
 An agent with the plugin installed reads `skills/voice-routing/SKILL.md` and loads only the
 reference the current step needs.
 

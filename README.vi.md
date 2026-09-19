@@ -63,6 +63,26 @@ python studio/speak.py --file script.txt --profile narrator --out out.mp3
 
 Đào và dựng làm **một lần** cho mỗi giọng. Viết và đọc thì làm mỗi lần.
 
+### Lệnh `voice-studio` (package `voice_studio`, đang phát triển)
+
+Cùng bộ công cụ, gom về một lệnh chạy bằng python của venv engine
+(`python -m voice_studio …` khi chưa cài lệnh):
+
+```bash
+voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # pipeline khác gọi
+voice-studio narrate --video cam.mp4 --file script.txt --out final.mp4 --json
+voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
+voice-studio clone --file talk.m4a --name narrator --consent
+voice-studio clean ghi_am.mp3                    # tách giọng + khử tạp âm (xem voice_studio/clean/README.md)
+voice-studio lab mine|build|split|organize …     # bộ dựng đa sắc thái ở trên
+voice-studio doctor                              # thiếu gì thì chỉ bước cài tiếp
+```
+
+`speak`/`narrate` là **hợp đồng ổn định** cho pipeline khác: `--json` in đúng một dòng JSON
+cuối stdout, log ra stderr, mã thoát `0` ok · `1` lỗi engine · `2` gọi/cấu hình sai (thiếu
+profile, text rỗng) · `3` trạm/engine chưa cài. Các lệnh `python studio/*.py` cũ vẫn chạy
+(là alias). `clone` và `make-profile` chỉ dùng cho giọng **đã được đồng ý** — xem luật 4.
+
 Agent đã cài plugin sẽ đọc `skills/voice-routing/SKILL.md` và chỉ nạp đúng reference của bước
 đang làm.
 
