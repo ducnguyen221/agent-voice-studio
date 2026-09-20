@@ -67,11 +67,17 @@ Sau này đổi ý được: `voice-studio migrate --to separate`.
 
 def _is_secret_name(name):
     base = os.path.basename(name).lower()
-    return any(fnmatch.fnmatch(base, pat) for pat in SECRET_PATTERNS) and base != ".env.example"
+    return any(fnmatch.fnmatchcase(base, pat) for pat in SECRET_PATTERNS) and base != ".env.example"
 
 
 def _skip_file(name):
-    return any(fnmatch.fnmatch(os.path.basename(name), pat) for pat in SKIP_FILES)
+    """Tên này là rác dựng-lại-được (bỏ khỏi mọi gói) hay không?
+
+    `fnmatch.fnmatch` chuẩn hoá hoa/thường THEO HỆ ĐIỀU HÀNH: cùng một `X.PROMPT.PT` bị bỏ
+    qua trên Windows nhưng lọt vào gói trên macOS/Linux. Luật đóng gói không được đổi theo
+    máy ⇒ tự hạ hoa/thường rồi so bằng `fnmatchcase`. `_is_secret_name` dùng cùng một khuôn.
+    """
+    return any(fnmatch.fnmatchcase(os.path.basename(name).lower(), pat) for pat in SKIP_FILES)
 
 
 def _write_json(path, data):

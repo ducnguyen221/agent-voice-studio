@@ -3,8 +3,11 @@
 
 Không có mạng: `update` chạy trên một "origin" là repo git trần trong thư mục tạm.
 """
+import contextlib
 import json
+import ntpath
 import os
+import posixpath
 import shutil
 import subprocess
 import zipfile
@@ -78,6 +81,29 @@ def test_export_refuses_secret_like_files(bad, live, tmp_path, capsys):
     assert os.path.basename(bad) in capsys.readouterr()[1]
 
 
+@pytest.mark.parametrize("name", ["demo.prompt.pt", "DEMO.PROMPT.PT", "Demo.Prompt.Pt",
+                                  "omnivoice/voices/a.PYC", "b.pyc"])
+def test_skip_file_same_verdict_on_every_os(name):
+    """Luật đóng gói không được đổi theo hệ điều hành.
+
+    `fnmatch.fnmatch` gọi `os.path.normcase`: trên Windows nó hạ hoa/thường, trên POSIX
+    không. Để nguyên thì `DEMO.PROMPT.PT` bị bỏ qua ở máy này mà lọt vào `export --personal`
+    ở máy kia — gói phình lên vì cache dựng lại được, và không ai đoán ra vì sao hai máy
+    khác nhau. Test này chạy y hệt trên cả hai OS đích.
+    """
+    assert station._skip_file(name) is True, name
+
+
+@pytest.mark.parametrize("name", ["demo.wav", "prompt.pt.txt", "station.json", "a.pycx"])
+def test_skip_file_keeps_real_files(name):
+    assert station._skip_file(name) is False, name
+
+
+@pytest.mark.parametrize("name", ["X_TOKEN.json", ".ENV", "Client_Secret.json", "key.PEM"])
+def test_is_secret_name_same_verdict_on_every_os(name):
+    assert station._is_secret_name(name) is True, name
+
+
 def test_export_without_personal_is_2(live, tmp_path):
     assert cli.main(["export", "--station", str(live), "--out", str(tmp_path / "p.zip")]) == 2
 
@@ -130,19 +156,64 @@ def test_safe_member_accepts_plain_relative(member):
     assert station._safe_member(member) is True, member
 
 
-def test_member_target_is_a_second_gate(tmp_path, monkeypatch):
+@contextlib.contextmanager
+def path_flavour(mod):
+    """Ép `os.path` sang một họ đường dẫn (`posixpath` / `ntpath`) trong một đoạn HẸP.
+
+    `station` gọi `os.path.*`, nên đổi thuộc tính `os.path` là đổi ở cấp TIẾN TRÌNH — mọi
+    thư viện khác trong lúc đó cũng thấy. Vì vậy: chỉ bọc đúng lời gọi cần đo, gom kết quả
+    ra biến, và **assert bên ngoài** — nếu assert đỏ thì traceback của pytest vẫn chạy trên
+    `os.path` thật.
+    """
+    old = os.path
+    os.path = mod
+    try:
+        yield
+    finally:
+        os.path = old
+
+
+# Trạm giả cho từng họ: phải TUYỆT ĐỐI **theo chính họ đó**. Đưa đường Windows vào
+# `posixpath` thì `realpath` không còn bất biến (mỗi lần gọi lại ghép thêm cwd vào đầu) và
+# test sẽ đỏ vì đồ nghề, không phải vì cổng.
+PATH_FLAVOURS = [
+    pytest.param(posixpath, "/srv/voice-station/st", id="posix"),
+    pytest.param(ntpath, "C:\\srv\\voice-station\\st", id="windows"),
+]
+
+
+@pytest.mark.parametrize("flavour, st", PATH_FLAVOURS)
+def test_member_target_is_a_second_gate(monkeypatch, flavour, st):
     """Lớp hai (commonpath) phải tự đứng vững: cho `_safe_member` nói dối rồi kiểm lại.
 
-    Phạm vi thật của lớp hai — nói thẳng để không ai tưởng nó bao hết: nó bắt `..` và đường
-    tuyệt đối sang **ổ khác**. Nó KHÔNG bắt `foo/C:/x.txt` khi trạm cũng nằm trên ổ C, vì
-    `os.path.join` nuốt luôn `C:` cùng ổ — ca đó là việc của lớp một, đã có test riêng.
+    Chạy HAI LƯỢT, mỗi họ đường dẫn một lượt, nên khẳng định không còn phụ thuộc OS đang
+    chạy test. Cạm bẫy đã trả giá: `"D:/x.txt"` là đường TUYỆT ĐỐI trên Windows nhưng chỉ là
+    một TÊN THƯ MỤC hợp lệ trên POSIX — viết assert theo một họ thì xanh ở đây, đỏ ở kia.
+
+    Hợp đồng thật của lớp hai, phát biểu một lần cho mọi họ: **trả None khi và chỉ khi đích
+    rơi ra ngoài trạm.** Nên `D:/x.txt` bị chặn ở họ Windows (khác ổ) mà được nhận ở họ
+    POSIX (thư mục tên `D:` NẰM TRONG trạm — không có gì để chặn; lớp một vẫn từ chối nó vì
+    có dấu hai chấm, xem test riêng ở trên).
+
+    Phạm vi lớp hai KHÔNG bao: `foo/C:/x.txt` khi trạm cũng nằm trên ổ C, vì `os.path.join`
+    nuốt luôn `C:` cùng ổ — ca đó là việc của lớp một.
     """
-    st = str(tmp_path / "st")
     monkeypatch.setattr(station, "_safe_member", lambda n: True)
-    for bad in ("../x.txt", "foo/../../../x.txt", "D:/x.txt"):
-        assert station._member_target(st, bad) is None, bad
-    good = station._member_target(st, "omnivoice/voices/demo.wav")
-    assert good is not None and good.endswith(os.path.join("voices", "demo.wav"))
+    names = ("../x.txt", "foo/../../../x.txt", "D:/x.txt", "omnivoice/voices/demo.wav")
+    with path_flavour(flavour):
+        root = flavour.realpath(st)
+        got = {n: station._member_target(st, n) for n in names}
+
+    assert got["../x.txt"] is None, "thoát lên trên phải bị chặn ở mọi họ đường dẫn"
+    assert got["foo/../../../x.txt"] is None, "thoát nhiều cấp phải bị chặn ở mọi họ"
+    if flavour is ntpath:
+        assert got["D:/x.txt"] is None, "ổ đĩa khác = ngoài trạm ⇒ họ Windows phải chặn"
+    else:
+        assert got["D:/x.txt"] is not None and \
+            got["D:/x.txt"].startswith(root + flavour.sep), \
+            "trên POSIX `D:` chỉ là tên thư mục trong trạm — chặn ở đây là chặn nhầm"
+    good = got["omnivoice/voices/demo.wav"]
+    assert good is not None and good.endswith(flavour.join("voices", "demo.wav"))
 
 
 def test_import_rejects_windows_drive_member(tmp_path, monkeypatch):

@@ -34,6 +34,10 @@ PATTERNS = {
                re.escape(s(100, 117, 99, 32, 110, 103, 117, 121, 101, 110)),        # tên tác giả (chỉ ở chỗ ghi công)
     "duong-may-win": re.escape(s(67, 58, 92, 85, 115, 101, 114, 115, 92)),            # ổ C + thư mục người dùng
     "duong-may-posix": r"/(?:home|Users)/[a-z][a-z0-9_-]+/",
+    # Biến môi trường trỏ thư mục người dùng: viết ra script là đường của MÁY NGƯỜI CHẠY,
+    # không phải của trạm. Mẫu này vốn nằm ở bản grep riêng trong verify.yml; gộp về đây
+    # khi bỏ bản grep đó, để cổng chỉ còn MỘT nguồn luật.
+    "bien-home-win": re.escape(s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37)),
 }
 
 # (file, khoá) → số lần tối đa được phép. Lý do bên cạnh.
@@ -110,6 +114,7 @@ def test_patterns_catch_their_target(tmp_path):
         "tac-gia": s(68, 117, 99, 32, 78, 103, 117, 121, 101, 110),
         "duong-may-win": s(67, 58, 92, 85, 115, 101, 114, 115, 92) + "x",
         "duong-may-posix": "/home/someone/",
+        "bien-home-win": s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37) + r"\voices",
     }
     for key, text in samples.items():
         assert re.search(PATTERNS[key], text, flags=re.IGNORECASE), key
