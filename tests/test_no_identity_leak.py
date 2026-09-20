@@ -59,8 +59,10 @@ ALLOW = {
     ("README.vi.md", "tac-gia"): 3,
 }
 
+# `.example` có trong danh sách vì `.env.example` là đúng loại file hay rò nhất: người ta
+# điền thử đường dẫn máy mình vào rồi quên gỡ.
 TEXT_EXT = {".py", ".md", ".json", ".toml", ".yml", ".yaml", ".txt", ".cfg", ".ini", ".sh",
-            ".ps1", ".gitignore", ".gitattributes", ""}
+            ".ps1", ".example", ".gitignore", ".gitattributes", ""}
 
 
 def repo_files():

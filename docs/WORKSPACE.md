@@ -4,6 +4,10 @@ Repo `agent-voice-studio` chỉ chứa **mã**. Mọi thứ của riêng bạn �
 output — nằm ở **trạm giọng**. Tài liệu này mô tả cây trạm, hai chế độ đặt trạm, và việc gì an
 toàn với từng thư mục.
 
+Repo này là một **năng lực thêm**, đứng một mình: cài khi bạn cần một giọng đọc. Quy trình sản
+xuất nội dung nào gọi nó thì gọi qua hợp đồng mã thoát + dòng JSON cuối stdout, và chạy bình
+thường khi máy chưa cài nó. Không có "bộ" nào phải cài đủ.
+
 ## Hai chế độ đặt trạm
 
 | Chế độ | Trạm | Secret | Dành cho |
@@ -21,9 +25,33 @@ toàn với từng thư mục.
 - `--mode embedded|separate` hoặc `--yes` (= nhận khuyến nghị `embedded`).
 
 Chạy không có terminal (agent, script) mà chưa chọn ⇒ `init` in bảng lựa chọn rồi thoát mã 2.
-**Agent cài phải trình bảng đó cho người dùng và chờ họ chọn** — không tự chọn im lặng.
+**Agent cài phải trình bảng đó cho người dùng và chờ họ chọn** — không tự chọn im lặng. Tự
+khai `--non-interactive` cũng vậy: nó nói "không có ai ngồi đây", KHÔNG nói "đoán hộ tôi", nên
+thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2.
+
+Agent cài nên **phân tích rồi khuyến nghị**, không hỏi trống: người không rành kỹ thuật, một
+máy ⇒ `embedded`; người nhiều máy, rành hơn, hoặc repo này là bản public của chính họ ⇒
+`separate`.
 
 Xem trước, không ghi gì: `voice-studio init --dry-run`.
+
+### Biến cấu hình ở chế độ `embedded` — `<repo>/.env`
+
+`init` chép `.env.example` (khuôn tên biến, không có giá trị) thành `<repo>/.env` và khoá
+quyền 600 trên POSIX. Chạy lại **không đè** file anh đã điền.
+
+Thứ tự đọc một biến: **biến môi trường thật → `<repo>/.env` (chỉ khi `mode = embedded`) →
+chưa đặt**. Biến thật luôn thắng file: máy đã đặt biến (máy chạy lịch) không được để một file
+lạc vào repo cướp cấu hình. Chế độ `separate` **không bao giờ** nạp `.env` — ở đó repo có thể
+là bản public của chính anh, và tự nạp một file nằm trong repo là mở cửa cho nó.
+
+Một giới hạn phải biết: chỉ thứ đi qua `voice_studio._env.env()` mới đọc được từ `.env`. Biến
+do **tiến trình khác** đọc — venv engine chạy riêng, thư viện Hugging Face đọc `HF_*` thẳng từ
+môi trường — thì không; chúng được đánh dấu `[MÔI TRƯỜNG THẬT]` ngay trong `.env.example` và
+phải đặt ở cấp user hoặc trong môi trường của scheduled task, kể cả khi đang `embedded`.
+
+`.env` giữ **đường dẫn và cấu hình máy**, không bao giờ giữ token. Bí mật nằm trong file ngoài
+git mà đường dẫn trong `.env` trỏ tới (ở `separate`: `~/.secret/voice-studio/`).
 
 ### Thứ tự tìm trạm (mọi lệnh dùng chung một hàm)
 
@@ -90,6 +118,9 @@ mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại (`OMNIVOIC
 
 - `.gitignore` của repo khoá `/workspace/`, `.env`, `.env.*` (trừ `.env.example`), `studio.local.json`
   — test `tests/test_repo_gates.py` đỏ nếu ai xoá một dòng.
+- `<repo>/.env` được dọn sẵn từ `.env.example`, quyền 600 trên POSIX. Cùng bộ test còn kiểm
+  rằng **mọi biến mã đọc đều có trong khuôn** — thiếu một dòng là người dùng không biết mình
+  phải điền gì, và chỉ phát hiện ra lúc lệnh nổ giữa chừng.
 - Hook `pre-commit` (cài vào `.git/hooks/` nếu chưa có hook): chặn commit file dưới `workspace/`,
   `.env`, `studio.local.json`, và dòng thêm mới trông giống token. Hook đã có sẵn thì giữ nguyên.
 - `doctor` kiểm lại các rào trên mỗi lần chạy.

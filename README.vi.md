@@ -32,6 +32,12 @@ tin cũ.
 Không phải engine — anh tự cài. Không phải dịch vụ. Không phải nguồn cung giọng: repo này
 **không chứa một file audio nào**, có chủ đích.
 
+Cũng **không phải một mảnh của bộ nào phải cài đủ**. Repo này đứng một mình: cài nó khi anh
+cần một giọng đọc, và chỉ khi đó. Một quy trình sản xuất nội dung (ví dụ
+`agent-marketing-studio`) *gọi được* nó qua hợp đồng mã thoát + dòng JSON cuối stdout nếu nó
+có mặt — nhưng quy trình đó chạy bình thường khi anh chưa cài, và sẽ nói rõ là đang thiếu
+năng lực giọng thay vì nổ giữa chừng. Không có thứ tự cài bắt buộc, không có "bộ ba".
+
 ## Cài
 
 ```bash
@@ -48,6 +54,17 @@ pip install -e .          # trong venv engine — lệnh voice-studio
 voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến nghị) hay ngoài (separate)
 voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
+
+`init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
+`<repo>/workspace/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
+không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,
+hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) thì `init`
+in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài phải đưa bảng cho người
+dùng xem, không tự chọn im lặng.
+
+Chế độ `embedded` là "clone là chạy": `init` dựng sẵn cây trạm và chép `.env.example` thành
+`<repo>/.env` cho anh điền. Cả `workspace/` lẫn `.env` đều bị `.gitignore` chặn và hook
+`pre-commit` chặn lần nữa. `.env` giữ **đường dẫn và cấu hình**, không bao giờ giữ token.
 
 Trạm giọng là nơi chứa venv, giọng, nhạc nền, output của anh — từng thư mục giải thích ở
 [`docs/WORKSPACE.md`](docs/WORKSPACE.md). Nhạc nền tự sinh: [`docs/bgm-generation.md`](docs/bgm-generation.md).

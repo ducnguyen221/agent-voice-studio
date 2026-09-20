@@ -33,8 +33,12 @@ from . import API_VERSION, __version__, _env, bgm, contract
 from .contract import ContractError, StationMissing
 
 MANIFEST = "voice-studio-export.json"
-MODES = ("embedded", "separate")
+MODES = _env.MODES                        # hợp đồng F17 — một nguồn sự thật ở _env
 SECRET_DIR_NAME = "voice-studio"          # ~/.secret/<tên> khi tách .env khỏi repo
+# Giá trị này ĐI VÀO studio.local.json, nên nó phải là ASCII và là một đường dẫn thật: một
+# chuỗi mô tả có dấu đọc bằng công cụ khác encoding sẽ hiện ra rác, và không ai dán nó vào
+# đâu được. Trùng đích mặc định của `voice-studio migrate --to separate`.
+SECRET_STORE = f"~/.secret/{SECRET_DIR_NAME}"
 
 # Tên file nhìn giống secret: không bao giờ vào gói export (backup chỉ kèm .env khi xin rõ).
 SECRET_PATTERNS = ("*token*", "*secret*", "*credential*", ".env", ".env.*", "*.pem", "*.key")
@@ -43,24 +47,24 @@ SKIP_DIRS = {".venv", "venv", "cache", "__pycache__", ".git"}
 SKIP_FILES = ("*.prompt.pt", "*.pyc")
 
 CHOICE_TABLE = """\
-Chọn cách đặt TRẠM GIỌNG (nơi chứa venv engine, giọng của bạn, nhạc nền, output):
+Chọn chỗ đặt TRẠM GIỌNG (nơi chứa venv engine, giọng của bạn, nhạc nền, output):
 
-  [1] embedded — gọn trong repo   ← KHUYẾN NGHỊ (Enter)
-      Là gì : trạm nằm ở <repo>/workspace/, secret ở <repo>/.env (cả hai bị git bỏ qua).
-      Lợi   : mở một folder là thấy hết; không phải đặt biến môi trường.
+  [1] embedded — gọn trong repo   ← KHUYẾN NGHỊ (bấm Enter)
+      Là gì : trạm nằm ở <repo>/workspace/, biến cấu hình ở <repo>/.env (git bỏ qua cả hai).
+      Lợi   : mở một folder là thấy hết; không phải đặt biến môi trường; backup một phát.
       Hại   : xoá folder repo là mất luôn giọng — đừng xoá repo để cài lại, dùng
-              `voice-studio update`; nhớ `voice-studio backup`.
-      Chọn khi: một máy, muốn dùng ngay, không rành kỹ thuật.
+              `voice-studio update`; và nhớ `voice-studio backup`.
+      Chọn khi: một máy, muốn dùng được ngay, không rành kỹ thuật.
 
   [2] separate — trạm ngoài repo (mặc định ~/.voice)
-      Là gì : trạm ở thư mục riêng; secret ở kho secret của máy (~/.secret/…).
-      Lợi   : repo luôn sạch (an toàn khi repo là public của bạn); nhiều repo/nhiều máy
-              dùng chung một trạm; cập nhật repo không đụng dữ liệu.
-      Hại   : thêm một chỗ phải nhớ; nên đặt VOICE_STATION cho mọi công cụ khác thấy.
+      Là gì : trạm ở thư mục riêng; bí mật ở kho secret của máy ({kho}).
+      Lợi   : repo luôn sạch (an toàn khi repo là bản public của chính bạn); nhiều máy /
+              nhiều repo dùng chung một trạm; cập nhật repo không đụng dữ liệu.
+      Hại   : thêm một chỗ phải nhớ; nên đặt VOICE_STATION cho lịch chạy thấy trạm.
       Chọn khi: rành kỹ thuật, nhiều máy, hoặc repo public của chính bạn.
 
 Sau này đổi ý được: `voice-studio migrate --to separate`.
-"""
+""".format(kho=SECRET_STORE)
 
 
 # ── tiện ích ───────────────────────────────────────────────────────────────────────────
@@ -148,8 +152,13 @@ def _ask_console(prompt):
     return input()
 
 
-def choose_mode(station=None, mode=None, yes=False, ask=None):
-    """-> (chế độ, gốc trạm, lý do). Ném ContractError khi cần người chọn mà không hỏi được."""
+def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=False):
+    """-> (chế độ, gốc trạm, lý do). Ném ContractError khi cần người chọn mà không hỏi được.
+
+    `non_interactive` = người gọi TỰ KHAI "không có ai ngồi đây". Nó KHÔNG có nghĩa là "cứ
+    đoán hộ tôi": thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2. Đoán ở đây là dựng
+    trạm sai chỗ, và người dùng chỉ phát hiện ra sau khi đã dựng vài giọng.
+    """
     repo = _env.repo_root()
     if station:
         return "separate", _env._expand(station), "--station"
@@ -172,7 +181,7 @@ def choose_mode(station=None, mode=None, yes=False, ask=None):
             mode, why = "embedded", "--yes (nhận khuyến nghị)"
         else:
             if ask is None:
-                if not _stdin_is_tty():
+                if non_interactive or not _stdin_is_tty():
                     contract.log(CHOICE_TABLE)
                     raise ContractError(
                         "cần người dùng chọn chế độ cài. Agent: trình bảng trên cho người dùng, "
@@ -264,6 +273,27 @@ def _hook_text():
             f"exec \"{py}\" -m voice_studio.precommit\n")
 
 
+def _copy_env(repo, created):
+    """`embedded`: dọn sẵn `<repo>/.env` từ `.env.example`, khoá quyền 600 trên POSIX.
+
+    Không có bước này thì "clone là chạy" chỉ đúng một nửa: `.env` được `_env.env()` đọc,
+    được `.gitignore` và hook chặn, được `doctor` kiểm — nhưng không ai tạo ra nó, nên người
+    dùng phải tự biết là phải chép. Không đè file đã có (chạy lại bộ cài không ăn mất cấu
+    hình của người ta).
+    """
+    src = os.path.join(repo, _env.ENV_EXAMPLE)
+    dst = os.path.join(repo, _env.ENV_FILE)
+    if os.path.exists(dst) or not os.path.isfile(src):
+        return
+    shutil.copyfile(src, dst)
+    created.append(_env.ENV_FILE)
+    if os.name != "nt":
+        try:
+            os.chmod(dst, 0o600)
+        except OSError as e:               # hệ tệp không hỗ trợ (exFAT, chia sẻ mạng)
+            contract.log(f"[init] không đặt được quyền 600 cho .env ({e}) — kiểm tay.")
+
+
 def _install_hook(repo):
     hooks = os.path.join(repo, ".git", "hooks")
     if not os.path.isdir(hooks):
@@ -280,8 +310,10 @@ def _install_hook(repo):
     return "installed"
 
 
-def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, ask=None):
-    mode, st, why = choose_mode(station=station, mode=mode, yes=yes, ask=ask)
+def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, ask=None,
+            non_interactive=False):
+    mode, st, why = choose_mode(station=station, mode=mode, yes=yes, ask=ask,
+                                non_interactive=non_interactive)
     repo = _env.repo_root()
     res = {"mode": mode, "station": st, "reason": why, "dry_run": bool(dry_run),
            "repo": repo, "created": [], "hook": None}
@@ -317,10 +349,13 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
         local.update({
             "mode": mode,
             "station_path": _env.WORKSPACE if mode == "embedded" else st,
-            "secrets": ".env" if mode == "embedded" else f"~/.secret/{SECRET_DIR_NAME}",
+            "secrets": _env.ENV_FILE if mode == "embedded" else SECRET_STORE,
         })
         _write_json(local_path, local)
         if mode == "embedded":
+            # Sau khi studio.local.json đã khai `mode: embedded` — trước đó `_env.env_file()`
+            # còn trả None và một `.env` vừa chép ra sẽ không được ai đọc.
+            _copy_env(repo, created)
             res["hook"] = _install_hook(repo)
     return res
 
@@ -343,7 +378,10 @@ def _print_init(res):
         for c in venv_commands(res["station"]):
             log("  " + c)
     if res["mode"] == "separate":
-        log(f"\nNên đặt biến cho mọi công cụ khác thấy trạm: VOICE_STATION={res['station']}")
+        log(f"\nNên đặt biến cho lịch chạy thấy trạm: VOICE_STATION={res['station']}")
+        log(f"Bí mật để ở kho secret của máy ({SECRET_STORE}); biến chỉ giữ ĐƯỜNG DẪN.")
+    else:
+        log("\nĐiền biến của bạn vào <repo>/.env (chỉ đường dẫn + cấu hình, KHÔNG token).")
 
 
 def init_main(argv=None):
@@ -353,6 +391,9 @@ def init_main(argv=None):
     ap.add_argument("--station", help="trạm ngoài repo (chọn separate, không hỏi)")
     ap.add_argument("--mode", choices=MODES, help="chọn chế độ không cần hỏi")
     ap.add_argument("--yes", action="store_true", help="nhận khuyến nghị (embedded) không hỏi")
+    ap.add_argument("--non-interactive", action="store_true",
+                    help="không có ai trả lời: KHÔNG hỏi và KHÔNG đoán — thiếu "
+                         "--yes/--mode/--station thì dừng với mã 2")
     ap.add_argument("--existing", action="store_true",
                     help="nhận một trạm đang chạy: chỉ ghi station.json, không rải file mẫu")
     ap.add_argument("--dry-run", action="store_true", help="chỉ báo sẽ làm gì, không ghi")
@@ -363,7 +404,7 @@ def init_main(argv=None):
 
     def fn(a):
         res = do_init(station=a.station, mode=a.mode, existing=a.existing, yes=a.yes,
-                      dry_run=a.dry_run)
+                      dry_run=a.dry_run, non_interactive=a.non_interactive)
         _print_init(res)
         return res
     return contract.run(fn, args, args.json)

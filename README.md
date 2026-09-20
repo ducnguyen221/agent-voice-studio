@@ -35,6 +35,13 @@ the table, including the ones that overturned an earlier belief.
 Not an engine — you install that yourself. Not a hosted service. Not a source of voices:
 this repository contains **no audio at all**, by design.
 
+Also not one piece of a suite you have to install whole. This repository stands alone:
+install it when you need a speaking voice, and only then. A content pipeline (for example
+`agent-marketing-studio`) *can* call it through the shared contract — exit code plus a final
+JSON line on stdout — when it is present, but that pipeline runs fine without it and says
+plainly that the voice capability is missing rather than failing mid-run. There is no
+required install order and no bundle.
+
 ## Install
 
 ```bash
@@ -52,6 +59,19 @@ pip install -e .          # inside the engine venv — provides the voice-studio
 voice-studio init         # asks: station inside the repo (embedded, recommended) or outside (separate)
 voice-studio doctor       # tells you what is still missing
 ```
+
+`init` **presents a two-option table before doing anything**, rather than asking an open
+question. `embedded` — station at `<repo>/workspace/`, configuration in `<repo>/.env` — is
+the **recommendation**: press Enter and you are done, with no environment variables to set.
+Choose `separate` when you work across machines, are comfortable with the technical side, or
+this repository is your own public fork. With nobody to answer (CI, a scheduled task) `init`
+prints that table and **exits with code 2 without writing a byte** — an installing agent must
+show the table to the user instead of choosing silently.
+
+`embedded` means clone-and-run: `init` lays down the station tree and copies `.env.example`
+to `<repo>/.env` for you to fill in. Both `workspace/` and `.env` are blocked by
+`.gitignore` and again by the `pre-commit` hook. `.env` holds **paths and configuration**,
+never tokens.
 
 The station holds your venv, voices, background music and output — every folder is described in
 [`docs/WORKSPACE.md`](docs/WORKSPACE.md). Generating background music: [`docs/bgm-generation.md`](docs/bgm-generation.md).

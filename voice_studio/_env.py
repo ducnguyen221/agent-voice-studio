@@ -27,6 +27,12 @@ Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — 
 `<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
 `VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ bỏ hai tầng giữa.
 `station.json` ở gốc trạm có thể khai `engine_dir`, `bgm_dir` (tương đối theo gốc trạm).
+
+Biến cấu hình đi theo thứ tự riêng: biến môi trường thật → `<repo>/.env` (**chỉ** khi
+`studio.local.json: mode = embedded`) → chưa đặt. Chế độ `separate` KHÔNG bao giờ tự nạp
+`.env`: ở đó repo có thể là bản public của chính người dùng, và tự nạp một file nằm trong
+repo là mở cửa cho nó. `.env` giữ ĐƯỜNG DẪN và cấu hình máy, không bao giờ giữ token —
+khuôn tên biến ở `<repo>/.env.example`.
 """
 import json
 import os
@@ -36,12 +42,21 @@ import warnings
 LOCAL_CONFIG = "studio.local.json"
 WORKSPACE = "workspace"
 STATION_FILE = "station.json"
+ENV_FILE = ".env"
+ENV_EXAMPLE = ".env.example"
+# Hợp đồng F17 — tên chế độ dùng chung với `agent-marketing-studio`, `agent-video-studio`.
+MODES = ("embedded", "separate")
 
 _LEGACY = {
     "VOICE_BGM": "NEWS_BGM",
     "VOICE_BGM_VOL": "NEWS_BGM_VOL",
     "VOICE_BGM_DIR": "NEWS_BGM_DIR",
 }
+
+# Đọc `<repo>/.env` cần biết repo nằm ở đâu, mà repo có thể do chính một biến chỉ ra. Tên
+# này vì thế KHÔNG BAO GIỜ được đọc từ `.env`: đọc là đệ quy vô hạn, và cũng là vòng lặp
+# logic — một file nằm TRONG repo không có tư cách nói repo nằm ở đâu.
+_NEVER_FROM_DOTENV = frozenset({"VOICE_STUDIO_REPO"})
 
 
 _warned = set()
@@ -52,8 +67,20 @@ def reset_deprecation_warnings():
     _warned.clear()
 
 
+def _deprecated(old, new):
+    """Cảnh báo tên cũ **một lần cho mỗi tên, mỗi tiến trình**."""
+    if old not in _warned:
+        _warned.add(old)
+        warnings.warn(
+            f"Biến {old} đã đổi tên thành {new}; tên cũ còn đọc được một phiên bản nữa.",
+            DeprecationWarning, stacklevel=4)
+
+
 def env(name):
-    """Đọc biến `name` (bỏ khoảng trắng; rỗng coi như chưa đặt).
+    """Đọc biến `name`: `os.environ` → `<repo>/.env` (CHỈ chế độ embedded) → None.
+
+    Bỏ khoảng trắng; rỗng coi như chưa đặt. Biến môi trường thật LUÔN thắng `.env`: máy đã
+    đặt biến (máy chạy lịch) không được để một file lạc vào repo cướp cấu hình.
 
     Nếu `name` có tên cũ và chỉ tên cũ được đặt: trả giá trị tên cũ + DeprecationWarning
     **một lần cho mỗi tên, mỗi tiến trình**. Một lượt dựng video đọc các biến này nhiều lần;
@@ -66,11 +93,18 @@ def env(name):
     if old:
         oval = (os.environ.get(old) or "").strip()
         if oval:
-            if old not in _warned:
-                _warned.add(old)
-                warnings.warn(
-                    f"Biến {old} đã đổi tên thành {name}; tên cũ còn đọc được một phiên bản nữa.",
-                    DeprecationWarning, stacklevel=3)
+            _deprecated(old, name)
+            return oval
+    if name in _NEVER_FROM_DOTENV:
+        return None
+    dot = read_env_file()
+    val = (dot.get(name) or "").strip()
+    if val:
+        return val
+    if old:
+        oval = (dot.get(old) or "").strip()
+        if oval:
+            _deprecated(old, name)
             return oval
     return None
 
@@ -109,6 +143,55 @@ def local_config(repo=None):
     """Nội dung `<repo>/studio.local.json` (lựa chọn chế độ cài), {} nếu không có."""
     repo = repo or repo_root()
     return read_json(os.path.join(repo, LOCAL_CONFIG))[0] if repo else {}
+
+
+def mode(repo=None):
+    """Chế độ cài đã chọn: `embedded` · `separate` · None (chưa chạy `voice-studio init`)."""
+    m = (local_config(repo).get("mode") or "").strip()
+    return m if m in MODES else None
+
+
+# ── biến cấu hình: os.environ → <repo>/.env (CHỈ chế độ embedded) ───────────────────────
+
+def env_file(repo=None):
+    """`<repo>/.env` khi và CHỈ KHI chế độ là `embedded` và file có thật; không thì None."""
+    repo = repo or repo_root()
+    if not repo or mode(repo) != "embedded":
+        return None
+    f = os.path.join(repo, ENV_FILE)
+    return f if os.path.isfile(f) else None
+
+
+def read_env_file(repo=None):
+    """Đọc `<repo>/.env` thành dict. Định dạng tối giản, CỐ Ý không hỗ trợ gì thêm:
+    `TEN=giá trị` mỗi dòng, bỏ qua dòng trống và dòng `#`, bỏ `export ` đầu dòng, gỡ một
+    lớp nháy bao ngoài. Không nội suy `$BIEN`, không nối dòng — mỗi tính năng thêm là một
+    cách nữa để một file text trở thành mã chạy được.
+
+    Đọc lại MỖI LẦN gọi (không cache): người dùng sửa `.env` rồi chạy lệnh ngay là chuyện
+    thường, và một cache ở đây nghĩa là họ sửa xong mà không có gì đổi.
+    """
+    f = env_file(repo)
+    if not f:
+        return {}
+    out = {}
+    try:
+        text = open(f, "r", encoding="utf-8", errors="replace").read()
+    except OSError:
+        return {}
+    for line in text.splitlines():
+        s = line.strip()
+        if not s or s.startswith("#") or "=" not in s:
+            continue
+        if s.startswith("export "):
+            s = s[len("export "):]
+        name, _, value = s.partition("=")
+        name, value = name.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        if name:
+            out[name] = value
+    return out
 
 
 def default_station():

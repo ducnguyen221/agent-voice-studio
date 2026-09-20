@@ -17,6 +17,8 @@ def repo(tmp_path, monkeypatch):
     r = tmp_path / "repo"
     (r / "voice_studio").mkdir(parents=True)
     (r / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
+    (r / ".env.example").write_text(
+        "# khuon\nVOICE_BGM_VOL=\nVOICE_STUDIO_WORK=\n", encoding="utf-8")
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
     return r
 
@@ -95,14 +97,79 @@ def test_bad_answer_is_contract_error(repo):
     assert not (repo / "workspace").exists()
 
 
-def test_non_interactive_without_choice_is_2_and_writes_nothing(repo, home, capsys):
+# ── embedded: `.env` phải có thật, và phải có người đọc nó ───────────────────────────────
+#
+# Ba test dưới đây giữ lời hứa "clone là chạy". Trước đó `.env` được `.gitignore` chặn, hook
+# chặn, `doctor` kiểm quyền — nhưng KHÔNG AI TẠO RA NÓ và KHÔNG AI ĐỌC NÓ. Tài liệu nói
+# "secret ở <repo>/.env" là một câu không đúng với mã, kiểu sai im lặng nhất.
+
+def test_embedded_lays_down_dotenv_from_the_example(repo):
+    res = station.do_init(yes=True)
+    env_file = repo / ".env"
+    assert env_file.is_file() and ".env" in res["created"]
+    assert "VOICE_BGM_VOL=" in env_file.read_text(encoding="utf-8")
+
+
+def test_rerun_never_overwrites_a_filled_dotenv(repo):
+    station.do_init(yes=True)
+    (repo / ".env").write_text("VOICE_BGM_VOL=0.42\n", encoding="utf-8")
+    res = station.do_init(yes=True)
+    assert (repo / ".env").read_text(encoding="utf-8") == "VOICE_BGM_VOL=0.42\n"
+    assert ".env" not in res["created"]
+
+
+def test_embedded_reads_config_from_dotenv(repo, monkeypatch):
+    station.do_init(yes=True)
+    (repo / ".env").write_text(
+        "# ghi chu\nexport VOICE_BGM_VOL = \"0.42\"\nrac khong co dau bang\n", encoding="utf-8")
+    monkeypatch.delenv("VOICE_BGM_VOL", raising=False)
+    assert _env.env("VOICE_BGM_VOL") == "0.42"
+
+
+def test_a_real_environment_variable_beats_the_dotenv(repo, monkeypatch):
+    station.do_init(yes=True)
+    (repo / ".env").write_text("VOICE_BGM_VOL=0.42\n", encoding="utf-8")
+    monkeypatch.setenv("VOICE_BGM_VOL", "0.99")
+    assert _env.env("VOICE_BGM_VOL") == "0.99"
+
+
+def test_separate_mode_never_loads_a_dotenv_sitting_in_the_repo(repo, tmp_path, monkeypatch):
+    """Ở `separate`, repo có thể là bản public của chính người dùng: tự nạp một file lạ nằm
+    trong đó là mở cửa cho nó."""
+    station.do_init(station=str(tmp_path / "ngoai"))
+    (repo / ".env").write_text("VOICE_BGM_VOL=0.42\n", encoding="utf-8")
+    monkeypatch.delenv("VOICE_BGM_VOL", raising=False)
+    assert _env.env_file() is None
+    assert _env.env("VOICE_BGM_VOL") is None
+
+
+def test_the_repo_pointer_is_never_taken_from_a_file_inside_the_repo(repo):
+    """`VOICE_STUDIO_REPO` nói repo nằm đâu — một file TRONG repo không có tư cách trả lời,
+    và đọc nó ở đây là đệ quy vô hạn."""
+    station.do_init(yes=True)
+    (repo / ".env").write_text("VOICE_STUDIO_REPO=/khong/ton/tai\n", encoding="utf-8")
+    assert _env.read_env_file()["VOICE_STUDIO_REPO"] == "/khong/ton/tai"
+    assert os.path.normcase(_env.repo_root()) == os.path.normcase(str(repo))
+
+
+@pytest.mark.parametrize("argv", [["init", "--non-interactive", "--json"],
+                                  ["init", "--json"]])
+def test_no_one_to_answer_is_code_2_and_writes_nothing(argv, repo, home, capsys):
+    """Khai `--non-interactive` KHÔNG có nghĩa "đoán hộ tôi": thiếu --yes/--mode/--station thì
+    vẫn là mã 2, in bảng cho agent trình cho người dùng."""
     before = snapshot(repo)
-    rc = cli.main(["init", "--json"])          # stdin của pytest không phải terminal
+    rc = cli.main(argv)
     out, err = capsys.readouterr()
     assert rc == 2
-    assert "embedded" in err and "separate" in err and "--mode" in err
+    assert "embedded" in err and "separate" in err and "KHUYẾN NGHỊ" in err
+    assert "--mode" in err                      # agent phải biết chạy lại thế nào
     assert last_json(out)["ok"] is False
     assert snapshot(repo) == before and not (home / ".voice").exists()
+
+
+def test_non_interactive_with_a_choice_goes_through(repo):
+    rc = cli.main(["init", "--non-interactive", "--yes", "--json"])
+    assert rc == 0 and (repo / "workspace" / "station.json").is_file()
 
 
 def test_embedded_installs_precommit_hook_without_overwriting(repo):
