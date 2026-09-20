@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent-voice-studio"
-version = "0.2.0.dev0"
+version = "0.2.0"
 description = "Engine mẫu chạy giọng quanh OmniVoice: tạo giọng, chuẩn hoá, đọc, nhạc nền — cài được, gọi được từ pipeline khác."
 readme = "README.md"
 license = { text = "MIT" }

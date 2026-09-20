@@ -11,7 +11,7 @@ import warnings
 
 import pytest
 
-from voice_studio import av
+from voice_studio import _env, av
 
 FAKE = r'''
 import json, os, sys
@@ -153,6 +153,23 @@ def test_legacy_news_bgm_warns_but_still_works(fake_ffmpeg, media, tmp_path, mon
     bgm_call = fake_ffmpeg()[1]
     assert str(music) in bgm_call
     assert "volume=0.300" in _value_after(bgm_call, "-filter_complex")
+
+
+def test_legacy_env_warns_once_per_name_not_every_call(tmp_path, monkeypatch):
+    """Đường chạy thật đọc biến BGM nhiều lần mỗi lượt — cảnh báo chỉ được phát MỘT lần/tên.
+
+    `simplefilter("always")` tắt bộ khử trùng lặp của Python, nên cái còn lại đo được chính là
+    cổng trong `_env`, không phải may mắn của filter mặc định.
+    """
+    music = tmp_path / "bed.mp3"
+    music.write_bytes(b"m")
+    monkeypatch.setenv("NEWS_BGM", str(music))
+    with warnings.catch_warnings(record=True) as seen:
+        warnings.simplefilter("always")
+        for _ in range(3):
+            assert _env.env("VOICE_BGM") == str(music)
+    dep = [w for w in seen if issubclass(w.category, DeprecationWarning)]
+    assert len(dep) == 1, f"phát {len(dep)} cảnh báo cho một tên — nhiễu log mỗi lượt chạy"
 
 
 def test_legacy_news_bgm_dir_with_style(fake_ffmpeg, media, tmp_path, monkeypatch):

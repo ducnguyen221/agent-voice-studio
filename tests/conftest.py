@@ -37,6 +37,10 @@ def _clean_contract_env(monkeypatch, tmp_path):
     # Bản clone đang chạy test có thể có workspace/ hoặc studio.local.json thật (chế độ
     # embedded của người phát triển) — trỏ "repo" sang một thư mục tạm rỗng.
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(tmp_path / "no-repo"))
+    # Cảnh báo tên biến cũ phát MỘT lần/tiến trình; mỗi test phải là một tờ giấy trắng,
+    # nếu không test chạy sau sẽ không thấy cảnh báo mà test chạy trước đã "tiêu" mất.
+    from voice_studio import _env
+    _env.reset_deprecation_warnings()
     yield
 
 

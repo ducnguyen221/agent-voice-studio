@@ -24,6 +24,39 @@ def test_compat_exports_legacy_names():
     assert compat.VOICE_OPTIONS is engine.VOICE_OPTIONS and compat.MODEL_ID == engine.MODEL_ID
 
 
+def test_compat_exposes_subprocess_for_station_regression_gate():
+    """Cổng hồi quy ở trạm vá `mcp_server.subprocess.run`; shim phải giải được tên đó.
+
+    Engine đơn khối cũ `import subprocess` ở cấp module, nên `ov.subprocess` là một phần bề
+    mặt mà pipeline đang dùng. Thiếu nó thì cổng canh sự cố 30/08 (file `.__tmp.wav` 21 MB →
+    `git add -A` → object git hỏng) **chết câm**: AttributeError, không phải FAIL.
+    """
+    import subprocess as _sp
+    assert compat.subprocess is _sp
+    assert "subprocess" in compat.__all__
+
+
+def test_legacy_subprocess_hook_still_catches_tmp_leak(tmp_path, monkeypatch):
+    """Chạy y hệt cổng của trạm, nhưng qua `compat`: ffmpeg sập ⇒ lỗi nổi lên, không rò file tạm."""
+    import subprocess as _sp
+
+    import numpy as np
+    monkeypatch.setattr(engine, "ffmpeg", lambda: "ffmpeg")   # không đòi ffmpeg thật trên CI
+    out = str(tmp_path / "all.mp3")
+    tmp = out[:-4] + ".__tmp.wav"
+
+    def boom(*a, **k):
+        raise _sp.CalledProcessError(1, "ffmpeg")
+
+    real, compat.subprocess.run = compat.subprocess.run, boom
+    try:
+        with pytest.raises(_sp.CalledProcessError):
+            compat._save(np.zeros(24000, dtype="float32"), out, 24000)
+    finally:
+        compat.subprocess.run = real
+    assert not os.path.exists(tmp), "RÒ: .__tmp.wav còn sau khi ffmpeg lỗi"
+
+
 def test_compat_synth_uses_named_profile(station, fake_engine):
     m = compat._get_model()
     assert m is fake_engine and compat._model is fake_engine

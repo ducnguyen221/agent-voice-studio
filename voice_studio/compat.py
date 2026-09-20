@@ -10,14 +10,21 @@ profile nào thì LÙI về giọng thiết kế từ `instruct`. API mới (`en
 thay vì lùi, vì giọng ngẫu nhiên mỗi lần gọi là đúng bệnh "mỗi câu một giọng". Code mới
 dùng `voice_studio.engine`, đừng dùng module này.
 """
+import subprocess          # noqa: F401 — xem ghi chú dưới: là BỀ MẶT, không phải import thừa
+
 from . import av, engine, profiles
 
 MODEL_ID = engine.MODEL_ID
 VOICE_OPTIONS = engine.VOICE_OPTIONS
 TARGET_RMS_DB = engine.TARGET_RMS_DB
 
+# `subprocess` nằm trong `__all__` có chủ đích: module đơn khối cũ `import subprocess` ở cấp
+# module, và cổng hồi quy của trạm (`tests/test_save_tmp_leak.py`) vá `mcp_server.subprocess.run`
+# để giả lập ffmpeg sập. Bỏ tên này đi thì cổng đó không đỏ — nó chết câm bằng AttributeError,
+# tức mất đúng thứ canh sự cố 30/08 (file `.__tmp.wav` 21 MB lọt vào git, hỏng object, 2 ngày
+# không push được). Vá trên module stdlib này ăn sang `engine.save()` vì cùng một object.
 __all__ = [
-    "MODEL_ID", "VOICE_OPTIONS", "TARGET_RMS_DB",
+    "MODEL_ID", "VOICE_OPTIONS", "TARGET_RMS_DB", "subprocess",
     "_get_model", "_synth", "_save", "_mux", "_mix_bgm", "_ffmpeg_exe", "_video_duration",
     "normalize_rms",
 ]

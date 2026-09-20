@@ -3,9 +3,12 @@ name: tests
 # Chạy bộ test KHÔNG cần model: torch/omnivoice được thay bằng module giả trong tests/conftest.py.
 # Hai hệ điều hành đích của trạm giọng: Windows và macOS.
 
+# Chạy trên MỌI nhánh, không riêng `main`: công việc thật sống trên nhánh feature, và một CI
+# chỉ nhìn `main` thì tới lúc merge mới biết đỏ — quá muộn để còn là cổng.
 on:
   push:
-    branches: [main]
+    branches: ['**']
+    tags: ['v*']
   pull_request:
   workflow_dispatch:
 

@@ -108,6 +108,60 @@ def test_import_rejects_path_traversal(tmp_path):
     assert not (tmp_path / "x.txt").exists()
 
 
+@pytest.mark.parametrize("member", [
+    "foo/C:/x.txt",          # ổ đĩa ở part GIỮA: os.path.join của Windows RESET tại đó ⇒ 'C:\\x.txt'
+    "foo/c:nasty.txt",       # ổ đĩa + tên file, không dấu gạch ⇒ 'c:nasty.txt' (thư mục hiện hành ổ C)
+    "C:/x.txt",              # ổ đĩa ngay part đầu
+    "C:x.txt",
+    "../x.txt",              # thoát lên trên
+    "foo/../../x.txt",
+    "/etc/x.txt",            # đường tuyệt đối POSIX
+    "\\\\?\\C:\\x.txt",      # tiền tố đường dài Windows
+    "\\\\server\\share\\x.txt",   # UNC
+    "",
+    "foo//x.txt",
+])
+def test_safe_member_rejects_every_escape(member):
+    assert station._safe_member(member) is False, member
+
+
+@pytest.mark.parametrize("member", ["a.txt", "omnivoice/voices/demo.wav", "a/b/c.txt"])
+def test_safe_member_accepts_plain_relative(member):
+    assert station._safe_member(member) is True, member
+
+
+def test_member_target_is_a_second_gate(tmp_path, monkeypatch):
+    """Lớp hai (commonpath) phải tự đứng vững: cho `_safe_member` nói dối rồi kiểm lại.
+
+    Phạm vi thật của lớp hai — nói thẳng để không ai tưởng nó bao hết: nó bắt `..` và đường
+    tuyệt đối sang **ổ khác**. Nó KHÔNG bắt `foo/C:/x.txt` khi trạm cũng nằm trên ổ C, vì
+    `os.path.join` nuốt luôn `C:` cùng ổ — ca đó là việc của lớp một, đã có test riêng.
+    """
+    st = str(tmp_path / "st")
+    monkeypatch.setattr(station, "_safe_member", lambda n: True)
+    for bad in ("../x.txt", "foo/../../../x.txt", "D:/x.txt"):
+        assert station._member_target(st, bad) is None, bad
+    good = station._member_target(st, "omnivoice/voices/demo.wav")
+    assert good is not None and good.endswith(os.path.join("voices", "demo.wav"))
+
+
+def test_import_rejects_windows_drive_member(tmp_path, monkeypatch):
+    """`voice-studio import` một gói 'giọng của bạn tôi' không được ghi ra ngoài trạm.
+
+    `chdir` vào tmp_path có chủ đích: khi cổng hỏng, `os.path.join` trả đường **theo ổ đĩa**
+    (`C:x.txt`) — tức ghi vào thư mục hiện hành của ổ C. Đứng ở tmp_path thì vết đổ đúng vào
+    `tmp_path/x.txt`, vừa chứng minh được rò, vừa không rải rác ra repo.
+    """
+    monkeypatch.chdir(tmp_path)
+    z = tmp_path / "evil.zip"
+    with zipfile.ZipFile(z, "w") as zf:
+        zf.writestr(station.MANIFEST, json.dumps({"kind": "personal", "files": ["foo/C:/x.txt"]}))
+        zf.writestr("foo/C:/x.txt", "x")
+    with pytest.raises(station.ContractError, match="nguy hiểm"):
+        station.import_personal(str(z), str(tmp_path / "st"))
+    assert not (tmp_path / "x.txt").exists(), "RÒ: gói ghi được ra ngoài trạm"
+
+
 def test_import_rejects_zip_without_manifest(tmp_path):
     z = tmp_path / "plain.zip"
     with zipfile.ZipFile(z, "w") as zf:

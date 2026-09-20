@@ -422,9 +422,36 @@ def export_personal(st, out):
 
 
 def _safe_member(name):
+    """Tên thành phần trong gói có an toàn để ghép vào trạm không? (lớp một)
+
+    Từ chối: rỗng · đường tuyệt đối · UNC · `..` · part rỗng · **dấu hai chấm ở BẤT KỲ part
+    nào**. Chỉ soi `parts[0]` là không đủ trên Windows: `os.path.join` RESET khi gặp một
+    thành phần có ổ đĩa, nên `foo/C:/x.txt` ghép ra `C:x.txt` — đường theo ổ đĩa, rơi vào
+    thư mục hiện hành của ổ C chứ không phải trong trạm.
+    """
     n = name.replace("\\", "/")
-    parts = n.split("/")
-    return not (n.startswith("/") or ":" in parts[0] or ".." in parts or n == "")
+    if not n or n.startswith("/"):
+        return False
+    return not any(p == "" or p == ".." or ":" in p for p in n.split("/"))
+
+
+def _member_target(st, name):
+    """Đường đích tuyệt đối của `name` trong trạm `st` — hoặc None nếu nó thoát ra ngoài.
+
+    Lớp hai, cố ý độc lập với `_safe_member`: kiểm HẬU NGHIỆM bằng `commonpath` trên đường
+    đã `realpath`, nên một lối thoát mà lớp một chưa nghĩ tới (symlink, dạng tên lạ) vẫn bị
+    chặn trước khi có byte nào được ghi.
+    """
+    if not _safe_member(name):
+        return None
+    root = os.path.realpath(st)
+    target = os.path.realpath(os.path.join(root, *name.replace("\\", "/").split("/")))
+    try:
+        if os.path.commonpath([root, target]) != root or target == root:
+            return None
+    except ValueError:              # khác ổ đĩa trên Windows ⇒ chắc chắn ngoài trạm
+        return None
+    return target
 
 
 def import_personal(zip_path, st, force=False):
@@ -437,18 +464,19 @@ def import_personal(zip_path, st, force=False):
         if manifest.get("kind") != "personal":
             raise ContractError("gói không phải loại personal")
         members = [n for n in names if n != MANIFEST]
-        unsafe = [n for n in members if not _safe_member(n)]
+        targets = {n: _member_target(st, n) for n in members}
+        unsafe = [n for n in members if targets[n] is None]
         if unsafe:
             raise ContractError("gói chứa đường dẫn nguy hiểm: " + ", ".join(unsafe))
         secret = [n for n in members if _is_secret_name(n)]
         if secret:
             raise ContractError("gói chứa file trông như secret: " + ", ".join(secret))
-        clash = [n for n in members if os.path.exists(os.path.join(st, *n.split("/")))]
+        clash = [n for n in members if os.path.exists(targets[n])]
         if clash and not force:
             raise ContractError("trạm đích đã có: " + ", ".join(clash) +
                                 " — dùng --force để ghi đè")
         for n in members:
-            target = os.path.join(st, *n.split("/"))
+            target = targets[n]
             os.makedirs(os.path.dirname(target), exist_ok=True)
             with zf.open(n) as src, open(target, "wb") as dst:
                 shutil.copyfileobj(src, dst)

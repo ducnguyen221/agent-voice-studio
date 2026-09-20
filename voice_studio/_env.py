@@ -44,10 +44,20 @@ _LEGACY = {
 }
 
 
+_warned = set()
+
+
+def reset_deprecation_warnings():
+    """Quên danh sách tên cũ đã cảnh báo — chỉ dùng trong test (mỗi test là một 'tiến trình')."""
+    _warned.clear()
+
+
 def env(name):
     """Đọc biến `name` (bỏ khoảng trắng; rỗng coi như chưa đặt).
 
-    Nếu `name` có tên cũ và chỉ tên cũ được đặt: trả giá trị tên cũ + DeprecationWarning.
+    Nếu `name` có tên cũ và chỉ tên cũ được đặt: trả giá trị tên cũ + DeprecationWarning
+    **một lần cho mỗi tên, mỗi tiến trình**. Một lượt dựng video đọc các biến này nhiều lần;
+    cảnh báo mỗi lần gọi chỉ làm log pipeline ồn lên chứ không nói thêm được gì.
     """
     val = (os.environ.get(name) or "").strip()
     if val:
@@ -56,9 +66,11 @@ def env(name):
     if old:
         oval = (os.environ.get(old) or "").strip()
         if oval:
-            warnings.warn(
-                f"Biến {old} đã đổi tên thành {name}; tên cũ còn đọc được một phiên bản nữa.",
-                DeprecationWarning, stacklevel=3)
+            if old not in _warned:
+                _warned.add(old)
+                warnings.warn(
+                    f"Biến {old} đã đổi tên thành {name}; tên cũ còn đọc được một phiên bản nữa.",
+                    DeprecationWarning, stacklevel=3)
             return oval
     return None
 
