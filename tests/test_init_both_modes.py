@@ -77,6 +77,16 @@ def test_enter_means_embedded(repo, home):
     assert not home.exists() or not (home / ".voice").exists()
 
 
+def test_the_choice_table_says_where_the_secrets_live(repo):
+    """Cùng bốn mục với hai trạm kia (Là gì · Lợi · Hại · Chọn khi) và cùng nói ra chỗ đặt
+    bí mật — người dùng gặp cả ba bộ cài, và ba câu chữ khác nhau là ba lần phải học lại."""
+    t = station.CHOICE_TABLE
+    for muc in ("Là gì", "Lợi", "Hại", "Chọn khi"):
+        assert t.count(muc) >= 2, muc
+    assert ".env" in t and station.SECRET_STORE in t
+    assert "bấm Enter" in t and "migrate --to separate" in t
+
+
 def test_yes_flag_accepts_recommended_embedded(repo):
     res = station.do_init(yes=True, ask=never_ask)
     assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
@@ -143,13 +153,19 @@ def test_separate_mode_never_loads_a_dotenv_sitting_in_the_repo(repo, tmp_path, 
     assert _env.env("VOICE_BGM_VOL") is None
 
 
-def test_the_repo_pointer_is_never_taken_from_a_file_inside_the_repo(repo):
-    """`VOICE_STUDIO_REPO` nói repo nằm đâu — một file TRONG repo không có tư cách trả lời,
-    và đọc nó ở đây là đệ quy vô hạn."""
+@pytest.mark.parametrize("var", ["VOICE_STUDIO_REPO", "VOICE_STATION", "OMNIVOICE_DIR"])
+def test_a_dotenv_can_never_move_the_repo_or_the_station(var, repo):
+    """Ba biến này quay ngược lại chính cái đã quyết định có đọc `.env` hay không: `.env` chỉ
+    được nạp khi mode = embedded, tức trạm đã chốt ở <repo>/workspace/. Để một dòng trong đó
+    trỏ trạm đi nơi khác là tự tạo ra "hai nguồn sự thật"."""
     station.do_init(yes=True)
-    (repo / ".env").write_text("VOICE_STUDIO_REPO=/khong/ton/tai\n", encoding="utf-8")
-    assert _env.read_env_file()["VOICE_STUDIO_REPO"] == "/khong/ton/tai"
+    (repo / ".env").write_text(f"{var}=/khong/ton/tai\n", encoding="utf-8")
+    assert _env.read_env_file()[var] == "/khong/ton/tai"     # đọc được nếu ai hỏi thẳng file
+    assert _env.env(var) != "/khong/ton/tai"                 # nhưng env() không lấy từ đó
     assert os.path.normcase(_env.repo_root()) == os.path.normcase(str(repo))
+    st, src = _env.resolve_station()
+    assert os.path.normcase(st) == os.path.normcase(str(repo / "workspace"))
+    assert src == "studio.local.json"
 
 
 @pytest.mark.parametrize("argv", [["init", "--non-interactive", "--json"],

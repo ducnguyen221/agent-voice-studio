@@ -677,8 +677,7 @@ def migrate_to_separate(target=None):
         _move_file(env_file, moved_env)
     local_path = os.path.join(repo, _env.LOCAL_CONFIG)
     local = _env.read_json(local_path)[0]
-    local.update({"mode": "separate", "station_path": target,
-                  "secrets": f"~/.secret/{SECRET_DIR_NAME}"})
+    local.update({"mode": "separate", "station_path": target, "secrets": SECRET_STORE})
     _write_json(local_path, local)
     sj = os.path.join(target, _env.STATION_FILE)
     info, err = _env.read_json(sj)

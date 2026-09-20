@@ -53,10 +53,14 @@ _LEGACY = {
     "VOICE_BGM_DIR": "NEWS_BGM_DIR",
 }
 
-# Đọc `<repo>/.env` cần biết repo nằm ở đâu, mà repo có thể do chính một biến chỉ ra. Tên
-# này vì thế KHÔNG BAO GIỜ được đọc từ `.env`: đọc là đệ quy vô hạn, và cũng là vòng lặp
-# logic — một file nằm TRONG repo không có tư cách nói repo nằm ở đâu.
-_NEVER_FROM_DOTENV = frozenset({"VOICE_STUDIO_REPO"})
+# Ba tên KHÔNG BAO GIỜ được đọc từ `<repo>/.env`, vì cả ba đều quay ngược lại chính cái đã
+# quyết định có đọc `.env` hay không:
+#   VOICE_STUDIO_REPO — nói repo nằm đâu, mà `.env` nằm TRONG repo. Đọc là đệ quy vô hạn.
+#   VOICE_STATION, OMNIVOICE_DIR — nói TRẠM NÀY nằm đâu. `.env` chỉ được nạp khi chế độ là
+#     `embedded`, tức là trạm đã được chốt ở `<repo>/workspace/`; để một dòng trong file đó
+#     trỏ trạm đi nơi khác là tự tạo ra đúng cái "hai nguồn sự thật" mà cả bộ cài này sinh
+#     ra để chặn. Trỏ trạm đi chỗ khác là việc của biến môi trường thật, hoặc của `migrate`.
+_NEVER_FROM_DOTENV = frozenset({"VOICE_STUDIO_REPO", "VOICE_STATION", "OMNIVOICE_DIR"})
 
 
 _warned = set()
