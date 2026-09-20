@@ -114,6 +114,8 @@ echo 'export VOICE_STATION=<đường trạm>' >> ~/.zshrc
 | `VOICES_DIR` | kho profile | `<trạm>/omnivoice/voices` |
 | `VOICE_DEFAULT_PROFILE` | profile mặc định khi không có `_default.txt` | — |
 | `OMNIVOICE_DEVICE` | ép thiết bị `cuda` / `mps` / `cpu` | tự chọn `cuda → mps → cpu` |
+| `OMNIVOICE_DTYPE` | ép độ chính xác `float16` / `float32` / `auto` | `cuda`,`mps` → float16 · `cpu` → float32 |
+| `HF_DEACTIVATE_ASYNC_LOAD` | tắt nạp weights bất đồng bộ của transformers | `1` sẵn trên macOS (xem dưới) |
 | `OMNIVOICE_ONLINE` | `1` = cho phép tải từ Hugging Face | tắt (offline) |
 | `VOICE_BGM_DIR`, `VOICE_BGM`, `VOICE_BGM_VOL` | thư viện nhạc nền · file nhạc cho một lần ghép · âm lượng | `<trạm>/assets/bgm` · — · 0.10 |
 | `VOICE_STUDIO_WORK` | output tạm + chỗ làm việc của `lab` | `<trạm>/out` |
@@ -121,6 +123,23 @@ echo 'export VOICE_STATION=<đường trạm>' >> ~/.zshrc
 
 Tên biến nhạc nền của bản cũ vẫn đọc được một phiên bản, kèm cảnh báo; `doctor` chỉ ra tên cần đổi.
 **Đặt `VOICE_STUDIO_WORK` ngoài repo** (mặc định đã vậy): output là dữ liệu giọng thật.
+
+### Apple Silicon (MPS): fp16 là mặc định
+
+Đo trên M1 16 GB với khúc văn đúng cỡ pipeline thật cắt ra: **fp16 RTF ≈ 1,77 · fp32 ≈ 2,31**
+— nhanh hơn ~23 %, đủ để một lượt đọc dài xong sớm hơn hơn một tiếng. Nên engine mặc định fp16
+trên MPS. Chất lượng nghe thì **phải nghe rồi mới kết luận**: đặt `OMNIVOICE_DTYPE=float32` nếu
+bạn thấy fp16 rè hoặc méo.
+
+Trên macOS engine tự đặt (nếu bạn chưa đặt) hai biến:
+
+- `PYTORCH_ENABLE_MPS_FALLBACK=1` — phép toán nào MPS chưa có thì chạy trên CPU thay vì sập.
+- `HF_DEACTIVATE_ASYNC_LOAD=1` — transformers 5.17 nạp weights song song **segfault** khi dtype
+  là fp16 trên MPS. Đổi vài giây khởi động lấy một lượt không sập.
+
+fp16 trên CPU bị từ chối cố ý: torch chạy CPU half bằng đường mô phỏng, chậm hơn fp32.
+
+*[Số đo lấy từ spike Mac; chưa chạy lại trên máy Windows — Windows không có MPS.]*
 
 ## Gọi từ pipeline khác
 

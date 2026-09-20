@@ -114,10 +114,59 @@ def test_load_cuda_uses_fp16(torch_env):
     assert engine.loaded_device() == "cuda:0"
 
 
-def test_load_mps_uses_fp32(torch_env):
+def test_load_mps_uses_fp16(torch_env):
+    """F1 phương án A: MPS mặc định fp16 (RTF 1,77 vs 2,31) — [chưa kiểm trên Mac thật]."""
     torch_env(mps=True)
     engine.load()
+    assert FakeOmniVoice.loads[0][1] == {"device_map": "mps", "dtype": "fp16"}
+
+
+def test_load_mps_dtype_env_forces_fp32(torch_env, monkeypatch):
+    torch_env(mps=True)
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "float32")
+    engine.load()
     assert FakeOmniVoice.loads[0][1] == {"device_map": "mps", "dtype": "fp32"}
+
+
+# ── OMNIVOICE_DTYPE ────────────────────────────────────────────────────────────────────
+
+def test_dtype_defaults_per_device():
+    assert engine.pick_dtype("cuda:0") == "float16"
+    assert engine.pick_dtype("mps") == "float16"
+    assert engine.pick_dtype("cpu") == "float32"
+
+
+def test_dtype_env_overrides_and_auto_means_default(monkeypatch):
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "fp32")
+    assert engine.pick_dtype("mps") == "float32"
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "half")
+    assert engine.pick_dtype("cuda:0") == "float16"
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "auto")
+    assert engine.pick_dtype("mps") == "float16"
+    assert engine.pick_dtype("cpu") == "float32"
+
+
+def test_dtype_argument_beats_env(monkeypatch):
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "float32")
+    assert engine.pick_dtype("mps", "float16") == "float16"
+
+
+def test_dtype_rejects_garbage_and_cpu_fp16(monkeypatch):
+    with pytest.raises(ValueError, match="OMNIVOICE_DTYPE"):
+        engine.pick_dtype("mps", "bfloat16")
+    monkeypatch.setenv("OMNIVOICE_DTYPE", "float16")
+    with pytest.raises(RuntimeError, match="CPU"):
+        engine.pick_dtype("cpu")
+
+
+def test_macos_sets_async_load_guard(monkeypatch):
+    """Trên macOS, nạp song song + fp16 trên MPS segfault ⇒ phải tắt sẵn."""
+    monkeypatch.setattr(engine.sys, "platform", "darwin")
+    monkeypatch.delenv("HF_DEACTIVATE_ASYNC_LOAD", raising=False)
+    monkeypatch.delenv("PYTORCH_ENABLE_MPS_FALLBACK", raising=False)
+    engine.apply_offline_env()
+    assert os.environ["HF_DEACTIVATE_ASYNC_LOAD"] == "1"
+    assert os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] == "1"
 
 
 def test_load_cpu_uses_fp32(torch_env):

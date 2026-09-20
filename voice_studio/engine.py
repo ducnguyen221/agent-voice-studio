@@ -16,10 +16,24 @@ máy chưa cài engine (test, CI, `doctor`).
 MẠNG: mặc định CHẠY OFFLINE (`HF_HUB_OFFLINE=1`, `TRANSFORMERS_OFFLINE=1`) vì weights đã
 nằm trong cache. Đặt `OMNIVOICE_ONLINE=1` để cho phép tải lần đầu.
 
-THIẾT BỊ: `cuda → mps → cpu`; ép bằng tham số hoặc `OMNIVOICE_DEVICE`. fp16 CHỈ trên CUDA —
-MPS và CPU chạy fp32. Trên macOS bật `PYTORCH_ENABLE_MPS_FALLBACK=1` (nếu chưa đặt) để phép
-toán nào MPS chưa hỗ trợ — thường là phần tokenizer âm thanh — tự chạy trên CPU thay vì
-làm sập cả lượt. [chưa kiểm trên Apple Silicon thật — chờ kết quả đo của spike Mac.]
+THIẾT BỊ: `cuda → mps → cpu`; ép bằng tham số hoặc `OMNIVOICE_DEVICE`.
+
+ĐỘ CHÍNH XÁC: `cuda → fp16`, `mps → fp16`, `cpu → fp32`; ép bằng `OMNIVOICE_DTYPE`
+(`float16`/`float32`, hoặc `auto` = mặc định). fp16 trên CPU bị từ chối — torch chạy CPU half
+bằng đường mô phỏng, chậm hơn fp32 chứ không nhanh hơn.
+
+Vì sao mps mặc định fp16: đo trên M1 16 GB (spike 2026-09-20), khúc văn đúng cỡ pipeline thật
+cắt ra, fp16 cho RTF ≈ 1,77 so với fp32 ≈ 2,31 — nhanh hơn ~23 %, và đó là khác biệt giữa một
+lượt đọc dài xong lúc 05:00 hay 06:10. Chất lượng nghe của fp16 phải do người nghe duyệt, mã
+này không khẳng định thay.
+
+Trên macOS đặt sẵn (nếu chưa có) hai biến:
+  · `PYTORCH_ENABLE_MPS_FALLBACK=1` — phép toán nào MPS chưa hỗ trợ (thường là phần tokenizer
+    âm thanh) tự chạy trên CPU thay vì làm sập cả lượt.
+  · `HF_DEACTIVATE_ASYNC_LOAD=1` — transformers 5.17 nạp weights song song gây segfault khi
+    dtype là fp16 trên MPS (đo trong spike). Tắt nạp bất đồng bộ là đổi vài giây khởi động
+    lấy một lượt không sập.
+[chưa kiểm trên Apple Silicon thật từ máy này — số đo lấy từ spike; Windows không có MPS.]
 """
 import os
 import subprocess
@@ -42,8 +56,8 @@ VOICE_OPTIONS = {
 
 __all__ = [
     "API_VERSION", "MODEL_ID", "VOICE_OPTIONS", "TARGET_RMS_DB",
-    "apply_offline_env", "pick_device", "load", "unload", "loaded_device", "seed_all",
-    "synth", "save", "normalize", "ffmpeg",
+    "apply_offline_env", "pick_device", "pick_dtype", "load", "unload", "loaded_device",
+    "seed_all", "synth", "save", "normalize", "ffmpeg",
 ]
 
 _model = None
@@ -57,6 +71,8 @@ def apply_offline_env():
         os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
     if sys.platform == "darwin":
         os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+        # transformers 5.17 + fp16 trên MPS: nạp weights song song segfault (đo trong spike).
+        os.environ.setdefault("HF_DEACTIVATE_ASYNC_LOAD", "1")
 
 
 apply_offline_env()
@@ -95,6 +111,33 @@ def pick_device(device=None):
     return "cpu"
 
 
+_DTYPE_ALIASES = {
+    "float16": "float16", "fp16": "float16", "half": "float16",
+    "float32": "float32", "fp32": "float32", "float": "float32", "full": "float32",
+}
+
+
+def pick_dtype(device, dtype=None):
+    """Chọn độ chính xác cho thiết bị: tham số → `OMNIVOICE_DTYPE` → mặc định theo thiết bị.
+
+    Mặc định: `cuda`/`mps` → float16, `cpu` → float32.
+    Trả về **tên** kiểu (chuỗi) chứ không phải đối tượng torch, để gọi được khi chưa có torch.
+    """
+    want = (dtype or os.environ.get("OMNIVOICE_DTYPE") or "").strip().lower()
+    kind = (device or "cpu").split(":", 1)[0]
+    if want and want != "auto":
+        name = _DTYPE_ALIASES.get(want)
+        if name is None:
+            raise ValueError(
+                f"OMNIVOICE_DTYPE không hợp lệ '{want}' — chỉ nhận float16, float32, auto")
+        if name == "float16" and kind == "cpu":
+            raise RuntimeError(
+                "đã ép float16 trên CPU — torch chạy CPU half bằng đường mô phỏng nên CHẬM hơn "
+                "float32; bỏ OMNIVOICE_DTYPE hoặc đặt float32")
+        return name
+    return "float32" if kind == "cpu" else "float16"
+
+
 def load(device=None):
     """Nạp model OmniVoice một lần mỗi tiến trình; gọi lại trả bản đã nạp.
 
@@ -107,7 +150,7 @@ def load(device=None):
     apply_offline_env()
     import torch
     from omnivoice import OmniVoice
-    dtype = torch.float16 if dev.startswith("cuda") else torch.float32
+    dtype = getattr(torch, pick_dtype(dev))
     _model = OmniVoice.from_pretrained(MODEL_ID, device_map=dev, dtype=dtype)
     _model_device = dev
     return _model
