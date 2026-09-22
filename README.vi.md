@@ -3,7 +3,7 @@
 Quy trình sản xuất giọng để một AI agent chạy trọn vẹn: từ hàng giờ ghi âm thô đến một giọng
 đọc đã được kiểm chứng, mà sắc thái do chính kịch bản điều khiển.
 
-**[English](README.md)** · [Hướng dẫn](GUIDE.vi.md) · MIT
+**[English](README.md)** · [Hướng dẫn](GUIDE.vi.md) · [Trang giới thiệu](https://ducnguyen.vn/agent-voice-studio/) · MIT
 
 ---
 
@@ -46,8 +46,10 @@ cd agent-voice-studio
 ```
 
 Tạo venv, cài torch theo hệ điều hành + `omnivoice==0.2.1`, rồi cài package và dựng trạm giọng.
-Các bước đầy đủ, kèm cảnh báo giấy phép weights (CC-BY-NC) và hai cạm bẫy từng tốn thời gian thật,
-nằm ở [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
+Các bước đầy đủ ở [`docs/INSTALL.md`](docs/INSTALL.md) — cài vào venv nào, hai chế độ trạm, khuôn
+`.env`, và bảng **cái gì đã chạy thật trên nền tảng nào**. Phần riêng của engine, kèm cảnh báo
+giấy phép weights (CC-BY-NC) và hai cạm bẫy từng tốn thời gian thật, nằm ở
+[`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
 ```bash
 pip install -e .          # trong venv engine — lệnh voice-studio
@@ -91,16 +93,38 @@ voice-studio speak --file script.txt --profile narrator --out out.mp3
 Cùng bộ công cụ, gom về một lệnh chạy bằng python của venv engine
 (`python -m voice_studio …` khi chưa cài lệnh):
 
+Đây là **toàn bộ** danh sách — đúng bảng mà `voice-studio --help` in ra, và có một test giữ cho
+hai bên không trôi khỏi nhau:
+
+| Lệnh | Làm gì |
+|---|---|
+| `speak` | text → file audio (hợp đồng ổn định, `--json`, mã 0/1/2/3) |
+| `narrate` | video câm + lời dẫn → MP4 có giọng (+ nhạc nền) |
+| `make-profile` | tạo profile giọng từ bản ghi / video / instruct |
+| `clone` | dựng profile từ media dài hoặc URL — **cần `--consent`** |
+| `verify` | soi một clip mẫu qua 6 cổng kiểm |
+| `reftext` | thêm dấu ngắt vào lời mẫu theo khoảng lặng thật |
+| `clean` | tách giọng + khử tạp âm cho clip mẫu (xem `voice_studio/clean/README.md`) |
+| `bgm` | thư viện nhạc nền: `list` \| `pick <style>` |
+| `tts` | đọc nhanh một câu ra file |
+| `ui` | giao diện web cục bộ để nghe thử |
+| `doctor` | kiểm trạm giọng, chỉ bước cài còn thiếu |
+| `mcp` | chạy MCP server (stdio) cho agent |
+| `lab` | bộ dựng profile đa sắc thái: `mine` \| `build` \| `split` \| `organize` |
+| `init` | dựng trạm (embedded \| separate) + `station.json` |
+| `export` | đóng gói giọng cá nhân để chuyển máy (`--personal`) |
+| `import` | nhập gói giọng cá nhân |
+| `backup` | zip cả trạm (không venv/cache/out) |
+| `migrate` | chuyển trạm embedded ra ngoài repo |
+| `update` | cập nhật repo (`git pull --ff-only`) |
+
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # pipeline khác gọi
 voice-studio narrate --video cam.mp4 --file script.txt --out final.mp4 --json
 voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
 voice-studio clone --file talk.m4a --name narrator --consent
-voice-studio clean ghi_am.mp3                    # tách giọng + khử tạp âm (xem voice_studio/clean/README.md)
 voice-studio lab mine|build|split|organize …     # bộ dựng đa sắc thái ở trên
-voice-studio doctor                              # thiếu gì thì chỉ bước cài tiếp
 voice-studio export --personal --out giong.zip   # chuyển máy: giọng + nhạc nền + station.json
-voice-studio backup --out tram.zip               # sao lưu trạm · update = git pull --ff-only
 ```
 
 `speak`/`narrate` là **hợp đồng ổn định** cho pipeline khác: `--json` in đúng một dòng JSON
@@ -111,13 +135,24 @@ profile, text rỗng) · `3` trạm/engine chưa cài. Các lệnh `python studi
 Agent đã cài plugin sẽ đọc `skills/voice-routing/SKILL.md` và chỉ nạp đúng reference của bước
 đang làm.
 
-## Bốn luật
+## Quy tắc
+
+Đây không phải lời khuyên. Ba luật đầu là lý do quy trình này tồn tại; luật thứ tư là **điều
+kiện** để được dùng nó.
 
 1. **Đừng tin tai — hãy đo.** Tổng hợp, cho nhận dạng nghe lại, so. "Nghe hay hơn" không phải
    kết quả.
 2. **Ghim seed.** Engine không tái lập nếu không ghim. Phép so không seed là đang đo nhiễu.
 3. **Clip mẫu hỏng thì hỏng mọi thứ sinh ra từ nó.** Đừng bao giờ cho qua lấy lệ.
-4. **Chỉ clone giọng của chính mình, hoặc người đã đồng ý bằng văn bản.**
+4. **Chỉ clone giọng của chính mình, hoặc người đã đồng ý bằng văn bản.** `clone` và
+   `make-profile` chỉ dùng cho giọng đã được đồng ý; `clone` đòi cờ `--consent` tường minh để
+   không ai lỡ tay. **Xin phép TRƯỚC khi clone giọng người khác** là điều kiện dùng repo này,
+   không phải một bước có thể bỏ khi vội.
+5. **Kiểm giấy phép của từng checkpoint mình tải.** Giấy phép của weights đi đường riêng với
+   giấy phép của code — xem mục [Ghi công](#ghi-công).
+
+Repo này **không chứa một file audio nào**, và một cổng trong bộ test chặn tên profile thật,
+đường dẫn máy cùng các file `*.wav` / `*.mp3` / `*.pt` trước khi một commit đi qua.
 
 ## Ghi công
 

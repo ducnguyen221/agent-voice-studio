@@ -55,14 +55,20 @@ ALLOW = {
     (".codex-plugin/plugin.json", "tac-gia"): 3,
     ("LICENSE", "tac-gia"): 1,
     ("NOTICE", "tac-gia"): 1,
-    ("README.md", "tac-gia"): 3,
+    ("README.md", "tac-gia"): 4,
     ("README.vi.md", "tac-gia"): 3,
+    ("docs/INSTALL.md", "tac-gia"): 1,
+    # Trang giới thiệu công khai (GitHub Pages): địa chỉ kho mã, tài liệu và các trang cùng họ
+    # là NỘI DUNG của trang, không phải rò rỉ. Vẫn khoá theo số đếm: thêm một liên kết là đỏ,
+    # nên không ai nhét được đường dẫn máy hay tên profile thật vào đây mà không bị nhìn thấy.
+    ("docs/index.html", "tac-gia"): 22,
 }
 
 # `.example` có trong danh sách vì `.env.example` là đúng loại file hay rò nhất: người ta
 # điền thử đường dẫn máy mình vào rồi quên gỡ.
 TEXT_EXT = {".py", ".md", ".json", ".toml", ".yml", ".yaml", ".txt", ".cfg", ".ini", ".sh",
-            ".ps1", ".example", ".gitignore", ".gitattributes", ""}
+            ".ps1", ".html", ".css", ".js", ".svg", ".example", ".gitignore",
+            ".gitattributes", ""}
 
 
 def repo_files():

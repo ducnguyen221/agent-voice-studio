@@ -3,7 +3,7 @@
 A voice-production process an AI agent runs end to end: from hours of raw recordings to a
 verified speaking voice whose delivery you control from inside the script.
 
-**[Tiếng Việt](README.vi.md)** · [Guide](GUIDE.md) · MIT
+**[Tiếng Việt](README.vi.md)** · [Guide](GUIDE.md) · [Website](https://ducnguyen.vn/agent-voice-studio/) · MIT
 
 ---
 
@@ -50,8 +50,10 @@ cd agent-voice-studio
 ```
 
 Create a venv, install torch for your OS plus `omnivoice==0.2.1`, then install the package and
-set up a voice station. Full steps (Vietnamese), including the weights licence warning
-(CC-BY-NC) and two traps that cost real time, are in
+set up a voice station. Step-by-step (Vietnamese): [`docs/INSTALL.md`](docs/INSTALL.md) — which
+venv, the two station modes, the `.env` template, and what has actually been run on which
+platform. The engine-specific steps, the weights licence warning (CC-BY-NC) and two traps that
+cost real time are in
 [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
 ```bash
@@ -103,16 +105,38 @@ Mining and building happen once per voice. Writing and speaking happen every tim
 The same tools behind one command, run with the engine venv's python
 (`python -m voice_studio …` until the command is installed):
 
+This is the whole list — the same one `voice-studio --help` prints, and a test keeps the two
+from drifting apart:
+
+| Command | Does |
+|---|---|
+| `speak` | text → audio file (the stable contract, `--json`, exit codes 0/1/2/3) |
+| `narrate` | silent video + narration → MP4 with voice (+ background music) |
+| `make-profile` | build a voice profile from a recording / video / instruction |
+| `clone` | build a profile from long media or a URL — **requires `--consent`** |
+| `verify` | run one reference clip through the six gates |
+| `reftext` | punctuate the reference text according to the real pauses |
+| `clean` | isolate the voice + denoise a reference clip (see `voice_studio/clean/README.md`) |
+| `bgm` | background-music library: `list` \| `pick <style>` |
+| `tts` | read one sentence straight to a file |
+| `ui` | a local web page for quick listening |
+| `doctor` | check the station, name the install step still missing |
+| `mcp` | run an MCP server (stdio) for an agent |
+| `lab` | the multi-style builder: `mine` \| `build` \| `split` \| `organize` |
+| `init` | lay out a station (embedded \| separate) + `station.json` |
+| `export` | pack personal voices to move machines (`--personal`) |
+| `import` | unpack a personal voice pack |
+| `backup` | zip the whole station (no venv/cache/out) |
+| `migrate` | move an embedded station out of the repo |
+| `update` | update the clone (`git pull --ff-only`) |
+
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # for other pipelines
 voice-studio narrate --video silent.mp4 --file script.txt --out final.mp4 --json
 voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
 voice-studio clone --file talk.m4a --name narrator --consent
-voice-studio clean recording.mp3                 # isolate voice + denoise (see voice_studio/clean/README.md)
 voice-studio lab mine|build|split|organize …     # the multi-style builder above
-voice-studio doctor                              # tells you what is still missing
 voice-studio export --personal --out voices.zip  # move machines: voices + music + station.json
-voice-studio backup --out station.zip            # back up the station · update = git pull --ff-only
 ```
 
 `speak`/`narrate` are the **stable contract** for other pipelines: `--json` prints exactly one
@@ -124,14 +148,25 @@ JSON line as the last line of stdout, logs go to stderr, exit codes `0` ok · `1
 An agent with the plugin installed reads `skills/voice-routing/SKILL.md` and loads only the
 reference the current step needs.
 
-## Four rules
+## Rules
+
+These are not advice. The first three are why this process exists; the fourth is a condition
+of using it.
 
 1. **Never trust your ear — measure.** Synthesize, transcribe back, compare. "Sounds better"
    is not a result.
 2. **Pin the seed.** The engine is not reproducible by default. An unpinned comparison
    measures sampling noise.
 3. **A bad reference clip poisons everything built from it.** Never wave one through.
-4. **Clone only your own voice, or one whose owner agreed in writing.**
+4. **Clone only your own voice, or one whose owner agreed in writing.** `clone` and
+   `make-profile` are for consented voices only; `clone` demands an explicit `--consent` flag so
+   nobody does it by accident. Asking **before** you clone somebody else's voice is a condition
+   of using this repository, not a step to skip when you are in a hurry.
+5. **Check the licence of every model checkpoint you download.** Weights are licensed separately
+   from the code that loads them — see [Acknowledgments](#acknowledgments).
+
+This repository ships **no audio at all**, and a test gate blocks real profile names, machine
+paths and `*.wav` / `*.mp3` / `*.pt` files before a commit can go through.
 
 ## Acknowledgments
 
