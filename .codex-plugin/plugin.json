@@ -1,6 +1,6 @@
 {
   "name": "agent-voice-studio",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "A voice-production process an AI agent runs from raw recordings to a verified speaking voice: mine distinct speaking styles out of hours of audio, gate every reference clip through six automatic checks, build profiles whose emotion is switched by markers inside the script, and apply a Vietnamese pronunciation ruleset measured by round-trip ASR.",
   "author": {
     "name": "Duc Nguyen",

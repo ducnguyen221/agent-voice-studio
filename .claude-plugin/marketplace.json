@@ -9,7 +9,7 @@
     {
       "name": "agent-voice-studio",
       "description": "Mine speaking styles out of long recordings, gate every reference clip with automatic checks, build multi-marker voice profiles, and write scripts a TTS engine reads correctly in Vietnamese.",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "source": "./",
       "license": "MIT",
       "author": {
