@@ -1,128 +1,124 @@
-# Writing a script a Vietnamese TTS engine reads correctly
+# Viết kịch bản để engine TTS tiếng Việt đọc đúng
 
-Every rule here was **measured**, not guessed: the text was synthesized, then Whisper
-transcribed the audio back, and the "heard" column is what came out. Where a rule was not
-measured, it says so.
+Mọi quy tắc ở đây đều đã được **đo**, không phải đoán: văn bản được tổng hợp thành tiếng, rồi
+Whisper phiên âm ngược audio đó, và cột "engine đọc thành" là thứ nó nghe ra. Quy tắc nào chưa
+đo thì ghi rõ là chưa đo.
 
-Measured on OmniVoice 0.2.1 with an 18-second reference clip. Behaviour on other engines
-will differ in detail but the *failure shapes* generalise: separators get swallowed,
-acronyms fuse with adjacent digits, and short standalone fragments render unstably.
+Đo trên OmniVoice 0.2.1 với clip tham chiếu dài 18 giây. Trên engine khác, chi tiết sẽ khác,
+nhưng *dạng lỗi* thì lặp lại: ký tự phân cách bị nuốt, từ viết tắt dính vào chữ số liền kề,
+và mảnh câu ngắn đứng riêng thì render chập chờn.
 
 ---
 
-## 1. The job
+## 1. Việc cần làm
 
-Raw text → a spoken script. **Not a transcription of the written text.** Prose written to be
-read with the eyes and prose written to be read aloud are different things; gluing article
-sentences together produces the flat, list-reading cadence everyone recognises as machine
-narration.
+Văn bản thô → kịch bản để nói. **Không phải chép lại văn bản viết.** Văn viết để đọc bằng mắt
+và văn viết để đọc thành tiếng là hai thứ khác nhau; ghép nối các câu của một bài báo sẽ cho
+ra nhịp đọc phẳng như đọc danh sách — thứ ai cũng nhận ra là giọng máy.
 
-Rewrite first, then apply the rules below, then mark it up, then check.
+Viết lại trước, rồi áp các quy tắc dưới đây, rồi gắn marker, rồi kiểm tra.
 
-## 2. The pronunciation table
+## 2. Bảng phát âm
 
-| Case | Written WRONG | Engine said | Written RIGHT |
+| Trường hợp | Viết SAI | Engine đọc thành | Viết ĐÚNG |
 |---|---|---|---|
-| **Version number** | `GLM-5.3` | "GLM-53" — the `.3` vanished | `GLM phiên bản 5.3` |
-| | `GLM 5.3` | "GOM53" — whole cluster mangled | |
+| **Số phiên bản** | `GLM-5.3` | "GLM-53" — mất `.3` | `GLM phiên bản 5.3` |
+| | `GLM 5.3` | "GOM53" — cả cụm bị méo | |
 | | `GPT 5.2` | "GPT-52" | `GPT phiên bản 5.2` |
-| **Clock time** | `14:30` | "14.30" — the word "giờ" lost | `14 giờ 30` |
-| **Date** | `22/8/2026` | "22.8.2026" — slashes lost | `22 tháng 8 năm 2026` |
-| **Domain** | `Z.ai` | **"Z đây"** — plainly wrong | `Z chấm AI` |
-| **Thousands** | — | correct | `2.436` *or* `2436` — both fine |
-| **Number in words** | — | correct | `hai nghìn bốn trăm ba mươi sáu` — also fine |
-| **Money** | — | correct | `1.250.000 đồng` |
-| **Percent** | — | read as "phần trăm" | `15%` |
-| **Common English tech terms** | — | correct | `API`, `OpenAI`, `Microsoft`, `Google` — leave alone |
+| **Giờ** | `14:30` | "14.30" — mất chữ "giờ" | `14 giờ 30` |
+| **Ngày** | `22/8/2026` | "22.8.2026" — mất dấu gạch chéo | `22 tháng 8 năm 2026` |
+| **Tên miền** | `Z.ai` | **"Z đây"** — sai hẳn | `Z chấm AI` |
+| **Hàng nghìn** | — | đúng | `2.436` *hoặc* `2436` — cả hai đều được |
+| **Số viết bằng chữ** | — | đúng | `hai nghìn bốn trăm ba mươi sáu` — cũng được |
+| **Tiền** | — | đúng | `1.250.000 đồng` |
+| **Phần trăm** | — | đọc thành "phần trăm" | `15%` |
+| **Thuật ngữ công nghệ tiếng Anh phổ biến** | — | đúng | `API`, `OpenAI`, `Microsoft`, `Google` — để nguyên |
 
-### The rule underneath the table
+### Quy tắc nằm bên dưới bảng
 
-**An acronym pressed against a number fuses and mangles.** `GLM 5.3` → "GOM53",
-`GPT 5.2` → "GPT-52". Put one ordinary word between them and it resolves:
-`GLM phiên bản 5.3` reads correctly. This is the single most useful line here — it covers
-model names, product versions, standards, anything shaped `LETTERS + digits`.
+**Từ viết tắt dính sát vào số sẽ dính liền và méo.** `GLM 5.3` → "GOM53",
+`GPT 5.2` → "GPT-52". Chèn một từ thường vào giữa là hết:
+`GLM phiên bản 5.3` đọc đúng. Đây là dòng hữu ích nhất trong tài liệu này — nó áp cho tên
+model, phiên bản sản phẩm, tiêu chuẩn, bất cứ thứ gì có dạng `CHỮ CÁI + chữ số`.
 
-**Separator characters get swallowed.** `:` `/` `.` inside times, dates and versions
-disappear. Spell them as words: `giờ`, `tháng`, `năm`, `chấm`.
+**Ký tự phân cách bị nuốt.** `:` `/` `.` trong giờ, ngày và số phiên bản biến mất. Viết chúng
+thành chữ: `giờ`, `tháng`, `năm`, `chấm`.
 
-**Bare numbers are safe.** Digits and spelled-out words both read correctly, including
-Vietnamese-style thousand dots. Leave them alone.
+**Số trơn thì an toàn.** Cả chữ số lẫn số viết bằng chữ đều đọc đúng, kể cả dấu chấm hàng
+nghìn kiểu Việt. Để nguyên.
 
-> **A superseded rule, kept because the reason matters.** An earlier version of this note
-> insisted numbers must stay as digits because spelled-out numbers got crushed
-> ("một nghìn một trăm bốn mươi mốt" collapsing to "141"). Re-measured with a good reference
-> clip: **both forms are correct.** The original fault was never the written form — it was a
-> reference clip of only a few seconds. A short clip degrades everything, and the symptom
-> happened to show up on numbers first. When a rule seems to be about text, check whether it
-> is actually about the clip.
+> **Một quy tắc đã bị thay thế, giữ lại vì lý do của nó quan trọng.** Bản trước của ghi chú
+> này bắt buộc giữ số ở dạng chữ số vì số viết bằng chữ bị nén lại
+> ("một nghìn một trăm bốn mươi mốt" co thành "141"). Đo lại với một clip tham chiếu tốt:
+> **cả hai dạng đều đúng.** Lỗi gốc chưa bao giờ nằm ở cách viết — mà ở một clip tham chiếu
+> chỉ dài vài giây. Clip ngắn làm giảm chất lượng mọi thứ, và triệu chứng tình cờ lộ ra ở con
+> số trước. Khi một quy tắc có vẻ là về văn bản, hãy kiểm xem thực ra nó có phải về clip không.
 
-**Never enable the engine's text normaliser for Vietnamese.** In OmniVoice, `normalize_text`
-routes zh/en through a proper normaliser and everything else through a regex that only knows
-`\d+`. Vietnamese thousand-dots come out as fragments — worse than no normalisation at all.
-Keep it off.
+**Không bao giờ bật bộ chuẩn hoá văn bản của engine cho tiếng Việt.** Trong OmniVoice,
+`normalize_text` đưa zh/en qua một bộ chuẩn hoá đúng nghĩa, còn mọi ngôn ngữ khác đi qua một
+regex chỉ biết `\d+`. Dấu chấm hàng nghìn kiểu Việt bị vỡ thành mảnh — tệ hơn không chuẩn hoá.
+Luôn tắt.
 
-### Not measured — verify when you hit them
+### Chưa đo — kiểm khi gặp
 
-Uncommon foreign proper nouns (one test heard `Claude` as "Cloud", and it was unclear
-whether the engine mispronounced it or ASR misheard); acronyms meant to be spelled out
-letter by letter; units like `km/h` and `GB`; Roman numerals.
+Tên riêng nước ngoài ít gặp (một lần thử nghe `Claude` thành "Cloud", và không rõ engine phát
+âm sai hay ASR nghe nhầm); từ viết tắt cần đánh vần từng chữ cái; đơn vị như `km/h` và `GB`;
+số La Mã.
 
-## 3. Markers
+## 3. Marker
 
 ```
 [marker-name] First sentence. Second sentence.
 [other-marker] Now the delivery changes.
 ```
 
-A marker holds **until the next marker**. Unmarked text uses the profile's neutral clip.
+Một marker giữ hiệu lực **đến marker kế tiếp**. Đoạn không gắn marker dùng clip trung tính
+của profile.
 
-Marker names come from the profile, not from your imagination — read
-`voices/<profile>.profile.json` first. A marker that is not in the manifest is stripped and
-the passage falls back to whatever is currently in effect, announced only by one line of
-console output that is easy to miss.
+Tên marker lấy từ profile, không phải tự nghĩ ra — đọc `voices/<profile>.profile.json` trước.
+Marker không có trong manifest sẽ bị gỡ bỏ và đoạn đó quay về marker đang có hiệu lực, chỉ
+được báo bằng một dòng console rất dễ bỏ qua.
 
-Choose by **meaning**, not to sprinkle variety: opening hook, emphasis or conclusion,
-quiet narration, fast enumeration, ordinary explanation.
+Chọn theo **ý nghĩa**, không rải cho có biến hoá: câu mở móc (hook), nhấn mạnh hoặc kết luận,
+kể chuyện nhỏ nhẹ, liệt kê nhanh, giải thích thông thường.
 
-**Non-verbal tags** — the engine's own inline sounds such as laughter, sighs and surprise
-interjections — pass straight through, and are weak. They are isolated noises; they cannot
-express "read this whole paragraph lower". Use them sparingly; in news copy they sound
-false very quickly.
+**Tag phi ngôn ngữ** — các âm nội tuyến của chính engine như tiếng cười, thở dài và thán từ
+ngạc nhiên — được chuyển thẳng qua, và yếu. Chúng là tiếng động rời rạc; không diễn đạt được
+"đọc cả đoạn này trầm hơn". Dùng tiết chế; trong văn bản tin tức chúng nghe giả rất nhanh.
 
-## 4. Seeds
+## 4. Seed
 
-Pin one. The engine is not reproducible without it, and an unpinned A/B measures sampling
-noise rather than your change. Detail in `engine-limits.md`.
+Pin một seed. Engine không tái lập được nếu thiếu nó, và một phép A/B không pin seed đo nhiễu
+lấy mẫu chứ không đo thay đổi của bạn. Chi tiết ở `engine-limits.md`.
 
-A seed does not improve a voice — it makes a render repeatable. Different draws *are*
-better or worse, so seed search is a real technique, but a machine can only **reject broken
-draws** (high ASR error). No metric tells you which draw sounds more human. Search seeds
-only for sentences that fail the ASR gate; do not search them all.
+Seed không làm giọng hay hơn — nó làm một lần render lặp lại được. Các lần lấy mẫu khác nhau
+*đúng là* có lần tốt lần kém, nên dò seed là một kỹ thuật thật, nhưng máy chỉ **loại được lần
+lấy mẫu hỏng** (lỗi ASR cao). Không có chỉ số nào cho biết lần nào nghe người hơn. Chỉ dò seed
+cho những câu trượt cổng ASR; đừng dò cho tất cả.
 
-## 5. Check before handing over
+## 5. Kiểm trước khi bàn giao
 
-1. No stray brackets — every marker exists in the manifest, every tag is a real engine tag.
-2. **No short fragment standing alone.** A title, a label or a bare number rendered by itself
-   comes out unstable: the first token distorts or a word is swallowed. Fold it into the
-   opening of a longer sentence.
-3. Very long sentences (beyond roughly 380 characters) split at commas, never mid-phrase.
-4. Synthesize → ASR back → character error rate above 0.25 means fix the *writing* of that
-   part and try again.
+1. Không còn ngoặc lạc — mọi marker đều có trong manifest, mọi tag đều là tag thật của engine.
+2. **Không có mảnh câu ngắn đứng một mình.** Tiêu đề, nhãn hay một con số trơn render riêng
+   sẽ chập chờn: token đầu bị méo hoặc một từ bị nuốt. Gộp nó vào đầu một câu dài hơn.
+3. Câu quá dài (khoảng trên 380 ký tự) tách tại dấu phẩy, không bao giờ tách giữa cụm từ.
+4. Tổng hợp → ASR ngược lại → tỉ lệ lỗi ký tự (CER) trên 0.25 nghĩa là sửa *cách viết* của
+   phần đó rồi thử lại.
 
-## 6. Worked example
+## 6. Ví dụ hoàn chỉnh
 
-**Raw:**
+**Thô:**
 > Z.ai công bố GLM-5.3 ngày 14/8/2026. Mô hình đã phát hiện 2.436 lỗ hổng bảo mật, tăng 15% so với bản trước.
 
-**Script:**
+**Kịch bản:**
 ```
 [hook] Ngày 14 tháng 8 năm 2026, công ty Z chấm AI công bố một mô hình mới.
 [neutral] Nó tên là GLM phiên bản 5.3.
 [emphasis] Và đây mới là con số đáng chú ý: mô hình này đã phát hiện 2.436 lỗ hổng bảo mật, tăng 15% so với bản trước.
 ```
 
-Changed: domain spelled out · version separated from its acronym · date written in words ·
-split into short sentences · markers assigned by meaning. Left alone: `2.436` and `15%`,
-because both were measured correct.
+Đã đổi: viết tên miền thành chữ · tách số phiên bản khỏi từ viết tắt · viết ngày bằng chữ ·
+chia thành câu ngắn · gắn marker theo ý nghĩa. Để nguyên: `2.436` và `15%`, vì cả hai đều đã
+đo là đúng.
 
-*(Marker names above are placeholders — use the ones in your own manifest.)*
+*(Tên marker ở trên chỉ là ví dụ — dùng tên trong manifest của bạn.)*

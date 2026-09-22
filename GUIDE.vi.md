@@ -24,9 +24,11 @@ không bao giờ là lượng.
 
 ## 1. Cài
 
-Xem [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md). Một biến
-môi trường `OMNIVOICE_DIR` nối bộ script này với engine. Trỏ `VOICE_STUDIO_WORK` ra **ngoài
-repo** để audio sinh ra không bao giờ có cơ hội lọt vào git.
+Xem [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md): venv →
+torch theo hệ điều hành → `omnivoice==0.2.1` → `pip install -e <repo>` → `voice-studio init` →
+`voice-studio doctor`. `init` hỏi đặt **trạm giọng** ở đâu — trong repo (`embedded`, mặc định) hay
+ngoài repo (`separate`); từng thư mục của trạm giải thích ở [`docs/WORKSPACE.md`](docs/WORKSPACE.md).
+Output mặc định nằm trong trạm, không bao giờ trong mã repo, để audio không có cơ hội lọt vào git.
 
 ## 2. Làm sạch — chỉ khi cần
 
@@ -42,7 +44,7 @@ Chi tiết và cạm bẫy hai-môi-trường:
 ## 3. Đào
 
 ```bash
-python studio/mine.py --dir recordings/ --name narrator
+voice-studio lab mine --dir recordings/ --name narrator
 ```
 
 Cắt audio thành cửa sổ có hai đầu là ranh giới câu, đo ngôn điệu, phân cụm trong nội bộ giọng,
@@ -57,7 +59,7 @@ chứ không theo cách nói.
 ## 4. Dựng
 
 ```bash
-python studio/build.py --name narrator --mode new
+voice-studio lab build --name narrator --mode new
 ```
 
 Chạy sáu cổng qua từng ứng viên, giữ cái đầu tiên đạt. Có clip bị loại là **bình thường** —
@@ -83,7 +85,7 @@ Bảng đo đầy đủ:
 ## 6. Đọc
 
 ```bash
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Cắt theo marker, rồi theo câu, ghim seed, chuẩn hoá mức, vuốt mối nối.

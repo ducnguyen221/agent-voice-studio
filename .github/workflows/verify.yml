@@ -20,7 +20,7 @@ jobs:
       # và cũng không nên: repo này cố ý chạy được mà không có engine cho tới
       # lúc thật sự tổng hợp giọng.
       - name: Compile every script
-        run: python -m compileall -q studio
+        run: python -m compileall -q studio voice_studio extras tests
 
       # Cổng chống rò. Repo dạy cách tạo giọng, nó KHÔNG chứa giọng.
       # Danh sách này chặn hai thứ: file nhị phân của giọng/model, và dấu vết
@@ -35,18 +35,42 @@ jobs:
           fi
           echo "OK — no audio or model binaries tracked."
 
+      # Cổng rò danh tính chỉ còn MỘT bản: tests/test_no_identity_leak.py.
+      #
+      # Trước đây bước này có một bản grep riêng. Hai bản, hai luật miễn trừ khác nhau: bản
+      # grep chỉ loại trừ chính file workflow, nên nó bắt luôn mẫu BỊA nằm trong test đột
+      # biến của chính cổng kia và báo đỏ giả. Bản trong tests/ mạnh hơn hẳn — miễn trừ theo
+      # SỐ ĐẾM từng (file, mẫu) chứ không miễn cả file, tự kiểm regex bằng test đột biến, và
+      # quét cả file chưa `git add`. Một luật, một chỗ — mẫu "biến môi trường trỏ thư mục
+      # người dùng" mà chỉ bản grep cũ có đã được gộp sang đó (khoá `bien-home-win`).
       - name: No machine paths or personal identifiers
         run: |
-          # Chỉ quét file được git theo dõi, và bỏ qua chính file workflow này
-          # (nó buộc phải chứa các mẫu để quét).
-          files=$(git ls-files | grep -v '^\.github/workflows/verify\.yml$')
-          hits=$(grep -REn 'C:\\Users\\|/home/[a-z]+/|%USERPROFILE%' $files || true)
-          if [ -n "$hits" ]; then
-            echo "::error::Absolute machine paths leaked into the repo:"
-            echo "$hits"
-            exit 1
-          fi
-          echo "OK — no absolute machine paths."
+          python -m pip install -q pytest
+          python -m pytest -q tests/test_no_identity_leak.py
+
+      # Nới miễn trừ mà không chứng minh lại = cổng mất răng trong im lặng. Bước này chèn một
+      # chuỗi danh tính THẬT vào một file KHÁC (không nằm trong bất kỳ miễn trừ nào) và đòi
+      # cổng phải đỏ. Bước trên xanh + bước này đỏ-đúng-lúc = cổng còn răng.
+      - name: Identity gate still has teeth (mutation)
+        run: |
+          python - <<'PY'
+          import subprocess, sys
+          from pathlib import Path
+          # Dựng chuỗi bằng chr() để chính file workflow này không tự khớp cổng.
+          leak = "".join(map(chr, (67, 58, 92, 85, 115, 101, 114, 115, 92))) + "someone"
+          probe = Path("extras/_mutation_probe.py")
+          probe.write_text("# " + leak + "\n", encoding="utf-8")
+          try:
+              r = subprocess.run([sys.executable, "-m", "pytest", "-q",
+                                  "tests/test_no_identity_leak.py"])
+          finally:
+              probe.unlink()
+          if r.returncode == 0:
+              print("::error::Identity gate lost its teeth: a real identity string in another "
+                    "file still passed.")
+              sys.exit(1)
+          print("OK — the gate went red exactly when it had to.")
+          PY
 
       - name: Plugin manifests are valid JSON and agree on version
         run: |

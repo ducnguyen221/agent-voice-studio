@@ -35,6 +35,13 @@ the table, including the ones that overturned an earlier belief.
 Not an engine — you install that yourself. Not a hosted service. Not a source of voices:
 this repository contains **no audio at all**, by design.
 
+Also not one piece of a suite you have to install whole. This repository stands alone:
+install it when you need a speaking voice, and only then. A content pipeline (for example
+`agent-marketing-studio`) *can* call it through the shared contract — exit code plus a final
+JSON line on stdout — when it is present, but that pipeline runs fine without it and says
+plainly that the voice capability is missing rather than failing mid-run. There is no
+required install order and no bundle.
+
 ## Install
 
 ```bash
@@ -42,12 +49,32 @@ git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
 ```
 
-Install a speech engine and point one variable at it. Full steps, including two traps that
-cost real time, are in [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
+Create a venv, install torch for your OS plus `omnivoice==0.2.1`, then install the package and
+set up a voice station. Full steps (Vietnamese), including the weights licence warning
+(CC-BY-NC) and two traps that cost real time, are in
+[`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
 ```bash
-export OMNIVOICE_DIR=/path/to/engine      # Windows: setx OMNIVOICE_DIR "C:\path\to\engine"
+pip install -e .          # inside the engine venv — provides the voice-studio command
+voice-studio init         # asks: station inside the repo (embedded, recommended) or outside (separate)
+voice-studio doctor       # tells you what is still missing
 ```
+
+`init` **presents a two-option table before doing anything**, rather than asking an open
+question. `embedded` — station at `<repo>/workspace/`, configuration in `<repo>/.env` — is
+the **recommendation**: press Enter and you are done, with no environment variables to set.
+Choose `separate` when you work across machines, are comfortable with the technical side, or
+this repository is your own public fork. With nobody to answer (CI, a scheduled task) `init`
+prints that table and **exits with code 2 without writing a byte** — an installing agent must
+show the table to the user instead of choosing silently.
+
+`embedded` means clone-and-run: `init` lays down the station tree and copies `.env.example`
+to `<repo>/.env` for you to fill in. Both `workspace/` and `.env` are blocked by
+`.gitignore` and again by the `pre-commit` hook. `.env` holds **paths and configuration**,
+never tokens.
+
+The station holds your venv, voices, background music and output — every folder is described in
+[`docs/WORKSPACE.md`](docs/WORKSPACE.md). Generating background music: [`docs/bgm-generation.md`](docs/bgm-generation.md).
 
 As an agent plugin:
 
@@ -64,12 +91,35 @@ codex plugin install agent-voice-studio@agent-voice-studio
 ## Use
 
 ```bash
-python studio/mine.py  --dir recordings/ --name narrator   # find the speaking styles
-python studio/build.py --name narrator --mode new          # gate clips, build the profile
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio lab mine  --dir recordings/ --name narrator   # find the speaking styles
+voice-studio lab build --name narrator --mode new          # gate clips, build the profile
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Mining and building happen once per voice. Writing and speaking happen every time.
+
+### The `voice-studio` command (package `voice_studio`)
+
+The same tools behind one command, run with the engine venv's python
+(`python -m voice_studio …` until the command is installed):
+
+```bash
+voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # for other pipelines
+voice-studio narrate --video silent.mp4 --file script.txt --out final.mp4 --json
+voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
+voice-studio clone --file talk.m4a --name narrator --consent
+voice-studio clean recording.mp3                 # isolate voice + denoise (see voice_studio/clean/README.md)
+voice-studio lab mine|build|split|organize …     # the multi-style builder above
+voice-studio doctor                              # tells you what is still missing
+voice-studio export --personal --out voices.zip  # move machines: voices + music + station.json
+voice-studio backup --out station.zip            # back up the station · update = git pull --ff-only
+```
+
+`speak`/`narrate` are the **stable contract** for other pipelines: `--json` prints exactly one
+JSON line as the last line of stdout, logs go to stderr, exit codes `0` ok · `1` engine error ·
+`2` bad call/config (missing profile, empty text) · `3` station/engine not installed. The old
+`python studio/*.py` commands still work (they are aliases). `clone` and `make-profile` are for
+**consented** voices only — see rule 4.
 
 An agent with the plugin installed reads `skills/voice-routing/SKILL.md` and loads only the
 reference the current step needs.

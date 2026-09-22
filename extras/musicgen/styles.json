@@ -1,0 +1,25 @@
+{
+  "_doc": "Bảng style nhạc nền cho gen_pack.py. Mỗi style: name (tên file <name>.mp3 trong thư viện), mood/use (mô tả cho người chọn), prompt (tiếng Anh — MusicGen hiểu mô tả tiếng Anh). Tất cả instrumental, dùng làm lớp nền dưới giọng đọc.",
+  "styles": [
+    {"name": "broadcast-bed", "mood": "trung tính, tự tin", "use": "Bản tin, tổng hợp — mặc định an toàn.",
+     "prompt": "modern broadcast underscore, corporate electronic, 94 BPM, instrumental, clean polished mix, soft pulsing synth bass, warm pad, light electronic percussion and soft claps, gentle pluck arpeggio, neutral confident and subtly uplifting, unobtrusive background bed"},
+    {"name": "uplifting-intro", "mood": "tươi sáng, hy vọng", "use": "Tin tốt, ra mắt, cột mốc.",
+     "prompt": "uplifting corporate intro, 95 BPM, instrumental, bright synth plucks, warm pad, soft piano accents, light percussion, hopeful neutral broadcast mood, clean modern"},
+    {"name": "minimal-tech", "mood": "tối giản, điềm tĩnh", "use": "Chủ đề công nghệ, dữ liệu.",
+     "prompt": "minimal tech bed, 92 BPM, instrumental, arpeggiated synth, subtle soft kick, airy pads, clean modern corporate, calm neutral, data driven feel"},
+    {"name": "cinematic-ambient", "mood": "trầm, sâu", "use": "Phân tích dài, chủ đề nghiêm túc.",
+     "prompt": "cinematic ambient underscore, 80 BPM, warm string pad, soft piano, subtle swells, calm serious documentary mood, instrumental, unobtrusive background bed"},
+    {"name": "lofi-chill", "mood": "thư giãn", "use": "Nội dung nhẹ, kể chuyện.",
+     "prompt": "lofi chillhop background, 85 BPM, mellow rhodes piano, soft clean drum beat, warm bass, relaxed neutral mood, instrumental, loopable"},
+    {"name": "energetic-drive", "mood": "năng lượng, tích cực", "use": "Mở đầu nhanh, short.",
+     "prompt": "energetic upbeat intro, 110 BPM, driving electronic, punchy claps, bright plucky synths, motivating positive mood, instrumental, clean"},
+    {"name": "inspiring-piano", "mood": "truyền cảm hứng", "use": "Câu chuyện con người, kết bài.",
+     "prompt": "inspiring corporate piano underscore, 90 BPM, gentle piano lead, warm strings, soft light percussion, hopeful emotional yet neutral, instrumental"},
+    {"name": "tech-pulse", "mood": "hiện đại, nhịp đều", "use": "Sản phẩm, demo công cụ.",
+     "prompt": "modern tech pulse bed, 100 BPM, pulsing analog synth bass, steady soft four on the floor kick, glassy plucks, futuristic clean, instrumental"},
+    {"name": "calm-corporate", "mood": "nhẹ nhàng, chuyên nghiệp", "use": "Hướng dẫn, bài giảng.",
+     "prompt": "calm corporate background, 88 BPM, soft marimba and pluck, warm pad, light shaker percussion, professional gentle, unobtrusive, instrumental"},
+    {"name": "dynamic-newsroom", "mood": "khẩn trương có kiểm soát", "use": "Tin nóng, sự kiện.",
+     "prompt": "dynamic newsroom underscore, 105 BPM, tense pulsing strings, electronic percussion, urgent but controlled broadcast mood, instrumental"}
+  ]
+}

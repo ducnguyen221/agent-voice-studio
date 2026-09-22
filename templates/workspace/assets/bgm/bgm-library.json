@@ -1,0 +1,22 @@
+{
+  "_doc": "Thư viện nhạc nền. Mỗi style là một file <name>.mp3 nằm cạnh file này. Người tạo nội dung chọn một style theo nội dung; renderer trộn ở mức 'volume'.",
+  "volume": 0.1,
+  "default": "neutral",
+  "styles": [
+    {
+      "name": "neutral",
+      "mood": "trung tính, chuyên nghiệp",
+      "use": "Mặc định an toàn cho mọi nội dung."
+    },
+    {
+      "name": "uplifting",
+      "mood": "tươi sáng, tích cực",
+      "use": "Tin tốt, ra mắt, cột mốc."
+    },
+    {
+      "name": "ambient",
+      "mood": "trầm lắng, sâu",
+      "use": "Phân tích dài, chủ đề nghiêm túc."
+    }
+  ]
+}

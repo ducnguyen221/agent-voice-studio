@@ -32,6 +32,12 @@ tin cũ.
 Không phải engine — anh tự cài. Không phải dịch vụ. Không phải nguồn cung giọng: repo này
 **không chứa một file audio nào**, có chủ đích.
 
+Cũng **không phải một mảnh của bộ nào phải cài đủ**. Repo này đứng một mình: cài nó khi anh
+cần một giọng đọc, và chỉ khi đó. Một quy trình sản xuất nội dung (ví dụ
+`agent-marketing-studio`) *gọi được* nó qua hợp đồng mã thoát + dòng JSON cuối stdout nếu nó
+có mặt — nhưng quy trình đó chạy bình thường khi anh chưa cài, và sẽ nói rõ là đang thiếu
+năng lực giọng thay vì nổ giữa chừng. Không có thứ tự cài bắt buộc, không có "bộ ba".
+
 ## Cài
 
 ```bash
@@ -39,12 +45,29 @@ git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
 ```
 
-Cài engine rồi trỏ đúng một biến vào đó. Các bước đầy đủ, kèm hai cạm bẫy từng tốn thời gian
-thật, nằm ở [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
+Tạo venv, cài torch theo hệ điều hành + `omnivoice==0.2.1`, rồi cài package và dựng trạm giọng.
+Các bước đầy đủ, kèm cảnh báo giấy phép weights (CC-BY-NC) và hai cạm bẫy từng tốn thời gian thật,
+nằm ở [`skills/voice-routing/references/install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md).
 
-```powershell
-setx OMNIVOICE_DIR "C:\duong\dan\toi\engine"
+```bash
+pip install -e .          # trong venv engine — lệnh voice-studio
+voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến nghị) hay ngoài (separate)
+voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
+
+`init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
+`<repo>/workspace/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
+không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,
+hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) thì `init`
+in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài phải đưa bảng cho người
+dùng xem, không tự chọn im lặng.
+
+Chế độ `embedded` là "clone là chạy": `init` dựng sẵn cây trạm và chép `.env.example` thành
+`<repo>/.env` cho anh điền. Cả `workspace/` lẫn `.env` đều bị `.gitignore` chặn và hook
+`pre-commit` chặn lần nữa. `.env` giữ **đường dẫn và cấu hình**, không bao giờ giữ token.
+
+Trạm giọng là nơi chứa venv, giọng, nhạc nền, output của anh — từng thư mục giải thích ở
+[`docs/WORKSPACE.md`](docs/WORKSPACE.md). Nhạc nền tự sinh: [`docs/bgm-generation.md`](docs/bgm-generation.md).
 
 Cài như plugin cho agent:
 
@@ -56,12 +79,34 @@ claude plugin install agent-voice-studio@agent-voice-studio
 ## Dùng
 
 ```bash
-python studio/mine.py  --dir recordings/ --name narrator   # tìm các sắc thái
-python studio/build.py --name narrator --mode new          # chấm clip, dựng profile
-python studio/speak.py --file script.txt --profile narrator --out out.mp3
+voice-studio lab mine  --dir recordings/ --name narrator   # tìm các sắc thái
+voice-studio lab build --name narrator --mode new          # chấm clip, dựng profile
+voice-studio speak --file script.txt --profile narrator --out out.mp3
 ```
 
 Đào và dựng làm **một lần** cho mỗi giọng. Viết và đọc thì làm mỗi lần.
+
+### Lệnh `voice-studio` (package `voice_studio`)
+
+Cùng bộ công cụ, gom về một lệnh chạy bằng python của venv engine
+(`python -m voice_studio …` khi chưa cài lệnh):
+
+```bash
+voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # pipeline khác gọi
+voice-studio narrate --video cam.mp4 --file script.txt --out final.mp4 --json
+voice-studio make-profile --audio rec.wav --start 120 --dur 18 --name narrator
+voice-studio clone --file talk.m4a --name narrator --consent
+voice-studio clean ghi_am.mp3                    # tách giọng + khử tạp âm (xem voice_studio/clean/README.md)
+voice-studio lab mine|build|split|organize …     # bộ dựng đa sắc thái ở trên
+voice-studio doctor                              # thiếu gì thì chỉ bước cài tiếp
+voice-studio export --personal --out giong.zip   # chuyển máy: giọng + nhạc nền + station.json
+voice-studio backup --out tram.zip               # sao lưu trạm · update = git pull --ff-only
+```
+
+`speak`/`narrate` là **hợp đồng ổn định** cho pipeline khác: `--json` in đúng một dòng JSON
+cuối stdout, log ra stderr, mã thoát `0` ok · `1` lỗi engine · `2` gọi/cấu hình sai (thiếu
+profile, text rỗng) · `3` trạm/engine chưa cài. Các lệnh `python studio/*.py` cũ vẫn chạy
+(là alias). `clone` và `make-profile` chỉ dùng cho giọng **đã được đồng ý** — xem luật 4.
 
 Agent đã cài plugin sẽ đọc `skills/voice-routing/SKILL.md` và chỉ nạp đúng reference của bước
 đang làm.

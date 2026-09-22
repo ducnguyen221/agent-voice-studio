@@ -1,0 +1,15 @@
+agent-voice-studio
+Copyright (c) 2026 Duc Nguyen — phát hành theo giấy phép MIT (xem LICENSE).
+
+Repo này KHÔNG phát hành lại code, model weights hay audio của bên thứ ba. Mã trong repo được
+viết mới / chưng cất từ lớp bọc của chính tác giả. Các thành phần dưới đây được GỌI TỚI lúc chạy
+và do người dùng tự cài; giấy phép của chúng áp cho chính chúng:
+
+- OmniVoice (k2-fsa) — code Apache-2.0; model weights CC-BY-NC (không thương mại).
+  Cài bằng `pip install omnivoice==0.2.1`; weights tải từ Hugging Face lúc chạy lần đầu.
+- MusicGen (dùng bởi extras/musicgen/, tuỳ chọn) — code MIT; weights `facebook/musicgen-*`
+  CC-BY-NC 4.0 (không thương mại). Kiểm ngày 2026-09-20, ghi ở extras/musicgen/upstream.json.
+- Hugging Face transformers (dùng bởi extras/musicgen/) — Apache-2.0.
+- PyTorch — BSD-3-Clause. ffmpeg — LGPL/GPL tuỳ bản build; gọi như tiến trình ngoài.
+
+Audio sinh ra bằng weights không thương mại: người dùng tự chịu trách nhiệm về mục đích sử dụng.

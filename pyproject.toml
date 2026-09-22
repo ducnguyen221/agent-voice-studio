@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-voice-studio"
+version = "0.2.0"
+description = "Engine mẫu chạy giọng quanh OmniVoice: tạo giọng, chuẩn hoá, đọc, nhạc nền — cài được, gọi được từ pipeline khác."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.10"
+# Lõi cố ý nhẹ: `voice-studio --help`, `init`, `doctor`, `export` chạy không cần torch.
+# torch cài RIÊNG theo hệ điều hành (CUDA / CPU / Apple MPS) — xem
+# skills/voice-routing/references/install-omnivoice.md; pip không chọn đúng bánh xe torch thay bạn.
+dependencies = [
+    "numpy",
+    "soundfile",
+]
+
+[project.optional-dependencies]
+# Engine: weights OmniVoice theo giấy phép CC-BY-NC (không thương mại) — đọc install-omnivoice.md.
+engine = ["omnivoice==0.2.1"]
+mcp = ["mcp"]
+ui = ["gradio"]
+clone = ["faster-whisper", "yt-dlp"]
+lab = ["librosa", "scikit-learn"]
+test = ["pytest"]
+
+[project.scripts]
+voice-studio = "voice_studio.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["voice_studio*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
