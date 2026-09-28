@@ -27,8 +27,8 @@ from . import API_VERSION, _env, contract, engine
 
 INSTALL_HINT = (
     "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → `pip install omnivoice==0.2.1` → "
-    "`pip install -e <repo agent-voice-studio>` → `voice-studio init` → "
-    "`OMNIVOICE_ONLINE=1 voice-studio doctor` (lần đầu tải weights). Chi tiết: "
+    "`pip install -e <repo agent-voice-studio>` → `voice-studio init` → lần tổng hợp đầu chạy "
+    "với OMNIVOICE_ONLINE=1 để tải weights (doctor không tải gì). Chi tiết: "
     "skills/voice-routing/references/install-omnivoice.md")
 
 
@@ -227,7 +227,8 @@ def engine_checks():
     cached, hub = _hf_cache_has(engine.MODEL_ID)
     if have_engine:
         checks.append(_check("weights", cached, f"{engine.MODEL_ID} @ {hub}", level="warn",
-                             hint="weights chưa có trong cache — chạy một lần với OMNIVOICE_ONLINE=1"))
+                             hint="weights chưa có trong cache — lần tổng hợp đầu (speak/make-profile) "
+                                  "chạy với OMNIVOICE_ONLINE=1; doctor không tải"))
     else:
         checks.append(_not_checked("weights", f"engine chưa cài — chưa kiểm cache {hub}"))
     # doctor không bao giờ nạp model (nặng hàng GB, có thể cần mạng): chưa ai chứng minh máy này

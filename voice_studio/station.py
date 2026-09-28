@@ -102,24 +102,33 @@ def _template_dir():
     return None
 
 
-def _venv_python_rel():
-    return "omnivoice/.venv/Scripts/python.exe" if os.name == "nt" else "omnivoice/.venv/bin/python"
+def venv_commands(st, windows=None):
+    """Lệnh tạo venv + cài engine để người dùng TỰ chạy (init không làm thay).
 
-
-def venv_commands(st):
-    """Lệnh tạo venv + cài engine để người dùng TỰ chạy (init không làm thay)."""
+    Cú pháp theo shell mặc định của hệ điều hành: PowerShell trên Windows (gọi exe có dấu nháy
+    phải qua `&`, biến môi trường đặt bằng `$env:`), sh/zsh ở nơi khác. Một lệnh dán vào sai
+    shell là lỗi cú pháp ngay dòng đầu — người mới không biết đó là lỗi của tài liệu.
+    """
+    windows = (os.name == "nt") if windows is None else windows
     venv = os.path.join(st, "omnivoice", ".venv")
-    py = os.path.join(st, *_venv_python_rel().split("/"))
+    py = os.path.join(venv, "Scripts", "python.exe") if windows else os.path.join(venv, "bin", "python")
+    run = f"& \"{py}\"" if windows else f"\"{py}\""
     repo = _env.repo_root() or "<thư mục repo agent-voice-studio>"
     torch = ("pip install torch --index-url https://download.pytorch.org/whl/cu126   # NVIDIA; "
              "không có GPU: bỏ --index-url" if sys.platform != "darwin"
              else "pip install torch   # Apple Silicon: dùng MPS")
+    out_wav = os.path.join(st, "out", "thu.wav")
+    first = (f"{run} -m voice_studio speak --text \"Xin chào\" --instruct \"female, young adult\" "
+             f"--out \"{out_wav}\" --json")
+    online = (f"$env:OMNIVOICE_ONLINE = \"1\"; {first}; Remove-Item Env:OMNIVOICE_ONLINE" if windows
+              else f"OMNIVOICE_ONLINE=1 {first}")
     return [
         f"python -m venv \"{venv}\"",
-        f"\"{py}\" -m {torch}",
-        f"\"{py}\" -m pip install omnivoice==0.2.1",
-        f"\"{py}\" -m pip install -e \"{repo}\"",
-        f"OMNIVOICE_ONLINE=1 \"{py}\" -m voice_studio doctor   # lần đầu: tải weights (~4 GB)",
+        f"{run} -m {torch}",
+        f"{run} -m pip install omnivoice==0.2.1",
+        f"{run} -m pip install -e \"{repo}\"",
+        f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)",
+        online + "   # lần tổng hợp đầu: tải weights (~4 GB)",
     ]
 
 

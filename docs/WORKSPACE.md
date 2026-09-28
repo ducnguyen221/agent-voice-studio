@@ -109,7 +109,8 @@ gốc). Chúng không do `init` tạo.
 | `cache/` | nháp | cache công cụ | công cụ | không | không | thấp | được |
 
 Weights của engine (~4 GB) **không** nằm trong trạm mà trong cache Hugging Face (`HF_HOME`,
-mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại (`OMNIVOICE_ONLINE=1 voice-studio doctor`).
+mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại: lần tổng hợp đầu ở máy mới chạy với `OMNIVOICE_ONLINE=1` (doctor
+không tải gì).
 
 ## Vận hành
 

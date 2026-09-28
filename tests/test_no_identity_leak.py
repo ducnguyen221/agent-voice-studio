@@ -60,9 +60,13 @@ ALLOW = {
     (".codex-plugin/plugin.json", "tac-gia"): 3,
     ("LICENSE", "tac-gia"): 1,
     ("NOTICE", "tac-gia"): 1,
-    ("README.md", "tac-gia"): 4,
-    ("README.vi.md", "tac-gia"): 3,
+    ("README.md", "tac-gia"): 6,        # +2: URL repo trong prompt cài
+    ("README.vi.md", "tac-gia"): 5,     # +2: URL repo trong prompt cài
     ("docs/INSTALL.md", "tac-gia"): 1,
+    # INSTALL.md cho agent: địa chỉ repo công khai là NGUỒN DUY NHẤT mà prompt và luật an toàn trỏ tới.
+    ("INSTALL.md", "tac-gia"): 7,
+    # Test cài đặt: hằng URL repo chính thức mà prompt phải trỏ tới.
+    ("tests/test_install_docs.py", "tac-gia"): 2,
     # Trang host: lệnh `plugin marketplace add <chủ>/<repo>` mang địa chỉ repo công khai.
     ("hosts/claude/README.md", "tac-gia"): 1,
     ("hosts/codex/README.md", "tac-gia"): 1,

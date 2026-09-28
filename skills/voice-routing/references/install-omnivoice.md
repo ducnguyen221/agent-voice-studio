@@ -82,15 +82,18 @@ voice-studio init --station <trạm cũ> --existing   # nhận trạm đang ch�
 `init` dựng `station.json`, `omnivoice/voices/`, `assets/bgm/` (khung thư viện nhạc nền, không
 mp3), `out/`, `cache/`. Nó **không** tạo venv, không tải model — chỉ in lệnh.
 
-**6. Tải weights lần đầu và kiểm:**
+**6. Kiểm, rồi tải weights ở lần tổng hợp đầu:**
 
 ```bash
-OMNIVOICE_ONLINE=1 voice-studio doctor    # PowerShell: $env:OMNIVOICE_ONLINE=1; voice-studio doctor
-voice-studio doctor                       # các lần sau: offline
+voice-studio doctor                       # kiểm engine; KHÔNG tải gì, không nạp model
+OMNIVOICE_ONLINE=1 voice-studio speak --text "Xin chào" --instruct "female, young adult" --out <trạm>/out/thu.wav --json
+# PowerShell: $env:OMNIVOICE_ONLINE = "1"; voice-studio speak …; Remove-Item Env:OMNIVOICE_ONLINE
 ```
 
 Mặc định engine chạy **offline** (`HF_HUB_OFFLINE=1`) để lịch chạy không bao giờ treo vì mạng;
-`OMNIVOICE_ONLINE=1` mở mạng đúng một lần. `doctor` thoát mã 3 kèm hướng dẫn nếu còn thiếu gì.
+`OMNIVOICE_ONLINE=1` mở mạng cho **đúng lần tổng hợp đó** — chỉ lệnh nạp model (`speak`,
+`make-profile`, `narrate`…) mới tải weights; `doctor` thì không bao giờ. Sau đó doctor báo
+`[PASS] weights`. `doctor` thoát mã 3 kèm hướng dẫn nếu còn thiếu gì.
 
 Thử cả chuỗi không cần ghi âm ai: làm theo `omnivoice/voices/_example/README.md` trong trạm
 (tạo giọng `sample` bằng thiết kế giọng, rồi `voice-studio speak`).
