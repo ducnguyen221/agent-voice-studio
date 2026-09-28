@@ -68,8 +68,10 @@ def test_expected_json_matches_speak_contract(station, fake_engine, tmp_path, ca
     assert set(res["engine"]) == set(expected["engine"])
 
 
-def test_doctor_verifies_samples_offline(monkeypatch):
+def test_doctor_verifies_samples_offline(monkeypatch, tmp_path):
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(ROOT))
+    # Bản clone của người chạy test có thể có workspace/ thật — trỏ trạm đi chỗ tạm.
+    monkeypatch.setenv("VOICE_STATION", str(tmp_path / "st"))
     c = {x["name"]: x for x in doctor.run_checks()}["samples"]
     assert c["level"] == "ok", c
 
