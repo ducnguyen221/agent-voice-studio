@@ -28,6 +28,8 @@ from . import API_VERSION, contract, engine, profiles
 from .contract import ContractError, StationMissing, log
 
 DEFAULT_SEED = 42
+# Khoá cấp một của dòng JSON thành công — một phần của hợp đồng API (đổi = tăng số đầu API_VERSION).
+RESULT_KEYS = ("ok", "outputs", "profile", "timings", "engine")
 
 
 def add_voice_args(ap):

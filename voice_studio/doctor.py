@@ -160,6 +160,7 @@ def run_checks():
         checks.append(_check("env-name-bgm", False, ", ".join(old_bgm), level="warn",
                              hint="tên biến cũ — đổi sang VOICE_BGM, VOICE_BGM_VOL, VOICE_BGM_DIR"))
 
+    checks.append(samples_check())
     if st is None:
         why = "chưa có trạm — kiểm lại sau khi đặt trạm"
         checks += [_not_checked(n, why) for n in ("voices", "default-profile", "bgm-library")]
@@ -181,6 +182,19 @@ def run_checks():
                          hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng"))
 
     return checks + engine_checks()
+
+
+def samples_check():
+    """Bài mẫu của repo còn đúng không — offline, không cần trạm hay engine."""
+    from . import samples
+    try:
+        ok, detail = samples.check()
+    except FileNotFoundError as e:
+        return _not_checked("samples", str(e))
+    except (OSError, ValueError) as e:
+        ok, detail = False, str(e)
+    return _check("samples", ok, detail, level="warn",
+                  hint="bài mẫu trong samples/ bị sửa lệch — `git status samples/`")
 
 
 def engine_checks():
