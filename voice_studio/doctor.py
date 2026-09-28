@@ -161,6 +161,10 @@ def run_checks():
                              hint="tên biến cũ — đổi sang VOICE_BGM, VOICE_BGM_VOL, VOICE_BGM_DIR"))
 
     checks.append(samples_check())
+    if st is not None:
+        wp = win_path_check(os.path.join(_env.engine_dir(), ".venv"))
+        if wp:
+            checks.append(wp)
     if st is None:
         why = "chưa có trạm — kiểm lại sau khi đặt trạm"
         checks += [_not_checked(n, why) for n in ("voices", "default-profile", "bgm-library")]
@@ -182,6 +186,26 @@ def run_checks():
                          hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng"))
 
     return checks + engine_checks()
+
+
+# Windows chưa bật đường dài: thư mục sâu nhất tối đa 248 ký tự. Gói torch (bản CUDA 2.13) có
+# thư mục giấy phép lồng sâu ~160 ký tự tính từ gốc venv ⇒ gốc venv dài quá ~88 ký tự là `pip
+# install torch` gãy giữa chừng với WinError 206 và để lại một torch cài dở (đo 28/09 khi cài
+# sạch vào trạm embedded nằm trong %TEMP%). Chừa biên: cảnh báo từ 80 ký tự.
+WIN_VENV_PATH_WARN = 80
+
+
+def win_path_check(venv, windows=None):
+    """Cảnh báo đường venv engine quá dài trên Windows; hệ khác (hoặc đường ngắn) ⇒ None."""
+    windows = (os.name == "nt") if windows is None else windows
+    if not windows:
+        return None
+    n = len(os.path.abspath(venv)) if os.name == "nt" else len(venv)
+    return _check("win-path", n <= WIN_VENV_PATH_WARN, f"{venv} ({n} ký tự)", level="warn",
+                  hint=f"đường venv engine dài hơn {WIN_VENV_PATH_WARN} ký tự: cài torch có thể gãy "
+                       "(WinError 206) khi Windows chưa bật đường dài. Clone repo vào thư mục ngắn, "
+                       "hoặc đặt trạm ở đường ngắn (`voice-studio init --station <thư mục ngắn>`); "
+                       "bật LongPathsEnabled là việc của quản trị máy, không phải của agent")
 
 
 def samples_check():

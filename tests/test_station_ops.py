@@ -520,3 +520,19 @@ def test_doctor_json_keeps_old_level_names(tmp_path, monkeypatch, capsys):
     levels = {c["level"] for c in res}
     assert levels <= {"ok", "warn", "error", "not_checked"}
     assert by_name(res)["station"]["ok"] is True and by_name(res)["synthesis"]["level"] == "not_checked"
+
+
+@pytest.mark.parametrize("venv,level", [
+    ("C:\\st\\omnivoice\\.venv", "ok"),
+    ("C:\\Users\\someone\\AppData\\Local\\Temp\\vs-t22\\agent-voice-studio\\workspace\\omnivoice\\.venv",
+     "warn"),
+])
+def test_doctor_warns_long_engine_venv_path_on_windows(venv, level):
+    c = doctor.win_path_check(venv, windows=True)
+    assert c["name"] == "win-path" and c["level"] == level
+    if level == "warn":
+        assert "WinError 206" in c["hint"]
+
+
+def test_win_path_check_is_silent_elsewhere():
+    assert doctor.win_path_check("/" + "x" * 300, windows=False) is None

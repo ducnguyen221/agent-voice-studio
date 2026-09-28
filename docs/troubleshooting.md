@@ -47,11 +47,18 @@ Engine chạy **offline** để lịch chạy không bao giờ treo vì mạng. 
 - Chọn độ chính xác bằng `OMNIVOICE_DTYPE`; ép thiết bị bằng `OMNIVOICE_DEVICE` (`mps` · `cpu`).
 - Tổng hợp giọng thật qua package trên Mac **chưa được kiểm** trong bản phát hành này — báo lại số
   đo nếu bạn chạy được.
-- Cặp phiên bản đã đo: Windows + CUDA với transformers 5.10.2; Mac spike với transformers 5.17.0.
+- Cặp phiên bản đã đo: Windows + CUDA với torch 2.12/transformers 5.10.2 và torch 2.13/transformers
+  5.17.0 (cài sạch 28/09); Mac spike với transformers 5.17.0.
   Repo không ghim transformers — `omnivoice` quyết định.
 
 ## Windows
 
+- **`pip install torch` gãy với WinError 206 ("filename or extension is too long")**: Windows
+  chưa bật đường dài và đường venv engine quá dài — torch có thư mục lồng ~160 ký tự bên trong
+  venv. Doctor báo `[WARN] win-path` khi gốc venv dài hơn 80 ký tự. Torch lúc đó **cài dở**
+  (doctor báo thiếu `torchgen`): xoá venv engine, đưa repo về đường ngắn
+  (`<home>\agent-voice-studio`) hoặc đặt trạm `separate` ở thư mục ngắn, rồi cài lại.
+  Bật `LongPathsEnabled` cần quyền quản trị — việc của bạn hoặc IT, không phải của agent.
 - **PowerShell 5.1 và stderr:** đừng `2>&1` khi gọi `voice-studio` — mỗi dòng log (đi ra stderr)
   bị bọc thành lỗi và `$?` thành False dù mã thoát là 0. Đọc `$LASTEXITCODE`.
 - **Console in chữ Việt ra rác:** đặt `PYTHONIOENCODING=utf-8`, hoặc đọc dòng JSON cuối (`--json`).

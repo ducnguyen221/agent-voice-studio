@@ -37,6 +37,6 @@ voice-studio speak --file samples/cau-ngan.script.txt --out <trạm>/out/cau-nga
 | `2` | gọi sai: chưa có profile mặc định, text rỗng | tạo profile hoặc truyền `--profile` |
 | `3` | chưa có trạm / chưa cài torch hay engine | `voice-studio doctor`, làm tiếp phần còn thiếu |
 
-Thời lượng câu này khoảng **5–8 giây** — ước lượng để nhận ra kết quả vô lý (0 giây, vài phút),
+Thời lượng câu này khoảng **6–12 giây** (đo: 9,2 giây với `--instruct`, CUDA) — ước lượng để nhận ra kết quả vô lý (0 giây, vài phút),
 **không phải** cổng kiểm: tốc độ đọc tuỳ giọng. Audio ra nằm trong trạm (`<trạm>/out/`), không
 bao giờ trong repo; `.gitignore` chặn mọi `*.wav` / `*.mp3`.

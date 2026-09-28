@@ -124,6 +124,9 @@ git remote -v
 - Thư mục đã tồn tại: là repo có `origin` đúng URL trên thì dùng tiếp (`git pull --ff-only`),
   **không** xoá hay clone đè; không phải thì hỏi người dùng chọn đường khác.
 - `git remote -v` khác URL trên (fork, bản sao lạ) thì dừng và hỏi.
+- **Windows: giữ đường repo ngắn** (như `<home>\agent-voice-studio`). Trạm embedded đặt venv
+  engine trong repo; torch có thư mục lồng rất sâu, và khi Windows chưa bật đường dài thì đường
+  venv dài quá ~80 ký tự làm `pip install torch` gãy (WinError 206). Doctor cảnh báo `win-path`.
 
 ## 5. Phần A — cài khung (không torch)
 
@@ -182,6 +185,7 @@ Mỗi dòng: `[TRẠNG THÁI] khu vực chi tiết`, có thể kèm một dòng 
 | `[FAIL] torch` / `omnivoice` | engine chưa cài | **bình thường khi chưa làm phần B**; doctor thoát mã 3 vì vậy |
 | `[WARN] default-profile` | chưa có giọng nào | bình thường với máy mới; tạo profile là việc sau cài |
 | `[WARN] ffmpeg` / `bgm-library` | thiếu ffmpeg / thư viện nhạc nền | cài ffmpeg (mục 3) khi cần mp3 hay ghép video |
+| `[WARN] win-path` | đường venv engine dài, cài torch có thể gãy trên Windows | trước phần B: clone lại vào đường ngắn, hoặc chọn `separate` với thư mục ngắn |
 | `[WARN] env-name` / `station-source` | tên biến cũ / trạm cũ được nhận ngầm | làm theo gợi ý nếu người dùng đồng ý |
 | `[NOT_CHECKED] weights` / `synthesis` | doctor không kiểm được lúc này | **không phải lỗi**; phần B mới kiểm được |
 | `[WARN] weights` | engine đã cài, weights chưa tải | bình thường tới lần tổng hợp đầu (mục 9) |
@@ -250,6 +254,9 @@ Gỡ vướng thường gặp:
 - **`torch` import lỗi dù đã cài**: bản torch quá cũ hoặc sai phần cứng — xem
   [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md), không tự hạ/nâng
   gói khác.
+- **Windows: `pip install torch` báo WinError 206 "filename or extension is too long"**: đường
+  venv engine quá dài; torch cài dở — xoá venv engine, dời repo/trạm sang đường ngắn rồi cài lại.
+  **Không** tự sửa registry để bật đường dài; đó là quyết định của người dùng/quản trị máy.
 - **Windows: `pip uninstall` báo file `voice-studio.exe` đang bị giữ**: gọi
   `python -m voice_studio uninstall` thay cho `voice-studio uninstall`.
 
