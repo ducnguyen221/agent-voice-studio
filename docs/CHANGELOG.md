@@ -4,7 +4,7 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
-## Chưa phát hành
+## 0.3.0 — chưa ghi ngày (điền khi tag)
 
 **Cài đặt cho agent, hai hệ điều hành.**
 
