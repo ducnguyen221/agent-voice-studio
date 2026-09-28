@@ -215,8 +215,9 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
         why = "--mode"
     if mode == "embedded":
         if not repo:
-            raise ContractError("chế độ embedded cần chạy từ bản clone repo (pip install -e <repo>); "
-                                "bản cài wheel chỉ dùng được separate (--station DIR).")
+            raise ContractError("chế độ embedded cần biết bản clone repo: cài `pip install -e <repo>`, "
+                                "hoặc bản sao kèm biến VOICE_STUDIO_REPO=<repo> (docs/INSTALL.md "
+                                "mục 3); không thì chỉ dùng được separate (--station DIR).")
         return "embedded", os.path.join(repo, _env.WORKSPACE), why
     return "separate", _env.default_station(), why
 
@@ -711,7 +712,17 @@ def update():
         raise contract.EngineError(
             "git pull --ff-only không chạy được (có sửa đổi cục bộ lệch nhánh?). Không xoá gì; "
             "xử lý tay rồi chạy lại.\n" + (r.stderr or r.stdout).strip())
-    return {"repo": repo, "output": (r.stdout or "").strip()}
+    res = {"repo": repo, "output": (r.stdout or "").strip(), "reinstall": None}
+    if installed_copy(repo):
+        # Bản sao (máy chạy lịch, docs/INSTALL.md mục 3): git pull KHÔNG đổi mã đang chạy.
+        res["reinstall"] = f"\"{sys.executable}\" -m pip install \"{repo}[engine]\""
+    return res
+
+
+def installed_copy(repo):
+    """Package đang chạy là bản sao cài vào site-packages (không `-e` từ `repo`)?"""
+    pkg_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.normcase(os.path.realpath(pkg_repo)) != os.path.normcase(os.path.realpath(repo))
 
 
 # ── uninstall ──────────────────────────────────────────────────────────────────────────
@@ -883,5 +894,8 @@ def update_main(argv=None):
     def fn(a):
         res = update()
         contract.log(res["output"] or "[update] đã mới nhất")
+        if res["reinstall"]:
+            contract.log("[update] package là BẢN SAO — mã mới chưa vào venv. Cài lại (ngoài giờ "
+                         "lịch chạy):\n  " + res["reinstall"])
         return res
     return contract.run(fn, args, args.json)

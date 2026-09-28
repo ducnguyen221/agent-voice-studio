@@ -28,6 +28,9 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
 - Phần phụ `engine` giữ `transformers` trong khoảng đã chạy thật (`>=5.10.2,<5.18`), không ghim
   cứng một số; cài engine bằng `pip install "<repo>[engine]"`. Doctor in phiên bản transformers và
   `[WARN]` khi nó nằm ngoài khoảng.
+- Cài package có **một** luật, ở `docs/INSTALL.md` mục 3: máy phát triển `pip install -e`, máy
+  chạy lịch cài **bản sao** (không `-e`) để sửa hay `git pull` repo không đổi lượt đang chạy; có
+  lệnh Windows và macOS. `voice-studio update` trên bản sao in lại lệnh cài để mã mới vào venv.
 
 ## 0.2.0 — 2026-09-22
 

@@ -43,6 +43,7 @@ Rồi, với `voice-studio` là lệnh ở dòng cuối bảng:
    dòng `[PASS] samples` xác nhận bài mẫu ([samples/README.md](samples/README.md)).
 3. Engine (torch ~2,5 GB + weights ~4 GB, giấy phép weights **không thương mại**): làm đúng các lệnh
    `init` in ra, chi tiết ở [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md).
+   Máy chạy lịch cài **bản sao** thay cho `-e`: [docs/INSTALL.md](docs/INSTALL.md) mục 3.
 4. Thử đọc: `voice-studio speak --file samples/cau-ngan.script.txt --instruct "female, young adult" --out workspace/out/thu.wav --json`
    (lần đầu đặt `OMNIVOICE_ONLINE=1` để tải weights).
 

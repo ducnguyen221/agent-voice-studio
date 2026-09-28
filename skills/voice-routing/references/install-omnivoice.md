@@ -30,9 +30,8 @@ rủi ro giấy phép bạn phải tự cân nhắc. Giấy phép weights đi đ
 
 ## Cài — sáu bước
 
-**Ngoại lệ có chủ đích:** hướng dẫn chung của họ repo này khuyên *không* `pip install -e`. Repo
-giọng là ngoại lệ: nó là package có `pyproject.toml` chuẩn, phải chạy **bằng chính venv của
-engine** (torch nằm ở đó), và `-e` giữ cho `git pull` là đủ để cập nhật — không phải cài lại.
+**`-e` hay bản sao:** lệnh dưới dùng `-e` (máy phát triển). Máy **chạy lịch** cài bản sao — luật
+và lệnh Windows/macOS chỉ nằm ở `docs/INSTALL.md` mục 3 của repo; đừng chép sang đây.
 
 **1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
 phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspace/`).

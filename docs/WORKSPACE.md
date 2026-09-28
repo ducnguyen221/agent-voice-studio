@@ -66,7 +66,8 @@ bao giờ là một thư mục ẩn mới dưới home. `~/.voice` chỉ đượ
 `--station`, chế độ `separate`) hoặc nó đã là một trạm từ trước (doctor nhắc đặt
 `VOICE_STATION` cho tường minh).
 
-`<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO`). Cài dạng wheel thì
+`<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO` — cách bản sao của máy
+chạy lịch tìm về bản clone, xem [`INSTALL.md`](INSTALL.md) mục 3). Cài dạng wheel không đặt biến thì
 không có repo — chỉ dùng được `separate`, và chưa đặt `VOICE_STATION` thì mọi lệnh cần trạm dừng
 với mã 3 kèm cách đặt.
 

@@ -11,6 +11,7 @@ import posixpath
 import shutil
 import subprocess
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -327,6 +328,15 @@ def test_update_fast_forwards_and_keeps_workspace(tmp_path, monkeypatch):
     assert os.path.normcase(res["repo"]) == os.path.normcase(str(user))
     assert (user / "a.txt").read_text(encoding="utf-8") == "2"
     assert (user / "workspace" / "mine.txt").read_text(encoding="utf-8") == "của tôi"
+    # Mã đang chạy KHÔNG nằm trong bản clone vừa pull ⇒ như bản sao của máy chạy lịch: pull chưa
+    # đổi gì trong venv, phải in lệnh cài lại (docs/INSTALL.md mục 3).
+    assert res["reinstall"] and f"{user}[engine]" in res["reinstall"]
+
+
+def test_installed_copy_tells_editable_from_copy(tmp_path):
+    pkg_repo = Path(station.__file__).resolve().parent.parent
+    assert station.installed_copy(str(pkg_repo)) is False      # chạy từ chính bản clone (-e)
+    assert station.installed_copy(str(tmp_path)) is True       # bản clone ở chỗ khác
 
 
 def test_update_without_repo_is_2(monkeypatch):

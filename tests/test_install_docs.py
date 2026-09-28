@@ -165,3 +165,37 @@ def test_install_page_is_host_neutral_and_linked_from_home():
     for host in ("Claude Code", "Codex", "Antigravity", "Claude Desktop"):
         assert host in page, host
     assert 'href="install/"' in read("docs/index.html"), "trang chủ chưa trỏ tới /install/"
+
+
+# ── `-e` hay bản sao: MỘT chỗ canonical, mọi nơi khác chỉ trỏ về ─────────────────────────
+CANONICAL_INSTALL = "docs/INSTALL.md"
+CANONICAL_HEADING = "## 3. Cài package — `-e` hay bản sao"
+POINTS_TO_CANONICAL = ["README.md", "README.vi.md", "INSTALL.md", "START-HERE.md", "GUIDE.md", "GUIDE.vi.md",
+                       "skills/voice-routing/references/install-omnivoice.md"]
+
+
+def test_copy_install_rule_has_one_canonical_home_with_both_os():
+    text = read(CANONICAL_INSTALL)
+    assert CANONICAL_HEADING in text
+    section = text.split(CANONICAL_HEADING, 1)[1].split("\n## ", 1)[0]
+    ps = "\n".join(fenced_blocks(section, "powershell"))
+    sh = "\n".join(fenced_blocks(section, "sh"))
+    # Bản sao = pip install KHÔNG -e, vào python của venv engine, kèm phần phụ engine.
+    assert '& $py -m pip install "<repo>[engine]"' in ps and "Scripts" in ps
+    assert '"$py" -m pip install "<repo>[engine]"' in sh and "/bin/python" in sh
+    assert "-e" not in ps + sh
+    assert "VOICE_STUDIO_REPO" in section and "voice-studio update" in section
+
+
+@pytest.mark.parametrize("rel", POINTS_TO_CANONICAL)
+def test_other_docs_point_to_the_canonical_rule(rel):
+    text = read(rel)
+    rel_link = "INSTALL.md" if rel.startswith("docs/") else "docs/INSTALL.md"
+    assert rel_link in text and re.search(r"(mục|section) 3|#3-cài-package", text), \
+        f"{rel}: phải trỏ về {CANONICAL_INSTALL} mục 3 cho luật `-e` / bản sao"
+
+
+def test_no_second_copy_of_the_editable_rule():
+    # Đoạn "ngoại lệ có chủ đích" cũ từng sống ở 3 nơi với 3 lời khác nhau.
+    for rel in POINTS_TO_CANONICAL + [CANONICAL_INSTALL, "docs/WORKSPACE.md"]:
+        assert "Ngoại lệ có chủ đích" not in read(rel), rel

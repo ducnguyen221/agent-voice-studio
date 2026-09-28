@@ -149,7 +149,10 @@ python3 -m venv .venv
 ```
 
 Từ đây, `voice-studio` trong các lệnh dưới nghĩa là `.\.venv\Scripts\voice-studio.exe` (Windows)
-hoặc `.venv/bin/voice-studio` (macOS). `pip install -e` giữ cho `git pull` là đủ để cập nhật.
+hoặc `.venv/bin/voice-studio` (macOS). `-e` giữ cho `git pull` là đủ để cập nhật. Máy sẽ **chạy
+lịch** (scheduled task, launchd) thì phần B cài **bản sao** thay cho `-e` — luật và lệnh ở
+[`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao); hỏi người dùng máy này
+có chạy lịch không, đừng tự đoán.
 
 ## 6. Dựng trạm giọng — người dùng chọn
 
@@ -206,7 +209,8 @@ Làm đúng các lệnh `init` đã in ở mục "Bước tiếp theo" (đườn
 [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md). Tóm tắt:
 
 1. Tạo venv engine; cài torch đúng phần cứng (NVIDIA: bản CUDA; Mac Apple Silicon: bản mặc định).
-2. `pip install omnivoice==0.2.1` rồi `pip install -e <repo>` **vào venv engine**.
+2. `pip install -e "<repo>[engine]"` **vào venv engine** (omnivoice ghim + transformers trong khoảng
+   đã đo). Máy chạy lịch: bỏ `-e` (bản sao, [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao)).
 3. Chạy `voice-studio doctor` bằng python của venv engine: `torch`, `omnivoice` phải `[PASS]`.
    Doctor **không tải gì** — `weights` còn `[WARN]` là đúng.
 4. Lần tổng hợp đầu tải weights, nên chạy với `OMNIVOICE_ONLINE=1` **cho riêng lệnh đó**

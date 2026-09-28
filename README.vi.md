@@ -75,6 +75,10 @@ voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến n
 voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
 
+`-e` dành cho máy phát triển. Máy **chạy lịch** cài **bản sao** (không `-e`) để sửa hay `git pull`
+repo không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windows và macOS, ở
+[`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
+
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
 `<repo>/workspace/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
 không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,

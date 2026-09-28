@@ -45,11 +45,20 @@ Lồng tiếng đi qua một lần `import voice_studio` **trong cùng tiến tr
 một lần cho cả bài. Hai venv khác nhau thì không có đường nào để import, và lỗi hiện ra ở giữa lượt
 chạy chứ không phải lúc cài.
 
-> **Ngoại lệ có chủ đích:** luật đẻ repo của hệ này khuyên *không* dùng `pip install -e`. Ở đây
-> dùng, vì repo phải chạy bằng chính venv của engine và `-e` giữ cho `git pull` là đủ để cập nhật.
-> Đổi lại: `voice-studio update` chỉ là `git pull --ff-only`, không bao giờ `clean`.
+## 3. Cài package — `-e` hay bản sao
 
-## 3. Cài package
+**Đây là chỗ DUY NHẤT quy định cách cài package.** README, `INSTALL.md` ở gốc và tài liệu engine
+chỉ trỏ về đây.
+
+| Máy của bạn | Cài | Vì sao |
+|---|---|---|
+| **Máy phát triển** — bạn sửa repo, hoặc tự gọi lệnh bằng tay | `pip install -e` | sửa mã hay `git pull` là có hiệu lực ngay, không phải cài lại |
+| **Máy chạy lịch** — scheduled task, cron, launchd gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
+
+Không chắc thì dùng `-e`. Máy vừa phát triển vừa chạy lịch: cho lịch một venv engine riêng cài bản
+sao, đừng dùng chung venv `-e`.
+
+### Máy phát triển (`-e`)
 
 ```
 git clone https://github.com/ducnguyen221/agent-voice-studio
@@ -57,6 +66,44 @@ cd agent-voice-studio
 pip install -e .          # trong venv engine — lệnh voice-studio
 voice-studio --version
 ```
+
+`voice-studio update` chỉ là `git pull --ff-only`, không bao giờ `clean`; với `-e` thì thế là đủ.
+
+### Máy chạy lịch (bản sao)
+
+Cài vào **python của venv engine** (`<trạm>/omnivoice/.venv`), kèm phần phụ `engine`.
+
+Windows (PowerShell):
+
+```powershell
+$py = "<trạm>\omnivoice\.venv\Scripts\python.exe"
+& $py -m pip install "<repo>[engine]"
+& $py -m voice_studio --version
+```
+
+macOS (sh/zsh):
+
+```sh
+py="<trạm>/omnivoice/.venv/bin/python"
+"$py" -m pip install "<repo>[engine]"
+"$py" -m voice_studio --version
+```
+
+Bản sao **không biết bản clone nằm đâu**. Đặt biến người dùng `VOICE_STUDIO_REPO=<repo>` — cần cho
+trạm `embedded`, cho `voice-studio update`, cây mẫu của `init` và bài mẫu của `doctor`. Trạm
+`separate` đã có `VOICE_STATION` thì vẫn chạy được không cần nó; thiếu cả hai thì lệnh cần trạm
+dừng mã 3. Trên macOS, lịch `launchd` không đọc `~/.zprofile`: khai biến trong mục
+`EnvironmentVariables` của plist.
+
+**Cập nhật máy chạy lịch** — làm ngoài giờ lịch chạy:
+
+```
+voice-studio update                       # git pull --ff-only trên bản clone
+<python venv engine> -m pip install "<repo>[engine]"   # nạp mã mới vào venv — bước này mới có hiệu lực
+```
+
+pip luôn cài lại từ thư mục cục bộ kể cả khi số phiên bản không đổi. `update` trên bản sao tự in
+lại lệnh cài để bạn không quên bước hai.
 
 ### Phần phụ
 
