@@ -23,12 +23,13 @@ PROMPT_START = {
 MAX_PROMPT_LINES = 12
 # Nơi chép prompt: file Markdown (khối ```text) hoặc trang web (<pre id="prompt-<lang>">).
 COPIES = {
-    "vi": ["README.vi.md"],
-    "en": ["README.md"],
+    "vi": ["README.vi.md", "START-HERE.md", "docs/install/index.html"],
+    "en": ["README.md", "docs/install/index.html"],
 }
 USER_DOCS = ["INSTALL.md", "README.md", "README.vi.md", "docs/INSTALL.md", "hosts/README.md",
              "hosts/claude/README.md", "hosts/codex/README.md", "hosts/antigravity/README.md",
-             "hosts/claude-desktop/README.md"]
+             "hosts/claude-desktop/README.md", "START-HERE.md", "docs/install/index.html",
+             "docs/troubleshooting.md"]
 
 
 def read(rel):
@@ -137,7 +138,7 @@ def test_install_md_names_every_host():
 
 
 def test_entry_docs_point_to_install_md():
-    for rel in ("README.md", "README.vi.md", "AGENTS.md", "hosts/README.md"):
+    for rel in ("README.md", "README.vi.md", "AGENTS.md", "hosts/README.md", "START-HERE.md"):
         assert "INSTALL.md" in read(rel), f"{rel} chưa trỏ tới INSTALL.md"
 
 
@@ -149,3 +150,18 @@ def test_doctor_is_never_said_to_download_weights():
             if re.search(r"OMNIVOICE_ONLINE\s*=\s*1\s+\S*voice-studio(?:\.exe)?\s+doctor", ln):
                 bad.append(f"{rel}: {ln.strip()}")
     assert not bad, "\n".join(bad)
+
+
+def test_start_here_is_short_and_teaches_only_real_commands():
+    text = read("START-HERE.md")
+    assert len(text.splitlines()) <= 60, "START-HERE.md phải ngắn (≤ 60 dòng)"
+    named = set(re.findall(r"voice-studio(?:\.exe)? ([a-z][a-z-]+)", text))
+    assert not named - set(cli.COMMANDS), sorted(named - set(cli.COMMANDS))
+    assert {"init", "doctor", "speak", "uninstall", "export", "import", "update"} <= named
+
+
+def test_install_page_is_host_neutral_and_linked_from_home():
+    page = read("docs/install/index.html")
+    for host in ("Claude Code", "Codex", "Antigravity", "Claude Desktop"):
+        assert host in page, host
+    assert 'href="install/"' in read("docs/index.html"), "trang chủ chưa trỏ tới /install/"

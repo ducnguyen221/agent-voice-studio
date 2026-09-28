@@ -73,3 +73,15 @@ def test_gate_goes_red_when_one_manifest_drifts(tmp_path):
     drifted = versions(tmp_path)
     assert len(set(drifted.values())) == 2
     assert drifted[".codex-plugin/plugin.json"] == "9.9.9"
+
+
+def test_changelog_leads_with_unreleased_or_current_version():
+    """Mục đầu `docs/CHANGELOG.md` là "Chưa phát hành" (đang làm) hoặc đúng số phiên bản hiện tại;
+    và số hiện tại phải có mục riêng. Phát hành = đổi tiêu đề "Chưa phát hành" thành số mới."""
+    from voice_studio import __version__
+    heads = re.findall(r"^## (.+)$", read("docs/CHANGELOG.md"), re.MULTILINE)
+    assert heads, "docs/CHANGELOG.md không có mục nào"
+    first = heads[0].split(" — ")[0].strip()
+    assert first in ("Chưa phát hành", __version__), f"mục đầu CHANGELOG là {heads[0]!r}"
+    assert any(h.split(" — ")[0].strip() == __version__ for h in heads), (
+        f"docs/CHANGELOG.md thiếu mục cho {__version__}")

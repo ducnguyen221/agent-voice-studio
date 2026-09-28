@@ -54,6 +54,7 @@ ALLOW = {
     ("tests/conftest.py", "tien-to-pipeline"): 4,
     ("tests/test_av_mux.py", "tien-to-pipeline"): 8,
     ("tests/test_bgm_pick.py", "tien-to-pipeline"): 1,
+    ("docs/troubleshooting.md", "tien-to-pipeline"): 1,        # dạy đổi tên biến cũ sang VOICE_BGM*
     # Ghi công tác giả + địa chỉ repo công khai: đúng chỗ, là điều kiện của license.
     (".claude-plugin/marketplace.json", "tac-gia"): 4,
     (".claude-plugin/plugin.json", "tac-gia"): 3,
@@ -67,6 +68,8 @@ ALLOW = {
     ("INSTALL.md", "tac-gia"): 7,
     # Test cài đặt: hằng URL repo chính thức mà prompt phải trỏ tới.
     ("tests/test_install_docs.py", "tac-gia"): 2,
+    ("START-HERE.md", "tac-gia"): 3,                 # prompt cài (2 URL) + lệnh clone
+    ("docs/install/index.html", "tac-gia"): 6,       # 2 prompt x 2 URL + link INSTALL/START-HERE trên GitHub
     # Trang host: lệnh `plugin marketplace add <chủ>/<repo>` mang địa chỉ repo công khai.
     ("hosts/claude/README.md", "tac-gia"): 1,
     ("hosts/codex/README.md", "tac-gia"): 1,

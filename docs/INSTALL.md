@@ -9,6 +9,10 @@ audience: anyone setting the voice studio up on a new machine
 Repo mang **phương pháp và mã**; giọng, nhạc nền và output sống ở **trạm giọng** — ngoài git.
 Cài xong thì `voice-studio doctor` phải xanh.
 
+> **Nhờ AI agent cài?** Agent làm theo [`INSTALL.md`](../INSTALL.md) ở gốc repo (luật an toàn,
+> Windows và macOS, prompt copy-dán). File này là bản chi tiết cho người tự cài; bản rút gọn ở
+> [`START-HERE.md`](../START-HERE.md), gỡ vướng ở [`troubleshooting.md`](troubleshooting.md).
+
 > **Một tài liệu, một việc.** File này là đường vào: thứ tự các bước, chọn venv, chọn chế độ
 > trạm. Phần **engine** (torch theo hệ điều hành, `omnivoice`, weights, biến môi trường, số đo
 > Apple Silicon) nằm ở

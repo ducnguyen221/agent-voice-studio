@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cài agent-voice-studio</title>
+<meta name="description" content="Nhờ AI agent cài Agent Voice Studio trên Windows hoặc macOS: một prompt copy-dán, agent hỏi trước khi cài phần mềm, tải engine hay chọn chỗ đặt trạm giọng.">
+<meta name="theme-color" content="#2f6df6" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0e0f13" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%232f6df6'/%3E%3Cg stroke='%23fff' stroke-width='2.2' stroke-linecap='round'%3E%3Cpath d='M9 13v6'/%3E%3Cpath d='M13.7 9.5v13'/%3E%3Cpath d='M18.3 12v8'/%3E%3C/g%3E%3Ccircle cx='23.4' cy='16' r='3.6' fill='%237c3aed'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#ffffff; --surface:#ffffff; --surface-2:#f4f6fa; --border:#e4e8ef; --text:#14161b;
+    --muted:#565d69; --accent:#2f6df6; --accent-weak:#e9f0fe; --mark:#7c3aed; --ok:#0f9d58;
+    --code-bg:#0f1116; --code-text:#e8ebf1; --code-border:#20242e; --radius:16px;
+    --mono:"JetBrains Mono",ui-monospace,"Cascadia Code",Consolas,monospace;
+    --font:"Be Vietnam Pro",-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#0e0f13; --surface:#16181d; --surface-2:#1b1e24; --border:#282c34; --text:#e9ebef;
+      --muted:#a4abb6; --accent:#5b8cff; --accent-weak:#182338; --mark:#a78bfa; --ok:#3ec38a;
+      --code-bg:#0a0c10; --code-text:#e4e8f0; --code-border:#20242e;
+    }
+  }
+  *{box-sizing:border-box}
+  html{background:var(--bg)}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font);line-height:1.6;
+    font-size:16px;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent)}
+  .wrap{max-width:860px;margin:0 auto;padding:28px 16px 64px}
+  .back{font-size:14px;text-decoration:none}
+  h1{font-size:clamp(28px,5vw,40px);letter-spacing:-.02em;line-height:1.15;margin:18px 0 10px}
+  h2{font-size:22px;letter-spacing:-.01em;margin:36px 0 10px}
+  p{margin:0 0 12px;color:var(--muted)}
+  code{font-family:var(--mono);font-size:.9em;background:var(--surface-2);padding:1px 6px;border-radius:6px}
+  .card{background:var(--code-bg);border:1px solid var(--code-border);border-radius:var(--radius);
+    margin:14px 0 22px;overflow:hidden}
+  .card-top{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--code-border);
+    color:#9aa3b2;font:500 13px var(--mono)}
+  .copy-btn{margin-left:auto;display:inline-flex;align-items:center;gap:6px;cursor:pointer;
+    background:rgba(255,255,255,.07);color:#cfd5df;border:1px solid rgba(255,255,255,.12);
+    border-radius:8px;padding:5px 10px;font:500 12.5px var(--font)}
+  .copy-btn:hover{background:rgba(255,255,255,.13);color:#fff}
+  .copy-btn svg{width:14px;height:14px}
+  pre{margin:0;padding:16px;color:var(--code-text);font:13.5px/1.65 var(--mono);white-space:pre-wrap;
+    word-break:break-word;overflow-x:auto}
+  .tbl-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:12px}
+  table{border-collapse:collapse;width:100%;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{background:var(--surface-2);font-weight:600}
+  tr:last-child td{border-bottom:none}
+  ul{padding-left:20px;color:var(--muted)}
+  li{margin:4px 0}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <a class="back" href="../">← agent-voice-studio</a>
+  <h1>Nhờ AI agent cài Agent Voice Studio</h1>
+  <p>Dán prompt dưới đây vào ứng dụng AI bạn đang dùng — Claude Code, Codex hoặc Antigravity — trên
+    Windows hoặc macOS. Agent đọc <a href="https://github.com/ducnguyen221/agent-voice-studio/blob/main/INSTALL.md">INSTALL.md</a>
+    trong repo rồi làm từng bước; nó <b>hỏi bạn trước</b> khi cài phần mềm, tải engine (vài GB) hay
+    chọn chỗ đặt trạm giọng, và báo lại nguyên từng dòng <code>voice-studio doctor</code>.</p>
+
+  <h2>Tiếng Việt</h2>
+  <div class="card">
+    <div class="card-top">prompt · tiếng Việt<button class="copy-btn" type="button" data-target="prompt-vi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="lbl">Sao chép</span></button></div>
+    <pre id="prompt-vi">Hãy cài Agent Voice Studio lên máy này (Windows hoặc macOS) cho chính ứng dụng AI bạn đang chạy.
+Nguồn duy nhất: https://github.com/ducnguyen221/agent-voice-studio
+Đọc trước rồi làm đúng từng bước trong hướng dẫn dành cho agent:
+https://raw.githubusercontent.com/ducnguyen221/agent-voice-studio/main/INSTALL.md
+(không mở được link thì clone repo rồi đọc file INSTALL.md trong đó).
+Hỏi tôi trước khi cài phần mềm, cần quyền admin, tải engine nặng vài GB hoặc chọn chỗ đặt trạm giọng.
+Không đổi chính sách hệ thống, không tải script về rồi chạy, không đọc hay ghi mật khẩu, khóa, file .env.
+Chạy voice-studio doctor và chép nguyên từng dòng; gặp lỗi thì dừng và giải thích bằng lời thường.
+Kết thúc bằng tóm tắt: đường dẫn repo, chỗ đặt trạm, kết quả doctor, phần mềm đã cài, việc tôi làm tiếp.</pre>
+  </div>
+
+  <h2>English</h2>
+  <div class="card">
+    <div class="card-top">prompt · English<button class="copy-btn" type="button" data-target="prompt-en"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="lbl">Copy</span></button></div>
+    <pre id="prompt-en">Install Agent Voice Studio on this machine (Windows or macOS) for the AI app you are running in.
+Single source: https://github.com/ducnguyen221/agent-voice-studio
+First read, then follow every step of the agent guide at
+https://raw.githubusercontent.com/ducnguyen221/agent-voice-studio/main/INSTALL.md
+(if the link cannot be opened, clone the repo and read its INSTALL.md).
+Ask me before installing software, anything needing admin rights, downloading the multi-GB engine,
+or choosing where the voice station lives. Do not change system policy, do not download-and-run
+scripts, never read or write passwords, keys or .env files. Run voice-studio doctor and copy every
+line; on any error stop and explain in plain words. Finish with a summary: repo path, station
+location, doctor result, software added, and what I need to do next.</pre>
+  </div>
+
+  <h2>Ứng dụng nào dùng được gì</h2>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Ứng dụng</th><th>Có gì sau khi cài</th></tr></thead>
+      <tbody>
+        <tr><td>Claude Code</td><td>skill <code>voice-routing</code> + lệnh <code>voice-studio</code>; plugin tuỳ chọn</td></tr>
+        <tr><td>Codex</td><td>skill + lệnh <code>voice-studio</code>; plugin tuỳ chọn</td></tr>
+        <tr><td>Antigravity</td><td>đọc <code>AGENTS.md</code> và skill ngay trong repo</td></tr>
+        <tr><td>Claude Desktop (tab chat)</td><td>không chạy được lệnh; chỉ công cụ MCP nếu bạn tự đăng ký</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h2>Cài xong có gì</h2>
+  <ul>
+    <li><b>Phần khung</b> (vài phút): lệnh <code>voice-studio</code>, trạm giọng trong <code>workspace/</code> của repo (git bỏ qua), bài mẫu đã kiểm.</li>
+    <li><b>Phần engine</b> (chỉ khi bạn đồng ý): torch ~2,5 GB và weights ~4 GB — giấy phép weights không thương mại.</li>
+    <li>Gỡ bất cứ lúc nào bằng <code>voice-studio uninstall</code>: gỡ phần mềm, <b>giữ</b> giọng của bạn.</li>
+  </ul>
+  <p>Tự cài bằng tay: <a href="https://github.com/ducnguyen221/agent-voice-studio/blob/main/START-HERE.md">START-HERE.md</a>.</p>
+</main>
+<script>
+  document.querySelectorAll('.copy-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var pre = document.getElementById(btn.getAttribute('data-target'));
+      var lbl = btn.querySelector('.lbl'), old = lbl.textContent;
+      function flash(ok){ lbl.textContent = ok ? '✓' : '✗'; setTimeout(function(){ lbl.textContent = old; }, 1400); }
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(pre.textContent).then(function(){ flash(true); }, function(){ flash(false); });
+      } else {
+        var ta = document.createElement('textarea'); ta.value = pre.textContent; document.body.appendChild(ta);
+        ta.select(); var ok = false; try { ok = document.execCommand('copy'); } catch (e) {} document.body.removeChild(ta); flash(ok);
+      }
+    });
+  });
+</script>
+</body>
+</html>
