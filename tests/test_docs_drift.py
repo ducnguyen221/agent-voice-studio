@@ -74,3 +74,17 @@ def test_page_states_the_exit_code_contract():
     text = _page()
     for code in ("0", "1", "2", "3"):
         assert f"<b>{code}</b>" in text, f"trang thiếu mã thoát {code} trong hợp đồng"
+
+
+def test_page_does_not_hardcode_a_test_count():
+    """Số test đổi theo từng commit; con số cứng trên trang ("290 test") trôi mà không ai thấy."""
+    text = re.sub(r"<[^>]+>", " ", _page())
+    stale = re.findall(r"\b\d+\s+test\b", text)
+    assert not stale, f"trang ghi cứng số test: {stale} — nói CI chạy ở đâu thay vì đếm"
+
+
+def test_page_links_the_current_marketing_path():
+    text = _page()
+    # Chỉ so phần đường: tên miền là tên tác giả, cổng rò danh tính không cho nó vào test.
+    assert "/marketing-agent/" not in text, "đường cũ; trang marketing là /agent-marketing-studio/"
+    assert ".vn/agent-marketing-studio/" in text
