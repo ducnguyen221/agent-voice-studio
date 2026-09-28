@@ -19,7 +19,11 @@ dependencies = [
 
 [project.optional-dependencies]
 # Engine: weights OmniVoice theo giấy phép CC-BY-NC (không thương mại) — đọc install-omnivoice.md.
-engine = ["omnivoice==0.2.1"]
+# transformers ghim theo KHOẢNG đã đo, không một số cứng: 5.10.2 (Windows + CUDA) và 5.17.0
+# (Windows cài sạch, Mac) đều chạy. omnivoice 0.2.1 chỉ đòi >=5.3.0 nên không tự chặn bản mới
+# chưa ai thử. Nới khoảng = đo trên máy thật trước, rồi sửa cùng lúc doctor.TRANSFORMERS_TESTED
+# (tests/test_repo_gates.py đỏ nếu hai chỗ lệch).
+engine = ["omnivoice==0.2.1", "transformers>=5.10.2,<5.18"]
 mcp = ["mcp"]
 ui = ["gradio"]
 clone = ["faster-whisper", "yt-dlp"]

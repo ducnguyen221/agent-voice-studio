@@ -49,7 +49,11 @@ Engine chạy **offline** để lịch chạy không bao giờ treo vì mạng. 
   đo nếu bạn chạy được.
 - Cặp phiên bản đã đo: Windows + CUDA với torch 2.12/transformers 5.10.2 và torch 2.13/transformers
   5.17.0 (cài sạch 28/09); Mac spike với transformers 5.17.0.
-  Repo không ghim transformers — `omnivoice` quyết định.
+- Vì vậy phần phụ `engine` ghim transformers theo **khoảng** đã đo (`>=5.10.2,<5.18`, nguồn duy
+  nhất là `pyproject.toml`), không một số cứng: cài qua `pip install "<repo>[engine]"` là pip giữ
+  bản trong khoảng. Doctor in phiên bản đang có và `[WARN] transformers` khi nó nằm ngoài khoảng
+  (cài `omnivoice` trần thì pip kéo bản mới nhất, chưa ai đo) — cài lại phần phụ `engine` để về
+  khoảng.
 
 ## Windows
 

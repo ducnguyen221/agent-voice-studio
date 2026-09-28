@@ -61,7 +61,7 @@ voice-studio --version
 ### Phần phụ
 
 ```
-pip install -e ".[engine]"   # engine tổng hợp (omnivoice, bản ghim)
+pip install -e ".[engine]"   # engine tổng hợp (omnivoice ghim, transformers trong khoảng đã đo)
 pip install -e ".[lab]"      # bộ đào giọng đa sắc thái (librosa, scikit-learn)
 pip install -e ".[mcp]"      # chạy như MCP server cho agent
 pip install -e ".[ui]"       # giao diện web cục bộ

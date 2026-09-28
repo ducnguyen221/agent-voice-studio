@@ -328,13 +328,15 @@ def test_init_prints_venv_commands_not_creating_venv(repo, tmp_path, capsys):
     out, err = capsys.readouterr()
     assert rc == 0 and last_json(out)["ok"]
     assert "venv" in err and "omnivoice==0.2.1" in err
+    # engine cài qua phần phụ [engine] ⇒ transformers nằm trong khoảng đã đo, không tự trôi
+    assert "[engine]" in err
     assert not (tmp_path / "st" / "omnivoice" / ".venv").exists()
 
 
 @pytest.mark.parametrize("windows", [True, False])
 def test_venv_commands_use_the_os_shell_syntax(windows, tmp_path):
     cmds = station.venv_commands(str(tmp_path / "st"), windows=windows)
-    engine_calls = cmds[1:5]
+    engine_calls = cmds[1:-1]
     if windows:
         assert all(c.startswith('& "') and "Scripts" in c for c in engine_calls)
         assert cmds[-1].startswith("$env:OMNIVOICE_ONLINE")

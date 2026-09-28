@@ -25,6 +25,9 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
 - Sửa: tài liệu từng bảo `OMNIVOICE_ONLINE=1 voice-studio doctor` để tải weights — doctor không
   bao giờ tải gì; lần tổng hợp đầu mới tải. Lệnh `init` in ra giờ đúng cú pháp PowerShell trên
   Windows.
+- Phần phụ `engine` giữ `transformers` trong khoảng đã chạy thật (`>=5.10.2,<5.18`), không ghim
+  cứng một số; cài engine bằng `pip install "<repo>[engine]"`. Doctor in phiên bản transformers và
+  `[WARN]` khi nó nằm ngoài khoảng.
 
 ## 0.2.0 — 2026-09-22
 

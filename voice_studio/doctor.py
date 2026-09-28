@@ -19,6 +19,8 @@ engine) — kèm hướng dẫn cài phần còn thiếu.
 """
 import argparse
 import importlib
+import importlib.metadata
+import itertools
 import os
 import subprocess
 import sys
@@ -26,10 +28,15 @@ import sys
 from . import API_VERSION, _env, contract, engine
 
 INSTALL_HINT = (
-    "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → `pip install omnivoice==0.2.1` → "
-    "`pip install -e <repo agent-voice-studio>` → `voice-studio init` → lần tổng hợp đầu chạy "
+    "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → "
+    "`pip install -e \"<repo agent-voice-studio>[engine]\"` (máy chạy lịch: bỏ `-e`, xem "
+    "docs/INSTALL.md mục 3) → `voice-studio init` → lần tổng hợp đầu chạy "
     "với OMNIVOICE_ONLINE=1 để tải weights (doctor không tải gì). Chi tiết: "
     "skills/voice-routing/references/install-omnivoice.md")
+
+# Khoảng transformers đã chạy thật với engine — PHẢI trùng phần phụ `engine` trong pyproject.toml
+# (tests/test_repo_gates.py giữ hai chỗ khớp). Ngoài khoảng: doctor WARN, không chặn.
+TRANSFORMERS_TESTED = ">=5.10.2,<5.18"
 
 
 NOT_CHECKED = "not_checked"
@@ -63,6 +70,47 @@ def _major(v):
         return int(str(v).split(".")[0])
     except (TypeError, ValueError):
         return None
+
+
+def _vtuple(v):
+    """Phiên bản → tuple số: "5.17.0" → (5, 17, 0); bỏ đuôi kiểu ".dev0", "+cu126". Không dùng
+    `packaging` để lõi không thêm phụ thuộc."""
+    parts = []
+    for p in str(v).split("+")[0].split("."):
+        digits = "".join(itertools.takewhile(str.isdigit, p))
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def in_range(version, spec):
+    """`version` thoả mọi điều kiện `>=` / `<` trong `spec` (vd ">=5.10.2,<5.18")?"""
+    v = _vtuple(version)
+    for cond in spec.split(","):
+        cond = cond.strip()
+        if cond.startswith(">="):
+            if v < _vtuple(cond[2:]):
+                return False
+        elif cond.startswith("<"):
+            if v >= _vtuple(cond[1:]):
+                return False
+        else:
+            raise ValueError(f"điều kiện phiên bản không hỗ trợ: {cond!r}")
+    return True
+
+
+def transformers_check(version=None):
+    """transformers có nằm trong khoảng đã đo không. Chỉ đọc metadata, không import."""
+    if version is None:
+        try:
+            version = importlib.metadata.version("transformers")
+        except importlib.metadata.PackageNotFoundError:
+            return _not_checked("transformers", "không thấy metadata transformers trong venv này")
+    return _check("transformers", in_range(version, TRANSFORMERS_TESTED),
+                  f"{version} (khoảng đã đo {TRANSFORMERS_TESTED})", level="warn",
+                  hint=f"ngoài khoảng đã chạy thật; cài lại phần phụ engine để về khoảng đó: "
+                       f"pip install \"<repo>[engine]\" (thêm -e trên máy phát triển)")
 
 
 def station_checks(st):
@@ -245,8 +293,11 @@ def engine_checks():
         importlib.import_module("omnivoice")
         checks.append(_check("omnivoice", True, "importable"))
         have_engine = True
+        checks.append(transformers_check())
     except ImportError as e:
-        checks.append(_check("omnivoice", False, str(e), hint="`pip install omnivoice==0.2.1`"))
+        checks.append(_check("omnivoice", False, str(e),
+                             hint="`pip install \"<repo>[engine]\"` (omnivoice==0.2.1 + transformers "
+                                  "trong khoảng đã đo; thêm -e trên máy phát triển)"))
 
     cached, hub = _hf_cache_has(engine.MODEL_ID)
     if have_engine:

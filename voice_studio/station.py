@@ -125,8 +125,9 @@ def venv_commands(st, windows=None):
     return [
         f"python -m venv \"{venv}\"",
         f"{run} -m {torch}",
-        f"{run} -m pip install omnivoice==0.2.1",
-        f"{run} -m pip install -e \"{repo}\"",
+        # Phần phụ `engine` = omnivoice==0.2.1 + transformers trong khoảng đã đo (pyproject.toml).
+        f"{run} -m pip install -e \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio; "
+        "máy chạy lịch: bỏ -e (docs/INSTALL.md mục 3)",
         f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)",
         online + "   # lần tổng hợp đầu: tải weights (~4 GB)",
     ]

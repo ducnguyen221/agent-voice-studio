@@ -61,10 +61,13 @@ cũ hơn sập lúc import với lỗi không chỉ rõ là do phiên bản.
 **4. Cài engine và package:**
 
 ```bash
-pip install omnivoice==0.2.1
-pip install -e <thư mục repo>              # lệnh voice-studio
-pip install -e "<thư mục repo>[mcp,lab]"   # tuỳ chọn: MCP server, bộ đào giọng (librosa, scikit-learn)
+pip install -e "<thư mục repo>[engine]"           # omnivoice==0.2.1 + transformers + lệnh voice-studio
+pip install -e "<thư mục repo>[engine,mcp,lab]"   # tuỳ chọn thêm: MCP server, bộ đào giọng (librosa, scikit-learn)
 ```
+
+Phần phụ `[engine]` ghim `omnivoice` và giữ `transformers` trong **khoảng đã đo** (khai ở
+`pyproject.toml`). Cài `omnivoice` trần thì pip kéo transformers mới nhất — chưa ai đo; doctor
+báo `[WARN] transformers` khi bản đang có nằm ngoài khoảng.
 
 Nhóm tuỳ chọn khác: `[ui]` (gradio), `[clone]` (faster-whisper, yt-dlp). **Đừng cài phần phụ
 chuẩn hoá văn bản của engine trên Windows** — một phụ thuộc không có wheel, đòi cả bộ build MSVC;
