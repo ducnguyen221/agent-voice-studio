@@ -117,6 +117,7 @@ hai bên không trôi khỏi nhau:
 | `backup` | zip cả trạm (không venv/cache/out) |
 | `migrate` | chuyển trạm embedded ra ngoài repo |
 | `update` | cập nhật repo (`git pull --ff-only`) |
+| `uninstall` | gỡ package + hook pre-commit, **giữ** trạm và giọng (`--dry-run` xem trước) |
 
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # pipeline khác gọi

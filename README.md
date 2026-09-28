@@ -129,6 +129,7 @@ from drifting apart:
 | `backup` | zip the whole station (no venv/cache/out) |
 | `migrate` | move an embedded station out of the repo |
 | `update` | update the clone (`git pull --ff-only`) |
+| `uninstall` | remove the package + pre-commit hook, **keep** the station and voices (`--dry-run` to preview) |
 
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # for other pipelines

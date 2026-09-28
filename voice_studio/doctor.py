@@ -9,6 +9,11 @@ không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám
 mặc định · thư viện nhạc nền · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
 trong cache (chạy offline được). Không tải gì, không nạp model.
 
+Bốn trạng thái mỗi dòng: `PASS` đã kiểm, đạt · `WARN` dùng được nhưng nên sửa · `FAIL` thiếu thứ
+bắt buộc · `NOT_CHECKED` doctor KHÔNG kiểm được điều này (chưa có trạm, chưa có engine, hoặc cần
+nạp model) — không phải lỗi, và không bao giờ được báo như đã đạt. JSON giữ tên mức cũ
+(`ok`/`warn`/`error`) cho bên gọi hiện có, thêm `not_checked` (khi đó `"ok": null`).
+
 Mã thoát: 0 dùng được (có thể kèm cảnh báo) · 3 thiếu thứ bắt buộc (trạm / kho giọng / torch /
 engine) — kèm hướng dẫn cài phần còn thiếu.
 """
@@ -27,9 +32,18 @@ INSTALL_HINT = (
     "skills/voice-routing/references/install-omnivoice.md")
 
 
+NOT_CHECKED = "not_checked"
+MARKS = {"ok": "PASS", "warn": "WARN", "error": "FAIL", NOT_CHECKED: "NOT_CHECKED"}
+
+
 def _check(name, ok, detail="", level="error", hint=""):
     return {"name": name, "ok": bool(ok), "level": "ok" if ok else level,
             "detail": detail, "hint": "" if ok else hint}
+
+
+def _not_checked(name, detail, hint=""):
+    """Điều doctor không kiểm được lần này. `ok` là null: không đạt, cũng không hỏng."""
+    return {"name": name, "ok": None, "level": NOT_CHECKED, "detail": detail, "hint": hint}
 
 
 def _hf_cache_has(model_id):
@@ -147,6 +161,8 @@ def run_checks():
                              hint="tên biến cũ — đổi sang VOICE_BGM, VOICE_BGM_VOL, VOICE_BGM_DIR"))
 
     if st is None:
+        why = "chưa có trạm — kiểm lại sau khi đặt trạm"
+        checks += [_not_checked(n, why) for n in ("voices", "default-profile", "bgm-library")]
         return checks + engine_checks()
 
     from . import profiles
@@ -186,30 +202,41 @@ def engine_checks():
             checks.append(_check("torch", False, str(e), hint="sửa OMNIVOICE_DEVICE"))
     except ImportError as e:
         checks.append(_check("torch", False, str(e), hint="cài torch vào venv engine"))
+    have_engine = False
     try:
         importlib.import_module("omnivoice")
         checks.append(_check("omnivoice", True, "importable"))
+        have_engine = True
     except ImportError as e:
         checks.append(_check("omnivoice", False, str(e), hint="`pip install omnivoice==0.2.1`"))
 
     cached, hub = _hf_cache_has(engine.MODEL_ID)
-    checks.append(_check("weights", cached, f"{engine.MODEL_ID} @ {hub}", level="warn",
-                         hint="weights chưa có trong cache — chạy một lần với OMNIVOICE_ONLINE=1"))
+    if have_engine:
+        checks.append(_check("weights", cached, f"{engine.MODEL_ID} @ {hub}", level="warn",
+                             hint="weights chưa có trong cache — chạy một lần với OMNIVOICE_ONLINE=1"))
+    else:
+        checks.append(_not_checked("weights", f"engine chưa cài — chưa kiểm cache {hub}"))
+    # doctor không bao giờ nạp model (nặng hàng GB, có thể cần mạng): chưa ai chứng minh máy này
+    # ĐỌC được thành tiếng. Nói thẳng điều đó thay vì để một bảng toàn PASS gợi ý ngược lại.
+    checks.append(_not_checked(
+        "synthesis", "doctor không nạp model",
+        hint='thử thật: voice-studio speak --text "Xin chào" --out <trạm>/out/thu.wav --json'))
     return checks
 
 
 def doctor(args):
     checks = run_checks()
     for c in checks:
-        mark = {"ok": "OK  ", "warn": "WARN", "error": "LỖI "}[c["level"]]
-        line = f"[{mark}] {c['name']:<16} {c['detail']}"
+        mark = "[" + MARKS[c["level"]] + "]"
+        line = f"{mark:<13} {c['name']:<16} {c['detail']}"
         if c["hint"]:
-            line += f"\n         → {c['hint']}"
+            line += f"\n{'':<14}→ {c['hint']}"
         contract.log(line)
     errors = [c["name"] for c in checks if c["level"] == "error"]
     warns = [c["name"] for c in checks if c["level"] == "warn"]
+    unchecked = [c["name"] for c in checks if c["level"] == NOT_CHECKED]
     result = {"voice_studio": API_VERSION, "station": _env.resolve_station()[0],
-              "checks": checks, "errors": errors, "warnings": warns}
+              "checks": checks, "errors": errors, "warnings": warns, "not_checked": unchecked}
     if errors:
         contract.log("\n" + INSTALL_HINT)
         raise _DoctorFailed(result)

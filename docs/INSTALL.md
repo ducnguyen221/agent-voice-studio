@@ -126,11 +126,17 @@ sau không gói chính nó.
 ## 7. Gỡ
 
 ```
-pip uninstall agent-voice-studio
+voice-studio uninstall --dry-run     # xem trước: gỡ gì, giữ gì
+python -m voice_studio uninstall --yes
 ```
 
-Trạm **không bị đụng tới**: nó là dữ liệu của bạn. Muốn xoá thì xoá thư mục trạm — sau khi đã
-`voice-studio backup`.
+`uninstall` gỡ hook `pre-commit` do `init` cài (chỉ khi đúng là hook của nó) và
+`pip uninstall agent-voice-studio` khỏi venv đang chạy; in lệnh gỡ plugin của từng host (repo
+không tự ghi cấu hình host nên cũng không tự xoá). Gọi qua `python -m` để trên Windows tiến trình
+không giữ khoá file `voice-studio.exe` đang bị gỡ. `--keep-package` chỉ gỡ hook.
+
+Trạm, `.env`, `studio.local.json` **không bị đụng tới**: chúng là dữ liệu của bạn. Muốn xoá thì
+xoá thư mục trạm — sau khi đã `voice-studio backup`.
 
 ## 8. Nền tảng: cái gì đã chạy thật
 
