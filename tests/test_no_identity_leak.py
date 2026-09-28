@@ -38,6 +38,11 @@ PATTERNS = {
     # không phải của trạm. Mẫu này vốn nằm ở bản grep riêng trong verify.yml; gộp về đây
     # khi bỏ bản grep đó, để cổng chỉ còn MỘT nguồn luật.
     "bien-home-win": re.escape(s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37)),
+    # Tên hệ điều phối agent và kho tri thức riêng của người viết: hạ tầng CÁ NHÂN, không phải
+    # phụ thuộc của repo. Repo public nhắc tới là lộ cấu trúc máy người viết, và người đọc sẽ
+    # tưởng phải cài thêm thứ đó. Danh sách chi tiết giữ NGOÀI repo; ở đây chỉ hai tên gốc.
+    "he-dieu-phoi": re.escape(s(111, 112, 99)) + "-?" + re.escape(s(111, 115)),       # có/không gạch nối
+    "kho-tri-thuc": "(?-i:" + r"\b" + re.escape(s(66, 114, 97, 105, 110)) + r"\b)",   # viết hoa
 }
 
 # (file, khoá) → số lần tối đa được phép. Lý do bên cạnh.
@@ -123,9 +128,15 @@ def test_patterns_catch_their_target(tmp_path):
         "duong-may-win": s(67, 58, 92, 85, 115, 101, 114, 115, 92) + "x",
         "duong-may-posix": "/home/someone/",
         "bien-home-win": s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37) + r"\voices",
+        "he-dieu-phoi": "~/." + s(111, 112, 99, 111, 115) + "/repo",
+        "kho-tri-thuc": "ghi vào " + s(66, 114, 97, 105, 110) + "/",
     }
     for key, text in samples.items():
         assert re.search(PATTERNS[key], text, flags=re.IGNORECASE), key
+    # dạng có gạch nối vẫn bị bắt; tên font "JetBrains Mono" trên trang không phải kho tri thức
+    assert re.search(PATTERNS["he-dieu-phoi"], "repo " + s(111, 112, 99, 45, 111, 115),
+                     flags=re.IGNORECASE)
+    assert not re.search(PATTERNS["kho-tri-thuc"], "JetBrains Mono", flags=re.IGNORECASE)
     # "đạo đức" (chữ thường) không phải tên người
     assert not re.search(PATTERNS["ten-nguoi"], s(0x111, 0x1EA1, 0x6F, 32, 0x111, 0x1EE9, 0x63),
                          flags=re.IGNORECASE)

@@ -73,5 +73,5 @@ tmp/
 !docs/example/**/*.json
 !docs/example/**/*.md
 
-# Plan/thiet ke noi bo -> quan ly tap trung o ~/.opcos/repo/<repo>/plans/ (repo opc-os, PRIVATE)
+# Plan/thiết kế nội bộ không thuộc repo public — giữ ngoài repo, không bao giờ commit.
 docs/plans/
