@@ -63,6 +63,9 @@ ALLOW = {
     ("README.md", "tac-gia"): 4,
     ("README.vi.md", "tac-gia"): 3,
     ("docs/INSTALL.md", "tac-gia"): 1,
+    # Trang host: lệnh `plugin marketplace add <chủ>/<repo>` mang địa chỉ repo công khai.
+    ("hosts/claude/README.md", "tac-gia"): 1,
+    ("hosts/codex/README.md", "tac-gia"): 1,
     # Trang giới thiệu công khai (GitHub Pages): địa chỉ kho mã, tài liệu và các trang cùng họ
     # là NỘI DUNG của trang, không phải rò rỉ. Vẫn khoá theo số đếm: thêm một liên kết là đỏ,
     # nên không ai nhét được đường dẫn máy hay tên profile thật vào đây mà không bị nhìn thấy.
