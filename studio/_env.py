@@ -1,7 +1,7 @@
 """_env.py — cầu nối cho các alias trong `studio/`: đưa gốc repo vào sys.path, rồi hỏi package.
 
 Mọi quyết định "trạm/kho giọng/thư mục làm việc nằm ở đâu" giờ nằm ở MỘT chỗ:
-`voice_studio._env` (VOICE_STATION → OMNIVOICE_DIR → ~/.voice). File này chỉ còn để các
+`voice_studio._env` (`resolve_station()`; thứ tự ở docs/WORKSPACE.md). File này chỉ còn để các
 script cũ `python studio/<tên>.py …` chạy được khi chưa `pip install` package — không giữ
 logic riêng, không dò đường theo vị trí engine nữa.
 """

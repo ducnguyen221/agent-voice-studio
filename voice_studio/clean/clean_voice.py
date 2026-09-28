@@ -9,7 +9,7 @@ Tầng 1 (audio-separator) cần venv `.venv-sep`; tầng 2 (ClearerVoice) cần
 hai venv ở THƯ MỤC CÔNG CỤ LÀM SẠCH của trạm:
 
     --clean-dir → VOICE_CLEAN_DIR → $VOICE_STATION/voice-clean → <cha OMNIVOICE_DIR>/voice-clean
-    → ~/.voice/voice-clean
+    → <trạm theo `voice_studio._env.resolve_station()`>/voice-clean → chưa xác định (mã 3)
 
 Python của venv chọn theo hệ điều hành (`Scripts/python.exe` trên Windows, `bin/python` nơi
 khác). Tiến trình hiện tại không có `audio_separator` ⇒ tự chạy lại chính file này bằng python
@@ -55,7 +55,14 @@ def resolve_clean_dir(explicit=None):
     eng = _envv("OMNIVOICE_DIR")
     if eng:
         return Path(eng).expanduser().resolve().parent / "voice-clean"
-    return Path.home() / ".voice" / "voice-clean"
+    # Tầng cuối dùng CHUNG thứ tự phân giải trạm của package (studio.local.json, workspace/…).
+    # Khi file chạy tự chứa trong venv tách, tiến trình cha đã truyền --clean-dir nên không tới đây.
+    try:
+        from voice_studio import _env
+    except ImportError:
+        return None
+    st = _env.resolve_station()[0]
+    return Path(st).resolve() / "voice-clean" if st else None
 
 
 def venv_python(root, venv, windows=None):
@@ -143,6 +150,10 @@ def main(argv=None):
         log("LỖI: --no-enhance và --enhance-only loại trừ nhau")
         return 2
     clean_dir = resolve_clean_dir(args.clean_dir)
+    if clean_dir is None:
+        log("LỖI: chưa xác định được thư mục công cụ làm sạch — đặt VOICE_STATION "
+            "(hoặc VOICE_CLEAN_DIR), hoặc truyền --clean-dir")
+        return 3
 
     if _need_reexec(args):
         sep_py = venv_python(clean_dir, SEP_VENV)

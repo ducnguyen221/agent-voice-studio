@@ -50,7 +50,8 @@ python -m venv <dir>/.venv-cv     # tăng cường
 ```
 
 `<dir>` là thư mục công cụ làm sạch, nằm **ngoài repo**: `--clean-dir` → biến
-`VOICE_CLEAN_DIR` → `$VOICE_STATION/voice-clean` → `~/.voice/voice-clean`. Lệnh `pip install`
+`VOICE_CLEAN_DIR` → `$VOICE_STATION/voice-clean` → `<trạm đang phân giải>/voice-clean`
+(thứ tự tìm trạm: `docs/WORKSPACE.md`). Lệnh `pip install`
 đầy đủ cho từng venv ở `voice_studio/clean/README.md`.
 
 Mỗi venv có bản torch riêng. Dự trù vài GB cho mỗi môi trường. `voice-studio clean` tự chạy lại

@@ -6,7 +6,7 @@ dưới đây, đọc biến môi trường MỖI LẦN gọi (không đóng bă
 
 Biến hợp đồng (tên mới trước, tên cũ đọc được để tương thích):
 
-    VOICE_STATION      gốc trạm giọng                 (mặc định ~/.voice)
+    VOICE_STATION      gốc trạm giọng                 (mặc định <repo>/workspace/)
     OMNIVOICE_DIR      tên cũ: THƯ MỤC ENGINE (= $VOICE_STATION/omnivoice); đọc được,
                        không cảnh báo ở đây — `voice-studio doctor` mới là chỗ nhắc đổi tên
     VOICES_DIR         kho profile giọng              (mặc định <engine>/voices)
@@ -22,10 +22,12 @@ MỘT phiên bản, kèm DeprecationWarning, rồi sẽ bị bỏ.
 Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — `resolve_station()`:
 
     --station (lệnh đặt VOICE_STATION trong tiến trình) → VOICE_STATION → OMNIVOICE_DIR (cha)
-    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ nếu có → ~/.voice
+    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ nếu có
+    → ~/.voice nếu ĐÃ là một trạm → <repo>/workspace/ (mặc định, `init` tạo) → chưa xác định
 
 `<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
-`VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ bỏ hai tầng giữa.
+`VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ không có tầng repo,
+và thiếu cả biến lẫn trạm cũ thì `station_dir()` báo mã 3 (không tự tạo thư mục ẩn ở home).
 `station.json` ở gốc trạm có thể khai `engine_dir`, `bgm_dir` (tương đối theo gốc trạm).
 
 Biến cấu hình đi theo thứ tự riêng: biến môi trường thật → `<repo>/.env` (**chỉ** khi
@@ -208,9 +210,25 @@ def has_marker(path):
                            os.path.isdir(os.path.join(path, "omnivoice", "voices")))
 
 
+UNSET = "unset"
+HOME_STATION = "home"
+UNSET_HINT = ("chưa xác định được trạm giọng: bản cài này không nằm trong một bản clone repo "
+              "và chưa đặt VOICE_STATION. Đặt VOICE_STATION=<thư mục trạm> (hoặc truyền "
+              "--station), rồi chạy `voice-studio init --station <thư mục trạm>`.")
+
+
 def resolve_station():
-    """-> (gốc trạm, nguồn). Nguồn ∈ VOICE_STATION · OMNIVOICE_DIR · studio.local.json ·
-    workspace · default. Đọc lại mỗi lần gọi."""
+    """-> (gốc trạm | None, nguồn). Đọc lại mỗi lần gọi. Thứ tự:
+
+        VOICE_STATION → OMNIVOICE_DIR (cha) → <repo>/studio.local.json → <repo>/workspace/ nếu có
+        → ~/.voice nếu ĐÃ là một trạm (`home`, tương thích máy cũ) → <repo>/workspace/ (chưa có;
+        `init` sẽ tạo) → (None, `unset`)
+
+    Không đặt gì thì trạm là THƯ MỤC TRONG REPO (bị git bỏ qua), không bao giờ là một thư mục
+    ẩn mới dưới home: `~/.voice` chỉ được dùng khi người dùng đã chọn nó (biến, `--station`,
+    `init` chế độ separate) hoặc nó đã là một trạm từ trước. Cài dạng wheel (không có repo) mà
+    chưa đặt gì ⇒ `unset` — `station_dir()` báo mã 3 kèm cách đặt, thay vì tự đẻ thư mục.
+    """
     st = env("VOICE_STATION")
     if st:
         return _expand(st), "VOICE_STATION"
@@ -218,20 +236,29 @@ def resolve_station():
     if eng:
         return os.path.dirname(_expand(eng)), "OMNIVOICE_DIR"
     repo = repo_root()
+    ws = os.path.join(repo, WORKSPACE) if repo else None
     if repo:
         sp = (local_config(repo).get("station_path") or "").strip()
         if sp:
             sp = os.path.expanduser(sp)
             return (sp if os.path.isabs(sp) else os.path.abspath(os.path.join(repo, sp))), LOCAL_CONFIG
-        ws = os.path.join(repo, WORKSPACE)
         if os.path.isdir(ws):
             return ws, WORKSPACE
-    return default_station(), "default"
+    home = default_station()
+    if has_marker(home):
+        return home, HOME_STATION
+    if repo and os.path.isdir(repo):
+        return ws, WORKSPACE
+    return None, UNSET
 
 
 def station_dir():
-    """Gốc trạm giọng theo thứ tự F17.3 (xem docstring module)."""
-    return resolve_station()[0]
+    """Gốc trạm giọng theo `resolve_station()`; chưa xác định được ⇒ StationMissing (mã 3)."""
+    st = resolve_station()[0]
+    if st is None:
+        from .contract import StationMissing
+        raise StationMissing(UNSET_HINT)
+    return st
 
 
 def station_info(station=None):

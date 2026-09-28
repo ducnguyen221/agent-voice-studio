@@ -25,7 +25,7 @@ Mọi thứ nặng nằm ở **trạm**, không nằm trong repo:
 ```
 
 Vị trí: `--clean-dir` → biến `VOICE_CLEAN_DIR` → `$VOICE_STATION/voice-clean` →
-`~/.voice/voice-clean`.
+`<trạm đang phân giải>/voice-clean` (thứ tự tìm trạm: `docs/WORKSPACE.md`).
 
 ## Cài đặt
 

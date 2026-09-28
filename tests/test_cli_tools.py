@@ -89,7 +89,10 @@ def test_doctor_red_on_bare_machine(capsys, monkeypatch):
     assert rc == 3
     res = last_json(out)
     assert res["ok"] is False and res["code"] == 3
-    assert {"station", "voices", "torch", "omnivoice"} <= set(res["errors"])
+    # Máy trần: không repo, không biến, không trạm cũ ⇒ trạm "chưa xác định" (không tự chọn
+    # một thư mục ẩn ở home), và các kiểm cần trạm không chạy.
+    assert {"station", "torch", "omnivoice"} <= set(res["errors"])
+    assert res["station"] is None and "VOICE_STATION" in err
     assert "pip install" in err                     # có hướng dẫn cài phần còn thiếu
 
 
@@ -115,7 +118,9 @@ def test_venv_python_per_os(tmp_path):
 
 
 def test_clean_dir_resolution_order(tmp_path, monkeypatch):
-    assert clean_voice.resolve_clean_dir() == Path.home() / ".voice" / "voice-clean"
+    assert clean_voice.resolve_clean_dir() is None           # máy trần: không tự chọn ~/.voice
+    (tmp_path / "home" / ".voice" / "omnivoice" / "voices").mkdir(parents=True)
+    assert clean_voice.resolve_clean_dir() == (tmp_path / "home" / ".voice" / "voice-clean").resolve()
     monkeypatch.setenv("OMNIVOICE_DIR", str(tmp_path / "old" / "omnivoice"))
     assert clean_voice.resolve_clean_dir() == (tmp_path / "old" / "voice-clean").resolve()
     monkeypatch.setenv("VOICE_STATION", str(tmp_path / "st"))

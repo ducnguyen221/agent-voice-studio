@@ -127,10 +127,17 @@ def run_checks():
     checks = [_check("python", sys.version_info >= (3, 10), sys.version.split()[0],
                      hint="cần Python ≥ 3.10")]
 
-    st = _env.station_dir()
-    checks.append(_check("station", os.path.isdir(st), st,
-                         hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
-    checks += station_checks(st)
+    st, st_src = _env.resolve_station()
+    if st is None:
+        checks.append(_check("station", False, "(chưa xác định)", hint=_env.UNSET_HINT))
+    else:
+        checks.append(_check("station", os.path.isdir(st), f"{st} (nguồn: {st_src})",
+                             hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
+        checks += station_checks(st)
+    if st_src == _env.HOME_STATION:
+        checks.append(_check("station-source", False, st, level="warn",
+                             hint="trạm ~/.voice được nhận vì nó đã có sẵn; đặt VOICE_STATION trỏ vào "
+                                  "đó để lịch chạy và máy khác thấy cùng một trạm"))
     if _env.env("OMNIVOICE_DIR") and not _env.env("VOICE_STATION"):
         checks.append(_check("env-name", False, "OMNIVOICE_DIR", level="warn",
                              hint="tên biến cũ — đặt VOICE_STATION=<gốc trạm> (OMNIVOICE_DIR vẫn đọc được)"))
@@ -138,6 +145,9 @@ def run_checks():
     if old_bgm:
         checks.append(_check("env-name-bgm", False, ", ".join(old_bgm), level="warn",
                              hint="tên biến cũ — đổi sang VOICE_BGM, VOICE_BGM_VOL, VOICE_BGM_DIR"))
+
+    if st is None:
+        return checks + engine_checks()
 
     from . import profiles
     vd = profiles.voices_dir()
@@ -154,6 +164,12 @@ def run_checks():
     checks.append(_check("bgm-library", os.path.isfile(lib_file), lib_file, level="warn",
                          hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng"))
 
+    return checks + engine_checks()
+
+
+def engine_checks():
+    """Phần không phụ thuộc trạm: ffmpeg · torch + thiết bị · omnivoice · weights trong cache."""
+    checks = []
     try:
         ff = _env.ffmpeg_exe()
         checks.append(_check("ffmpeg", True, ff))
@@ -192,7 +208,7 @@ def doctor(args):
         contract.log(line)
     errors = [c["name"] for c in checks if c["level"] == "error"]
     warns = [c["name"] for c in checks if c["level"] == "warn"]
-    result = {"voice_studio": API_VERSION, "station": _env.station_dir(),
+    result = {"voice_studio": API_VERSION, "station": _env.resolve_station()[0],
               "checks": checks, "errors": errors, "warnings": warns}
     if errors:
         contract.log("\n" + INSTALL_HINT)
