@@ -61,3 +61,25 @@ def test_relative_links_resolve(rel):
         if path and not (base / path).exists():
             missing.append(target)
     assert not missing, f"{rel} có link tương đối gãy: {missing}"
+
+
+# ── VO-2: repo không tự ghi cấu hình host; đăng ký host là bước theo INSTALL.md ─────────────
+# Dấu vết của file cấu hình host trên máy người dùng. Mã package nhắc tới một trong số này
+# nghĩa là đã có đường ghi (hoặc đọc) cấu hình host ngoài tay người dùng.
+HOST_CONFIG_MARKERS = (".claude", ".codex", ".gemini", "claude_desktop_config", "mcp.json",
+                       "settings.json", "config.toml")
+
+
+def test_package_code_never_touches_host_config():
+    hits = []
+    for py in sorted((ROOT / "voice_studio").rglob("*.py")):
+        text = py.read_text(encoding="utf-8")
+        hits += [f"{py.relative_to(ROOT)}: {m}" for m in HOST_CONFIG_MARKERS if m in text]
+    assert not hits, f"mã package nhắc tới cấu hình host: {hits}"
+
+
+def test_host_index_says_registration_is_an_install_md_step():
+    text = read("hosts/README.md")
+    assert "không tự ghi cấu hình của bất kỳ host AI nào" in text
+    assert "../INSTALL.md#10-" in text, "đăng ký host phải trỏ về INSTALL.md mục 10"
+    assert "## 10. Host" in read("INSTALL.md")

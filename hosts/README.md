@@ -24,9 +24,12 @@ bước cho host đó. Tự cài thì theo [START-HERE.md](../START-HERE.md) r�
 ## Đăng ký ở cấp người dùng
 
 Plugin marketplace và mục MCP (nếu có) ghi vào cấu hình **của người dùng** trên máy, không vào
-file trong repo. Repo này **không tự ghi** cấu hình host nào: mọi đăng ký do lệnh của chính host
-thực hiện, bạn thấy và duyệt từng lệnh. `voice-studio uninstall` vì thế chỉ **in** lệnh gỡ plugin
-của từng host, không tự sửa cấu hình host.
+file trong repo. Repo này **không tự ghi cấu hình của bất kỳ host AI nào** — không lệnh
+`voice-studio` nào, kể cả `init`, `doctor`, `update`, đụng tới file cấu hình của Claude Code,
+Codex, Antigravity hay Claude Desktop. Đăng ký host là một **bước tuỳ chọn theo
+[INSTALL.md mục 10](../INSTALL.md#10-host-plugin-tuỳ-chọn-và-khởi-động-lại)**: lệnh của chính host
+thực hiện, agent hỏi trước, bạn thấy và duyệt từng lệnh. `voice-studio uninstall` vì thế chỉ
+**in** lệnh gỡ plugin của từng host, không tự sửa cấu hình host.
 
 ## Trạng thái kiểm trên host thật
 
