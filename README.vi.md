@@ -40,6 +40,24 @@ năng lực giọng thay vì nổ giữa chừng. Không có thứ tự cài b�
 
 ## Cài
 
+**Nhờ agent cài.** Dán khối này vào Claude Code, Codex hoặc Antigravity. Agent làm theo
+[`INSTALL.md`](INSTALL.md): kiểm máy, hỏi trước khi cài phần mềm hay tải engine, để **anh** chọn
+chỗ đặt trạm giọng, và báo nguyên từng dòng `voice-studio doctor`. Chạy trên Windows và macOS.
+
+```text
+Hãy cài Agent Voice Studio lên máy này (Windows hoặc macOS) cho chính ứng dụng AI bạn đang chạy.
+Nguồn duy nhất: https://github.com/ducnguyen221/agent-voice-studio
+Đọc trước rồi làm đúng từng bước trong hướng dẫn dành cho agent:
+https://raw.githubusercontent.com/ducnguyen221/agent-voice-studio/main/INSTALL.md
+(không mở được link thì clone repo rồi đọc file INSTALL.md trong đó).
+Hỏi tôi trước khi cài phần mềm, cần quyền admin, tải engine nặng vài GB hoặc chọn chỗ đặt trạm giọng.
+Không đổi chính sách hệ thống, không tải script về rồi chạy, không đọc hay ghi mật khẩu, khóa, file .env.
+Chạy voice-studio doctor và chép nguyên từng dòng; gặp lỗi thì dừng và giải thích bằng lời thường.
+Kết thúc bằng tóm tắt: đường dẫn repo, chỗ đặt trạm, kết quả doctor, phần mềm đã cài, việc tôi làm tiếp.
+```
+
+Tự cài bằng tay (từng bước: [`START-HERE.md`](START-HERE.md)):
+
 ```bash
 git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
@@ -56,6 +74,10 @@ pip install -e .          # trong venv engine — lệnh voice-studio
 voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến nghị) hay ngoài (separate)
 voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
+
+`-e` dành cho máy phát triển. Máy **chạy lịch** cài **bản sao** (không `-e`) để sửa hay `git pull`
+repo không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windows và macOS, ở
+[`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
 `<repo>/workspace/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
@@ -117,6 +139,7 @@ hai bên không trôi khỏi nhau:
 | `backup` | zip cả trạm (không venv/cache/out) |
 | `migrate` | chuyển trạm embedded ra ngoài repo |
 | `update` | cập nhật repo (`git pull --ff-only`) |
+| `uninstall` | gỡ package + hook pre-commit, **giữ** trạm và giọng (`--dry-run` xem trước) |
 
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # pipeline khác gọi

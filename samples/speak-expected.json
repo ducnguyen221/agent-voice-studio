@@ -1,0 +1,20 @@
+{
+  "ok": true,
+  "outputs": [
+    {
+      "kind": "audio",
+      "path": "<trạm>/out/cau-ngan.wav",
+      "duration": 6.5
+    }
+  ],
+  "profile": "<tên profile>",
+  "timings": {
+    "load": 0.0,
+    "synth": 0.0,
+    "total": 0.0
+  },
+  "engine": {
+    "voice_studio": "1.0.0",
+    "device": "cuda | mps | cpu"
+  }
+}

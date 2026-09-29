@@ -79,7 +79,8 @@ Pipeline khác gọi `speak`/`narrate` với `--json`: đọc **mã thoát** (`0
 ## Đồ đạc nằm ở đâu
 
 Engine, kho giọng và bản ghi là **của bạn**, sống ở *trạm giọng* ngoài git: `<repo>/workspace/`
-(chế độ `embedded`, mặc định) hoặc `~/.voice` (chế độ `separate`). Repo chỉ giữ phương pháp và
+(chế độ `embedded`, mặc định — cũng là trạm khi không đặt biến nào) hoặc thư mục người dùng
+chọn, thường `~/.voice` (chế độ `separate`, đặt `VOICE_STATION`). Repo chỉ giữ phương pháp và
 mã. Giữ nguyên như vậy: audio không bao giờ được vào repo — `.gitignore` chặn cả họ audio mặc
 định, và hook `pre-commit` của chế độ embedded chặn `workspace/` lẫn `.env`.
 

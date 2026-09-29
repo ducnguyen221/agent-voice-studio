@@ -1,5 +1,5 @@
 """station.py — dựng và vận hành trạm giọng: `init`, `export --personal`, `import`, `backup`,
-`migrate --to separate`, `update`.
+`migrate --to separate`, `update`, `uninstall`.
 
 TRẠM là nơi chứa những gì của riêng người dùng (venv engine, kho giọng, nhạc nền, output);
 repo chỉ chứa mã. Có HAI chế độ cài (F17):
@@ -102,24 +102,34 @@ def _template_dir():
     return None
 
 
-def _venv_python_rel():
-    return "omnivoice/.venv/Scripts/python.exe" if os.name == "nt" else "omnivoice/.venv/bin/python"
+def venv_commands(st, windows=None):
+    """Lệnh tạo venv + cài engine để người dùng TỰ chạy (init không làm thay).
 
-
-def venv_commands(st):
-    """Lệnh tạo venv + cài engine để người dùng TỰ chạy (init không làm thay)."""
+    Cú pháp theo shell mặc định của hệ điều hành: PowerShell trên Windows (gọi exe có dấu nháy
+    phải qua `&`, biến môi trường đặt bằng `$env:`), sh/zsh ở nơi khác. Một lệnh dán vào sai
+    shell là lỗi cú pháp ngay dòng đầu — người mới không biết đó là lỗi của tài liệu.
+    """
+    windows = (os.name == "nt") if windows is None else windows
     venv = os.path.join(st, "omnivoice", ".venv")
-    py = os.path.join(st, *_venv_python_rel().split("/"))
+    py = os.path.join(venv, "Scripts", "python.exe") if windows else os.path.join(venv, "bin", "python")
+    run = f"& \"{py}\"" if windows else f"\"{py}\""
     repo = _env.repo_root() or "<thư mục repo agent-voice-studio>"
     torch = ("pip install torch --index-url https://download.pytorch.org/whl/cu126   # NVIDIA; "
              "không có GPU: bỏ --index-url" if sys.platform != "darwin"
              else "pip install torch   # Apple Silicon: dùng MPS")
+    out_wav = os.path.join(st, "out", "thu.wav")
+    first = (f"{run} -m voice_studio speak --text \"Xin chào\" --instruct \"female, young adult\" "
+             f"--out \"{out_wav}\" --json")
+    online = (f"$env:OMNIVOICE_ONLINE = \"1\"; {first}; Remove-Item Env:OMNIVOICE_ONLINE" if windows
+              else f"OMNIVOICE_ONLINE=1 {first}")
     return [
         f"python -m venv \"{venv}\"",
-        f"\"{py}\" -m {torch}",
-        f"\"{py}\" -m pip install omnivoice==0.2.1",
-        f"\"{py}\" -m pip install -e \"{repo}\"",
-        f"OMNIVOICE_ONLINE=1 \"{py}\" -m voice_studio doctor   # lần đầu: tải weights (~4 GB)",
+        f"{run} -m {torch}",
+        # Phần phụ `engine` = omnivoice==0.2.1 + transformers trong khoảng đã đo (pyproject.toml).
+        f"{run} -m pip install -e \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio; "
+        "máy chạy lịch: bỏ -e (docs/INSTALL.md mục 3)",
+        f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)",
+        online + "   # lần tổng hợp đầu: tải weights (~4 GB)",
     ]
 
 
@@ -205,8 +215,9 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
         why = "--mode"
     if mode == "embedded":
         if not repo:
-            raise ContractError("chế độ embedded cần chạy từ bản clone repo (pip install -e <repo>); "
-                                "bản cài wheel chỉ dùng được separate (--station DIR).")
+            raise ContractError("chế độ embedded cần biết bản clone repo: cài `pip install -e <repo>`, "
+                                "hoặc bản sao kèm biến VOICE_STUDIO_REPO=<repo> (docs/INSTALL.md "
+                                "mục 3); không thì chỉ dùng được separate (--station DIR).")
         return "embedded", os.path.join(repo, _env.WORKSPACE), why
     return "separate", _env.default_station(), why
 
@@ -263,6 +274,10 @@ def _station_json(st, mode, existing):
     data.setdefault("created", datetime.date.today().isoformat())
     changed = data != cur
     return path, data, changed, venv_exists
+
+
+# Dòng nhận diện hook do CHÍNH `init` cài (nằm trong `_hook_text`) — `uninstall` chỉ gỡ hook có nó.
+HOOK_MARKER = "# voice-studio: chặn commit dữ liệu trạm"
 
 
 def _hook_text():
@@ -697,7 +712,140 @@ def update():
         raise contract.EngineError(
             "git pull --ff-only không chạy được (có sửa đổi cục bộ lệch nhánh?). Không xoá gì; "
             "xử lý tay rồi chạy lại.\n" + (r.stderr or r.stdout).strip())
-    return {"repo": repo, "output": (r.stdout or "").strip()}
+    res = {"repo": repo, "output": (r.stdout or "").strip(), "reinstall": None}
+    if installed_copy(repo):
+        # Bản sao (máy chạy lịch, docs/INSTALL.md mục 3): git pull KHÔNG đổi mã đang chạy.
+        res["reinstall"] = f"\"{sys.executable}\" -m pip install \"{repo}[engine]\""
+    return res
+
+
+def installed_copy(repo):
+    """Package đang chạy là bản sao cài vào site-packages (không `-e` từ `repo`)?"""
+    pkg_repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    return os.path.normcase(os.path.realpath(pkg_repo)) != os.path.normcase(os.path.realpath(repo))
+
+
+# ── uninstall ──────────────────────────────────────────────────────────────────────────
+
+PACKAGE = "agent-voice-studio"
+# Plugin do lệnh của CHÍNH host cài (repo không tự ghi cấu hình host) ⇒ ở đây chỉ IN lệnh gỡ.
+HOST_UNINSTALL = (
+    "claude plugin uninstall agent-voice-studio@agent-voice-studio   # Claude Code, nếu đã cài plugin",
+    "codex plugin uninstall agent-voice-studio@agent-voice-studio    # Codex, nếu đã cài plugin",
+    "Claude Desktop / Antigravity: xoá mục MCP `omnivoice-tts` nếu bạn đã tự thêm",
+)
+
+
+def _our_hook(repo):
+    """Đường hook pre-commit nếu nó do `voice-studio init` cài (có HOOK_MARKER); không thì None."""
+    if not repo:
+        return None
+    hook = os.path.join(repo, ".git", "hooks", "pre-commit")
+    try:
+        with open(hook, "r", encoding="utf-8", errors="replace") as f:
+            return hook if HOOK_MARKER in f.read() else None
+    except OSError:
+        return None
+
+
+def _pip_uninstall_cmd():
+    return [sys.executable, "-m", "pip", "uninstall", "-y", PACKAGE]
+
+
+def plan_uninstall(keep_package=False):
+    """Kế hoạch gỡ — KHÔNG ghi gì. Gỡ phần mềm, GIỮ dữ liệu của người dùng."""
+    repo = _env.repo_root()
+    st, src = _env.resolve_station()
+    kept = []
+    if st and os.path.isdir(st):
+        kept.append(f"trạm giọng {st} (nguồn: {src}) — giọng, nhạc nền, output, venv engine")
+    if repo:
+        for name in (_env.ENV_FILE, _env.LOCAL_CONFIG):
+            if os.path.isfile(os.path.join(repo, name)):
+                kept.append(os.path.join(repo, name))
+    return {
+        "remove_hook": _our_hook(repo),
+        "remove_package": None if keep_package else PACKAGE,
+        "pip": None if keep_package else " ".join(_pip_uninstall_cmd()),
+        "kept": kept,
+        "host_commands": list(HOST_UNINSTALL),
+        "repo": repo,
+    }
+
+
+def do_uninstall(keep_package=False, dry_run=False):
+    plan = plan_uninstall(keep_package)
+    res = dict(plan, dry_run=bool(dry_run), removed=[])
+    if dry_run:
+        return res
+    if plan["remove_hook"]:
+        os.remove(plan["remove_hook"])
+        res["removed"].append(plan["remove_hook"])
+    if not keep_package:
+        r = subprocess.run(_pip_uninstall_cmd(), capture_output=True, text=True,
+                           encoding="utf-8", errors="replace", timeout=300)
+        if r.returncode != 0:
+            raise contract.EngineError(
+                "pip uninstall không chạy được — dữ liệu chưa bị đụng. Tự chạy: "
+                + res["pip"] + "\n" + (r.stderr or r.stdout).strip())
+        res["removed"].append(PACKAGE)
+    return res
+
+
+def _print_uninstall(res):
+    log = contract.log
+    tag = "(xem trước — chưa đụng gì) " if res["dry_run"] else ""
+    verb = "sẽ gỡ" if res["dry_run"] else "đã gỡ"
+    if res["remove_hook"]:
+        log(f"[uninstall] {tag}{verb} hook pre-commit của voice-studio: {res['remove_hook']}")
+    if res["remove_package"]:
+        log(f"[uninstall] {tag}{verb} package {res['remove_package']} khỏi {sys.executable}")
+        log("            (gói khác cài cùng venv này và import voice_studio sẽ mất phần giọng)")
+    for k in res["kept"]:
+        log(f"[uninstall] GIỮ NGUYÊN {k}")
+    log("\nPlugin/MCP do host cài — gỡ bằng lệnh của host nếu bạn đã cài:")
+    for c in res["host_commands"]:
+        log("  " + c)
+    log("\nMuốn xoá hẳn dữ liệu: `voice-studio backup` trước, rồi tự xoá thư mục trạm.")
+
+
+def _confirm_uninstall(keep_package):
+    """Không `--yes`: có người thì hỏi y/N; không có người thì mã 2 (không đoán)."""
+    _print_uninstall(do_uninstall(keep_package, dry_run=True))
+    if not _stdin_is_tty():
+        raise ContractError("cần người dùng đồng ý. Agent: trình kế hoạch trên cho người dùng, "
+                            "rồi chạy lại với --yes (hoặc --dry-run để chỉ xem).")
+    sys.stderr.write("Gỡ? [y/N]: ")
+    sys.stderr.flush()
+    try:
+        ans = input().strip().lower()
+    except EOFError:
+        ans = ""
+    if ans not in ("y", "yes", "c", "có"):
+        raise ContractError("đã huỷ — chưa đụng gì")
+
+
+def uninstall_main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="voice-studio uninstall",
+        description="Gỡ phần mềm, GIỮ dữ liệu: bỏ hook pre-commit do init cài và `pip uninstall` "
+                    "package. Trạm, giọng, .env, studio.local.json không bị đụng.")
+    ap.add_argument("--dry-run", action="store_true", help="chỉ in sẽ làm gì")
+    ap.add_argument("--yes", action="store_true", help="gỡ không hỏi lại")
+    ap.add_argument("--keep-package", action="store_true",
+                    help="chỉ gỡ hook, giữ package (vd venv dùng chung với gói khác)")
+    ap.add_argument("--json", action="store_true")
+    args, code = contract.parse(ap, argv)
+    if args is None:
+        return code
+
+    def fn(a):
+        if not a.dry_run and not a.yes:
+            _confirm_uninstall(a.keep_package)
+        res = do_uninstall(a.keep_package, dry_run=a.dry_run)
+        _print_uninstall(res)
+        return res
+    return contract.run(fn, args, args.json)
 
 
 def backup_main(argv=None):
@@ -746,5 +894,8 @@ def update_main(argv=None):
     def fn(a):
         res = update()
         contract.log(res["output"] or "[update] đã mới nhất")
+        if res["reinstall"]:
+            contract.log("[update] package là BẢN SAO — mã mới chưa vào venv. Cài lại (ngoài giờ "
+                         "lịch chạy):\n  " + res["reinstall"])
         return res
     return contract.run(fn, args, args.json)

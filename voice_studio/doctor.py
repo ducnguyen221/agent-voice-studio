@@ -9,11 +9,18 @@ không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám
 mặc định · thư viện nhạc nền · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
 trong cache (chạy offline được). Không tải gì, không nạp model.
 
+Bốn trạng thái mỗi dòng: `PASS` đã kiểm, đạt · `WARN` dùng được nhưng nên sửa · `FAIL` thiếu thứ
+bắt buộc · `NOT_CHECKED` doctor KHÔNG kiểm được điều này (chưa có trạm, chưa có engine, hoặc cần
+nạp model) — không phải lỗi, và không bao giờ được báo như đã đạt. JSON giữ tên mức cũ
+(`ok`/`warn`/`error`) cho bên gọi hiện có, thêm `not_checked` (khi đó `"ok": null`).
+
 Mã thoát: 0 dùng được (có thể kèm cảnh báo) · 3 thiếu thứ bắt buộc (trạm / kho giọng / torch /
 engine) — kèm hướng dẫn cài phần còn thiếu.
 """
 import argparse
 import importlib
+import importlib.metadata
+import itertools
 import os
 import subprocess
 import sys
@@ -21,15 +28,29 @@ import sys
 from . import API_VERSION, _env, contract, engine
 
 INSTALL_HINT = (
-    "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → `pip install omnivoice==0.2.1` → "
-    "`pip install -e <repo agent-voice-studio>` → `voice-studio init` → "
-    "`OMNIVOICE_ONLINE=1 voice-studio doctor` (lần đầu tải weights). Chi tiết: "
+    "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → "
+    "`pip install -e \"<repo agent-voice-studio>[engine]\"` (máy chạy lịch: bỏ `-e`, xem "
+    "docs/INSTALL.md mục 3) → `voice-studio init` → lần tổng hợp đầu chạy "
+    "với OMNIVOICE_ONLINE=1 để tải weights (doctor không tải gì). Chi tiết: "
     "skills/voice-routing/references/install-omnivoice.md")
+
+# Khoảng transformers đã chạy thật với engine — PHẢI trùng phần phụ `engine` trong pyproject.toml
+# (tests/test_repo_gates.py giữ hai chỗ khớp). Ngoài khoảng: doctor WARN, không chặn.
+TRANSFORMERS_TESTED = ">=5.10.2,<5.18"
+
+
+NOT_CHECKED = "not_checked"
+MARKS = {"ok": "PASS", "warn": "WARN", "error": "FAIL", NOT_CHECKED: "NOT_CHECKED"}
 
 
 def _check(name, ok, detail="", level="error", hint=""):
     return {"name": name, "ok": bool(ok), "level": "ok" if ok else level,
             "detail": detail, "hint": "" if ok else hint}
+
+
+def _not_checked(name, detail, hint=""):
+    """Điều doctor không kiểm được lần này. `ok` là null: không đạt, cũng không hỏng."""
+    return {"name": name, "ok": None, "level": NOT_CHECKED, "detail": detail, "hint": hint}
 
 
 def _hf_cache_has(model_id):
@@ -49,6 +70,47 @@ def _major(v):
         return int(str(v).split(".")[0])
     except (TypeError, ValueError):
         return None
+
+
+def _vtuple(v):
+    """Phiên bản → tuple số: "5.17.0" → (5, 17, 0); bỏ đuôi kiểu ".dev0", "+cu126". Không dùng
+    `packaging` để lõi không thêm phụ thuộc."""
+    parts = []
+    for p in str(v).split("+")[0].split("."):
+        digits = "".join(itertools.takewhile(str.isdigit, p))
+        if not digits:
+            break
+        parts.append(int(digits))
+    return tuple(parts)
+
+
+def in_range(version, spec):
+    """`version` thoả mọi điều kiện `>=` / `<` trong `spec` (vd ">=5.10.2,<5.18")?"""
+    v = _vtuple(version)
+    for cond in spec.split(","):
+        cond = cond.strip()
+        if cond.startswith(">="):
+            if v < _vtuple(cond[2:]):
+                return False
+        elif cond.startswith("<"):
+            if v >= _vtuple(cond[1:]):
+                return False
+        else:
+            raise ValueError(f"điều kiện phiên bản không hỗ trợ: {cond!r}")
+    return True
+
+
+def transformers_check(version=None):
+    """transformers có nằm trong khoảng đã đo không. Chỉ đọc metadata, không import."""
+    if version is None:
+        try:
+            version = importlib.metadata.version("transformers")
+        except importlib.metadata.PackageNotFoundError:
+            return _not_checked("transformers", "không thấy metadata transformers trong venv này")
+    return _check("transformers", in_range(version, TRANSFORMERS_TESTED),
+                  f"{version} (khoảng đã đo {TRANSFORMERS_TESTED})", level="warn",
+                  hint=f"ngoài khoảng đã chạy thật; cài lại phần phụ engine để về khoảng đó: "
+                       f"pip install \"<repo>[engine]\" (thêm -e trên máy phát triển)")
 
 
 def station_checks(st):
@@ -127,10 +189,17 @@ def run_checks():
     checks = [_check("python", sys.version_info >= (3, 10), sys.version.split()[0],
                      hint="cần Python ≥ 3.10")]
 
-    st = _env.station_dir()
-    checks.append(_check("station", os.path.isdir(st), st,
-                         hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
-    checks += station_checks(st)
+    st, st_src = _env.resolve_station()
+    if st is None:
+        checks.append(_check("station", False, "(chưa xác định)", hint=_env.UNSET_HINT))
+    else:
+        checks.append(_check("station", os.path.isdir(st), f"{st} (nguồn: {st_src})",
+                             hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
+        checks += station_checks(st)
+    if st_src == _env.HOME_STATION:
+        checks.append(_check("station-source", False, st, level="warn",
+                             hint="trạm ~/.voice được nhận vì nó đã có sẵn; đặt VOICE_STATION trỏ vào "
+                                  "đó để lịch chạy và máy khác thấy cùng một trạm"))
     if _env.env("OMNIVOICE_DIR") and not _env.env("VOICE_STATION"):
         checks.append(_check("env-name", False, "OMNIVOICE_DIR", level="warn",
                              hint="tên biến cũ — đặt VOICE_STATION=<gốc trạm> (OMNIVOICE_DIR vẫn đọc được)"))
@@ -138,6 +207,16 @@ def run_checks():
     if old_bgm:
         checks.append(_check("env-name-bgm", False, ", ".join(old_bgm), level="warn",
                              hint="tên biến cũ — đổi sang VOICE_BGM, VOICE_BGM_VOL, VOICE_BGM_DIR"))
+
+    checks.append(samples_check())
+    if st is not None:
+        wp = win_path_check(os.path.join(_env.engine_dir(), ".venv"))
+        if wp:
+            checks.append(wp)
+    if st is None:
+        why = "chưa có trạm — kiểm lại sau khi đặt trạm"
+        checks += [_not_checked(n, why) for n in ("voices", "default-profile", "bgm-library")]
+        return checks + engine_checks()
 
     from . import profiles
     vd = profiles.voices_dir()
@@ -154,6 +233,45 @@ def run_checks():
     checks.append(_check("bgm-library", os.path.isfile(lib_file), lib_file, level="warn",
                          hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng"))
 
+    return checks + engine_checks()
+
+
+# Windows chưa bật đường dài: thư mục sâu nhất tối đa 248 ký tự. Gói torch (bản CUDA 2.13) có
+# thư mục giấy phép lồng sâu ~160 ký tự tính từ gốc venv ⇒ gốc venv dài quá ~88 ký tự là `pip
+# install torch` gãy giữa chừng với WinError 206 và để lại một torch cài dở (đo 28/09 khi cài
+# sạch vào trạm embedded nằm trong %TEMP%). Chừa biên: cảnh báo từ 80 ký tự.
+WIN_VENV_PATH_WARN = 80
+
+
+def win_path_check(venv, windows=None):
+    """Cảnh báo đường venv engine quá dài trên Windows; hệ khác (hoặc đường ngắn) ⇒ None."""
+    windows = (os.name == "nt") if windows is None else windows
+    if not windows:
+        return None
+    n = len(os.path.abspath(venv)) if os.name == "nt" else len(venv)
+    return _check("win-path", n <= WIN_VENV_PATH_WARN, f"{venv} ({n} ký tự)", level="warn",
+                  hint=f"đường venv engine dài hơn {WIN_VENV_PATH_WARN} ký tự: cài torch có thể gãy "
+                       "(WinError 206) khi Windows chưa bật đường dài. Clone repo vào thư mục ngắn, "
+                       "hoặc đặt trạm ở đường ngắn (`voice-studio init --station <thư mục ngắn>`); "
+                       "bật LongPathsEnabled là việc của quản trị máy, không phải của agent")
+
+
+def samples_check():
+    """Bài mẫu của repo còn đúng không — offline, không cần trạm hay engine."""
+    from . import samples
+    try:
+        ok, detail = samples.check()
+    except FileNotFoundError as e:
+        return _not_checked("samples", str(e))
+    except (OSError, ValueError) as e:
+        ok, detail = False, str(e)
+    return _check("samples", ok, detail, level="warn",
+                  hint="bài mẫu trong samples/ bị sửa lệch — `git status samples/`")
+
+
+def engine_checks():
+    """Phần không phụ thuộc trạm: ffmpeg · torch + thiết bị · omnivoice · weights trong cache."""
+    checks = []
     try:
         ff = _env.ffmpeg_exe()
         checks.append(_check("ffmpeg", True, ff))
@@ -170,30 +288,45 @@ def run_checks():
             checks.append(_check("torch", False, str(e), hint="sửa OMNIVOICE_DEVICE"))
     except ImportError as e:
         checks.append(_check("torch", False, str(e), hint="cài torch vào venv engine"))
+    have_engine = False
     try:
         importlib.import_module("omnivoice")
         checks.append(_check("omnivoice", True, "importable"))
+        have_engine = True
+        checks.append(transformers_check())
     except ImportError as e:
-        checks.append(_check("omnivoice", False, str(e), hint="`pip install omnivoice==0.2.1`"))
+        checks.append(_check("omnivoice", False, str(e),
+                             hint="`pip install \"<repo>[engine]\"` (omnivoice==0.2.1 + transformers "
+                                  "trong khoảng đã đo; thêm -e trên máy phát triển)"))
 
     cached, hub = _hf_cache_has(engine.MODEL_ID)
-    checks.append(_check("weights", cached, f"{engine.MODEL_ID} @ {hub}", level="warn",
-                         hint="weights chưa có trong cache — chạy một lần với OMNIVOICE_ONLINE=1"))
+    if have_engine:
+        checks.append(_check("weights", cached, f"{engine.MODEL_ID} @ {hub}", level="warn",
+                             hint="weights chưa có trong cache — lần tổng hợp đầu (speak/make-profile) "
+                                  "chạy với OMNIVOICE_ONLINE=1; doctor không tải"))
+    else:
+        checks.append(_not_checked("weights", f"engine chưa cài — chưa kiểm cache {hub}"))
+    # doctor không bao giờ nạp model (nặng hàng GB, có thể cần mạng): chưa ai chứng minh máy này
+    # ĐỌC được thành tiếng. Nói thẳng điều đó thay vì để một bảng toàn PASS gợi ý ngược lại.
+    checks.append(_not_checked(
+        "synthesis", "doctor không nạp model",
+        hint='thử thật: voice-studio speak --text "Xin chào" --out <trạm>/out/thu.wav --json'))
     return checks
 
 
 def doctor(args):
     checks = run_checks()
     for c in checks:
-        mark = {"ok": "OK  ", "warn": "WARN", "error": "LỖI "}[c["level"]]
-        line = f"[{mark}] {c['name']:<16} {c['detail']}"
+        mark = "[" + MARKS[c["level"]] + "]"
+        line = f"{mark:<13} {c['name']:<16} {c['detail']}"
         if c["hint"]:
-            line += f"\n         → {c['hint']}"
+            line += f"\n{'':<14}→ {c['hint']}"
         contract.log(line)
     errors = [c["name"] for c in checks if c["level"] == "error"]
     warns = [c["name"] for c in checks if c["level"] == "warn"]
-    result = {"voice_studio": API_VERSION, "station": _env.station_dir(),
-              "checks": checks, "errors": errors, "warnings": warns}
+    unchecked = [c["name"] for c in checks if c["level"] == NOT_CHECKED]
+    result = {"voice_studio": API_VERSION, "station": _env.resolve_station()[0],
+              "checks": checks, "errors": errors, "warnings": warns, "not_checked": unchecked}
     if errors:
         contract.log("\n" + INSTALL_HINT)
         raise _DoctorFailed(result)

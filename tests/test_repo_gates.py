@@ -151,3 +151,46 @@ def test_pyproject_entry_point_and_version():
     for name in ("engine", "mcp", "ui", "clone", "test"):
         assert name in extras
     assert any("omnivoice==0.2.1" in d for d in extras["engine"])
+
+
+# ── transformers: ghim theo KHOẢNG đã đo, không một số cứng ────────────────────────────
+# Các bản đã chạy thật với engine (docs/troubleshooting.md, mục Apple Silicon). Thêm bản mới vào
+# đây chỉ khi đã đo trên máy thật.
+TRANSFORMERS_MEASURED = ("5.10.2", "5.17.0")
+
+
+@pytest.mark.skipif(tomllib is None, reason="cần Python ≥ 3.11 để đọc TOML")
+def test_engine_pins_transformers_to_the_doctor_range():
+    from voice_studio import doctor
+    engine = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))[
+        "project"]["optional-dependencies"]["engine"]
+    pins = [d for d in engine if d.replace(" ", "").lower().startswith("transformers")]
+    assert len(pins) == 1, "phần phụ engine phải ghim transformers đúng một lần"
+    spec = pins[0].replace(" ", "")[len("transformers"):]
+    # Một chỗ nói khoảng cho pip, một chỗ cho doctor — lệch là doctor khen/chê sai bản.
+    assert spec == doctor.TRANSFORMERS_TESTED
+    assert "==" not in spec and ">=" in spec and "<" in spec.replace(">=", ""), \
+        "ghim theo khoảng có cận dưới và cận trên, không ghim cứng một số"
+
+
+@pytest.mark.parametrize("version", TRANSFORMERS_MEASURED)
+def test_every_measured_transformers_is_inside_the_range(version):
+    from voice_studio import doctor
+    assert doctor.in_range(version, doctor.TRANSFORMERS_TESTED)
+
+
+@pytest.mark.parametrize("version,inside", [
+    ("5.10.1", False), ("5.10.2", True), ("5.17.9", True), ("5.18.0", False),
+    ("5.17.0.dev0", True), ("5.12.0+local", True), ("6.0", False), ("4.57.1", False)])
+def test_in_range_bounds(version, inside):
+    from voice_studio import doctor
+    assert doctor.in_range(version, ">=5.10.2,<5.18") is inside
+
+
+def test_doctor_warns_outside_measured_transformers():
+    from voice_studio import doctor
+    ok = doctor.transformers_check("5.17.0")
+    assert ok["level"] == "ok" and "5.17.0" in ok["detail"]
+    bad = doctor.transformers_check("5.20.1")
+    # Ngoài khoảng là CẢNH BÁO, không chặn: chưa ai đo không có nghĩa là hỏng.
+    assert bad["level"] == "warn" and "[engine]" in bad["hint"]

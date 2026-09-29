@@ -408,8 +408,8 @@
         <li><b class="num" data-to="19">19</b> lệnh</li>
         <li class="m"><b class="num" data-to="6">6</b> cổng kiểm</li>
         <li><b class="num" data-to="7">7</b> tài liệu skill</li>
-        <li><b class="num" data-to="290">290</b> test</li>
-        <li>phiên bản <b>v0.2.0</b></li>
+        <li>CI <b>Windows + macOS</b></li>
+        <li>phiên bản <b>v0.3.0</b></li>
         <li><b>0</b> file audio trong repo</li>
       </ul>
     </div>
@@ -630,13 +630,19 @@
         có ai trả lời (CI, lịch chạy) thì nó in bảng đó ra và <b>thoát mã 2 mà chưa ghi byte nào</b>.</p>
     </div>
 
+    <div class="note plain reveal">
+      <p><strong>Nhờ AI agent cài.</strong> Trang <a href="install/" style="color:var(--accent)">/install/</a>
+        có một prompt copy-dán (tiếng Việt và tiếng Anh) cho Claude Code, Codex hoặc Antigravity, trên
+        Windows hoặc macOS: agent hỏi trước khi cài phần mềm, tải engine hay chọn chỗ đặt trạm.</p>
+    </div>
+
     <div class="code-card reveal">
       <div class="code-top"><span class="fn">clone → cài → dựng trạm</span>
         <button class="copy-btn" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg><span class="lbl">Sao chép</span></button>
       </div>
       <div class="code-scroll"><pre><code><span class="pr">git</span> clone https://github.com/ducnguyen221/agent-voice-studio
 <span class="cm"># tạo venv, cài torch theo hệ điều hành + omnivoice==0.2.1 — xem docs/INSTALL.md</span>
-<span class="pr">pip</span> install -e .          <span class="cm"># trong venv engine — có lệnh voice-studio</span>
+<span class="pr">pip</span> install -e .          <span class="cm"># trong venv engine — có lệnh voice-studio; máy chạy lịch: bản sao, docs/INSTALL.md mục 3</span>
 <span class="pr">voice-studio</span> init         <span class="cm"># trình bảng embedded | separate rồi chờ bạn chọn</span>
 <span class="pr">voice-studio</span> doctor       <span class="cm"># thiếu gì thì chỉ bước cài tiếp</span></code></pre></div>
     </div>
@@ -698,7 +704,7 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>Bảng lệnh</span>
-      <h2>Toàn bộ lệnh của bản v0.2.0</h2>
+      <h2>Toàn bộ lệnh của bản v0.3.0</h2>
       <p>Chính là bảng mà <code>voice-studio --help</code> in ra — một cổng trong bộ test giữ cho hai
         bên không trôi khỏi nhau.</p>
     </div>
@@ -725,6 +731,7 @@
           <tr><td class="lbl">backup</td><td>zip cả trạm (không venv/cache/out)</td></tr>
           <tr><td class="lbl">migrate</td><td>chuyển trạm embedded ra ngoài repo</td></tr>
           <tr><td class="lbl">update</td><td>cập nhật repo (<code>git pull --ff-only</code>)</td></tr>
+          <tr><td class="lbl">uninstall</td><td>gỡ package + hook, <b>giữ</b> trạm và giọng (<code>--dry-run</code> xem trước)</td></tr>
         </tbody>
       </table>
     </div>
@@ -811,7 +818,7 @@
         <h3>agent-marketing-studio</h3>
         <p>Quy trình sản xuất nội dung. Gọi được repo này khi nó có mặt; chưa cài thì pipeline vẫn
           chạy bình thường và <b>nói rõ là đang thiếu năng lực giọng</b>.</p>
-        <div class="cmd"><a href="https://ducnguyen.vn/marketing-agent/" style="color:var(--accent)">ducnguyen.vn/marketing-agent</a></div>
+        <div class="cmd"><a href="https://ducnguyen.vn/agent-marketing-studio/" style="color:var(--accent)">ducnguyen.vn/agent-marketing-studio</a></div>
       </div>
       <div class="card lift reveal" style="--d:140ms">
         <h3>Dùng một mình</h3>
@@ -845,7 +852,7 @@
     <div class="stats reveal" style="margin-top:26px">
       <div class="stat ok"><div class="v">MIT</div><div class="k">Giấy phép của <b>mã trong repo này</b>. Toàn văn ở file <code class="inline">LICENSE</code>; phần bên thứ ba ở <code class="inline">NOTICE</code>.</div></div>
       <div class="stat"><div class="v">CC-BY-NC</div><div class="k">Giấy phép của <b>weights engine tổng hợp</b> — khác giấy phép code, và ràng buộc mục đích thương mại.</div></div>
-      <div class="stat"><div class="v"><span class="num" data-to="290">290</span> <small>test</small></div><div class="k">Chạy trên máy trần, không cần engine: engine được thay bằng module giả trong test.</div></div>
+      <div class="stat"><div class="v">Win + Mac</div><div class="k">Bộ test chạy ở CI trên cả hai hệ điều hành, mọi nhánh, trên máy trần không cần engine: engine được thay bằng module giả trong test.</div></div>
     </div>
   </div>
 </section>

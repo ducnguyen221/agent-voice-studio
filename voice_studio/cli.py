@@ -29,6 +29,7 @@ COMMANDS = {
     "backup":       ("voice_studio.station:backup_main", "zip cả trạm (không venv/cache/out)"),
     "migrate":      ("voice_studio.station:migrate_main", "chuyển trạm embedded ra ngoài repo"),
     "update":       ("voice_studio.station:update_main", "cập nhật repo (git pull --ff-only)"),
+    "uninstall":    ("voice_studio.station:uninstall_main", "gỡ package + hook, GIỮ trạm và giọng (--dry-run)"),
 }
 LAB = {
     "mine": "voice_studio.lab.mine",

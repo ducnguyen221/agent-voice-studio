@@ -38,6 +38,11 @@ PATTERNS = {
     # không phải của trạm. Mẫu này vốn nằm ở bản grep riêng trong verify.yml; gộp về đây
     # khi bỏ bản grep đó, để cổng chỉ còn MỘT nguồn luật.
     "bien-home-win": re.escape(s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37)),
+    # Tên hệ điều phối agent và kho tri thức riêng của người viết: hạ tầng CÁ NHÂN, không phải
+    # phụ thuộc của repo. Repo public nhắc tới là lộ cấu trúc máy người viết, và người đọc sẽ
+    # tưởng phải cài thêm thứ đó. Danh sách chi tiết giữ NGOÀI repo; ở đây chỉ hai tên gốc.
+    "he-dieu-phoi": re.escape(s(111, 112, 99)) + "-?" + re.escape(s(111, 115)),       # có/không gạch nối
+    "kho-tri-thuc": "(?-i:" + r"\b" + re.escape(s(66, 114, 97, 105, 110)) + r"\b)",   # viết hoa
 }
 
 # (file, khoá) → số lần tối đa được phép. Lý do bên cạnh.
@@ -49,15 +54,25 @@ ALLOW = {
     ("tests/conftest.py", "tien-to-pipeline"): 4,
     ("tests/test_av_mux.py", "tien-to-pipeline"): 8,
     ("tests/test_bgm_pick.py", "tien-to-pipeline"): 1,
+    ("docs/troubleshooting.md", "tien-to-pipeline"): 1,        # dạy đổi tên biến cũ sang VOICE_BGM*
     # Ghi công tác giả + địa chỉ repo công khai: đúng chỗ, là điều kiện của license.
     (".claude-plugin/marketplace.json", "tac-gia"): 4,
     (".claude-plugin/plugin.json", "tac-gia"): 3,
     (".codex-plugin/plugin.json", "tac-gia"): 3,
     ("LICENSE", "tac-gia"): 1,
     ("NOTICE", "tac-gia"): 1,
-    ("README.md", "tac-gia"): 4,
-    ("README.vi.md", "tac-gia"): 3,
+    ("README.md", "tac-gia"): 6,        # +2: URL repo trong prompt cài
+    ("README.vi.md", "tac-gia"): 5,     # +2: URL repo trong prompt cài
     ("docs/INSTALL.md", "tac-gia"): 1,
+    # INSTALL.md cho agent: địa chỉ repo công khai là NGUỒN DUY NHẤT mà prompt và luật an toàn trỏ tới.
+    ("INSTALL.md", "tac-gia"): 7,
+    # Test cài đặt: hằng URL repo chính thức mà prompt phải trỏ tới.
+    ("tests/test_install_docs.py", "tac-gia"): 2,
+    ("START-HERE.md", "tac-gia"): 3,                 # prompt cài (2 URL) + lệnh clone
+    ("docs/install/index.html", "tac-gia"): 6,       # 2 prompt x 2 URL + link INSTALL/START-HERE trên GitHub
+    # Trang host: lệnh `plugin marketplace add <chủ>/<repo>` mang địa chỉ repo công khai.
+    ("hosts/claude/README.md", "tac-gia"): 1,
+    ("hosts/codex/README.md", "tac-gia"): 1,
     # Trang giới thiệu công khai (GitHub Pages): địa chỉ kho mã, tài liệu và các trang cùng họ
     # là NỘI DUNG của trang, không phải rò rỉ. Vẫn khoá theo số đếm: thêm một liên kết là đỏ,
     # nên không ai nhét được đường dẫn máy hay tên profile thật vào đây mà không bị nhìn thấy.
@@ -123,9 +138,15 @@ def test_patterns_catch_their_target(tmp_path):
         "duong-may-win": s(67, 58, 92, 85, 115, 101, 114, 115, 92) + "x",
         "duong-may-posix": "/home/someone/",
         "bien-home-win": s(37, 85, 83, 69, 82, 80, 82, 79, 70, 73, 76, 69, 37) + r"\voices",
+        "he-dieu-phoi": "~/." + s(111, 112, 99, 111, 115) + "/repo",
+        "kho-tri-thuc": "ghi vào " + s(66, 114, 97, 105, 110) + "/",
     }
     for key, text in samples.items():
         assert re.search(PATTERNS[key], text, flags=re.IGNORECASE), key
+    # dạng có gạch nối vẫn bị bắt; tên font "JetBrains Mono" trên trang không phải kho tri thức
+    assert re.search(PATTERNS["he-dieu-phoi"], "repo " + s(111, 112, 99, 45, 111, 115),
+                     flags=re.IGNORECASE)
+    assert not re.search(PATTERNS["kho-tri-thuc"], "JetBrains Mono", flags=re.IGNORECASE)
     # "đạo đức" (chữ thường) không phải tên người
     assert not re.search(PATTERNS["ten-nguoi"], s(0x111, 0x1EA1, 0x6F, 32, 0x111, 0x1EE9, 0x63),
                          flags=re.IGNORECASE)

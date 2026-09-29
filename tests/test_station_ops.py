@@ -11,6 +11,7 @@ import posixpath
 import shutil
 import subprocess
 import zipfile
+from pathlib import Path
 
 import pytest
 
@@ -327,6 +328,15 @@ def test_update_fast_forwards_and_keeps_workspace(tmp_path, monkeypatch):
     assert os.path.normcase(res["repo"]) == os.path.normcase(str(user))
     assert (user / "a.txt").read_text(encoding="utf-8") == "2"
     assert (user / "workspace" / "mine.txt").read_text(encoding="utf-8") == "của tôi"
+    # Mã đang chạy KHÔNG nằm trong bản clone vừa pull ⇒ như bản sao của máy chạy lịch: pull chưa
+    # đổi gì trong venv, phải in lệnh cài lại (docs/INSTALL.md mục 3).
+    assert res["reinstall"] and f"{user}[engine]" in res["reinstall"]
+
+
+def test_installed_copy_tells_editable_from_copy(tmp_path):
+    pkg_repo = Path(station.__file__).resolve().parent.parent
+    assert station.installed_copy(str(pkg_repo)) is False      # chạy từ chính bản clone (-e)
+    assert station.installed_copy(str(tmp_path)) is True       # bản clone ở chỗ khác
 
 
 def test_update_without_repo_is_2(monkeypatch):
@@ -416,3 +426,123 @@ def test_precommit_blocks(gitrepo, rel, text, blocked):
     stage(gitrepo, rel, text)
     problems = precommit.check(str(gitrepo))
     assert bool(problems) is blocked, problems
+
+
+# ── uninstall: gỡ phần mềm, giữ dữ liệu ───────────────────────────────────────────────
+
+def tree_hash(root):
+    out = {}
+    for dp, _dn, fn in os.walk(root):
+        for n in fn:
+            full = os.path.join(dp, n)
+            out[os.path.relpath(full, root)] = station._sha256(full)
+    return out
+
+
+@pytest.fixture
+def pip_calls(monkeypatch):
+    calls = []
+
+    def fake_run(cmd, **kw):
+        calls.append(list(cmd))
+        return subprocess.CompletedProcess(cmd, 0, "Successfully uninstalled", "")
+    monkeypatch.setattr(station.subprocess, "run", fake_run)
+    return calls
+
+
+def put_hook(repo, text):
+    hooks = repo / ".git" / "hooks"
+    hooks.mkdir(parents=True, exist_ok=True)
+    (hooks / "pre-commit").write_text(text, encoding="utf-8")
+    return hooks / "pre-commit"
+
+
+def test_uninstall_dry_run_touches_nothing(embedded_repo, pip_calls, capsys):
+    hook = put_hook(embedded_repo, station._hook_text())
+    rc = cli.main(["uninstall", "--dry-run", "--json"])
+    res = last_json(capsys.readouterr().out)
+    assert rc == 0 and res["dry_run"] is True and res["removed"] == []
+    assert hook.is_file() and pip_calls == []
+    assert os.path.samefile(res["remove_hook"], hook)
+
+
+def test_uninstall_yes_removes_hook_and_package_keeps_station(embedded_repo, pip_calls, capsys):
+    import sys
+    hook = put_hook(embedded_repo, station._hook_text())
+    before = tree_hash(embedded_repo / "workspace")
+    rc = cli.main(["uninstall", "--yes", "--json"])
+    res = last_json(capsys.readouterr().out)
+    assert rc == 0 and not hook.exists()
+    assert pip_calls == [[sys.executable, "-m", "pip", "uninstall", "-y", "agent-voice-studio"]]
+    assert tree_hash(embedded_repo / "workspace") == before          # giọng không suy suyển
+    assert (embedded_repo / ".env").is_file() and (embedded_repo / "studio.local.json").is_file()
+    assert any("workspace" in k for k in res["kept"])
+    assert any("claude plugin uninstall" in c for c in res["host_commands"])
+
+
+def test_uninstall_keeps_a_foreign_hook(embedded_repo, pip_calls, capsys):
+    hook = put_hook(embedded_repo, "#!/bin/sh\nexec lint-staged\n")
+    rc = cli.main(["uninstall", "--yes", "--keep-package", "--json"])
+    res = last_json(capsys.readouterr().out)
+    assert rc == 0 and hook.is_file() and res["remove_hook"] is None
+    assert pip_calls == []                                            # --keep-package
+
+
+def test_uninstall_without_yes_and_nobody_to_ask_is_2(embedded_repo, pip_calls, capsys):
+    hook = put_hook(embedded_repo, station._hook_text())
+    rc = cli.main(["uninstall", "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["code"] == 2
+    assert hook.is_file() and pip_calls == [] and "--yes" in err
+
+
+def test_uninstall_pip_failure_is_1_and_names_the_command(embedded_repo, monkeypatch, capsys):
+    monkeypatch.setattr(station.subprocess, "run",
+                        lambda cmd, **kw: subprocess.CompletedProcess(cmd, 1, "", "denied"))
+    rc = cli.main(["uninstall", "--yes", "--json"])
+    res = last_json(capsys.readouterr().out)
+    assert rc == 1 and "pip uninstall" in res["error"]
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
+# ── doctor: bốn trạng thái ─────────────────────────────────────────────────────────────
+
+def test_doctor_reports_not_checked_honestly(monkeypatch, capsys):
+    import sys
+    monkeypatch.setitem(sys.modules, "torch", None)
+    monkeypatch.setitem(sys.modules, "omnivoice", None)
+    rc = cli.main(["doctor", "--json"])
+    out, err = capsys.readouterr()
+    res = last_json(out)
+    assert rc == 3
+    assert {"voices", "weights", "synthesis"} <= set(res["not_checked"])
+    nc = by_name(res["checks"])
+    assert nc["weights"]["ok"] is None and nc["weights"]["level"] == "not_checked"
+    assert "voices" not in res["errors"]                    # chưa kiểm ≠ hỏng
+    assert "[NOT_CHECKED]" in err and "[FAIL]" in err
+
+
+def test_doctor_json_keeps_old_level_names(tmp_path, monkeypatch, capsys):
+    st = tmp_path / "st"
+    (st / "omnivoice" / "voices").mkdir(parents=True)
+    monkeypatch.setenv("VOICE_STATION", str(st))
+    res = doctor.run_checks()
+    levels = {c["level"] for c in res}
+    assert levels <= {"ok", "warn", "error", "not_checked"}
+    assert by_name(res)["station"]["ok"] is True and by_name(res)["synthesis"]["level"] == "not_checked"
+
+
+@pytest.mark.parametrize("venv,level", [
+    ("C:\\st\\omnivoice\\.venv", "ok"),
+    ("C:\\Users\\someone\\AppData\\Local\\Temp\\vs-t22\\agent-voice-studio\\workspace\\omnivoice\\.venv",
+     "warn"),
+])
+def test_doctor_warns_long_engine_venv_path_on_windows(venv, level):
+    c = doctor.win_path_check(venv, windows=True)
+    assert c["name"] == "win-path" and c["level"] == level
+    if level == "warn":
+        assert "WinError 206" in c["hint"]
+
+
+def test_win_path_check_is_silent_elsewhere():
+    assert doctor.win_path_check("/" + "x" * 300, windows=False) is None

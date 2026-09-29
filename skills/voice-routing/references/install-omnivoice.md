@@ -30,9 +30,8 @@ rủi ro giấy phép bạn phải tự cân nhắc. Giấy phép weights đi đ
 
 ## Cài — sáu bước
 
-**Ngoại lệ có chủ đích:** hướng dẫn chung của họ repo này khuyên *không* `pip install -e`. Repo
-giọng là ngoại lệ: nó là package có `pyproject.toml` chuẩn, phải chạy **bằng chính venv của
-engine** (torch nằm ở đó), và `-e` giữ cho `git pull` là đủ để cập nhật — không phải cài lại.
+**`-e` hay bản sao:** lệnh dưới dùng `-e` (máy phát triển). Máy **chạy lịch** cài bản sao — luật
+và lệnh Windows/macOS chỉ nằm ở `docs/INSTALL.md` mục 3 của repo; đừng chép sang đây.
 
 **1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
 phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspace/`).
@@ -61,10 +60,13 @@ cũ hơn sập lúc import với lỗi không chỉ rõ là do phiên bản.
 **4. Cài engine và package:**
 
 ```bash
-pip install omnivoice==0.2.1
-pip install -e <thư mục repo>              # lệnh voice-studio
-pip install -e "<thư mục repo>[mcp,lab]"   # tuỳ chọn: MCP server, bộ đào giọng (librosa, scikit-learn)
+pip install -e "<thư mục repo>[engine]"           # omnivoice==0.2.1 + transformers + lệnh voice-studio
+pip install -e "<thư mục repo>[engine,mcp,lab]"   # tuỳ chọn thêm: MCP server, bộ đào giọng (librosa, scikit-learn)
 ```
+
+Phần phụ `[engine]` ghim `omnivoice` và giữ `transformers` trong **khoảng đã đo** (khai ở
+`pyproject.toml`). Cài `omnivoice` trần thì pip kéo transformers mới nhất — chưa ai đo; doctor
+báo `[WARN] transformers` khi bản đang có nằm ngoài khoảng.
 
 Nhóm tuỳ chọn khác: `[ui]` (gradio), `[clone]` (faster-whisper, yt-dlp). **Đừng cài phần phụ
 chuẩn hoá văn bản của engine trên Windows** — một phụ thuộc không có wheel, đòi cả bộ build MSVC;
@@ -82,15 +84,18 @@ voice-studio init --station <trạm cũ> --existing   # nhận trạm đang ch�
 `init` dựng `station.json`, `omnivoice/voices/`, `assets/bgm/` (khung thư viện nhạc nền, không
 mp3), `out/`, `cache/`. Nó **không** tạo venv, không tải model — chỉ in lệnh.
 
-**6. Tải weights lần đầu và kiểm:**
+**6. Kiểm, rồi tải weights ở lần tổng hợp đầu:**
 
 ```bash
-OMNIVOICE_ONLINE=1 voice-studio doctor    # PowerShell: $env:OMNIVOICE_ONLINE=1; voice-studio doctor
-voice-studio doctor                       # các lần sau: offline
+voice-studio doctor                       # kiểm engine; KHÔNG tải gì, không nạp model
+OMNIVOICE_ONLINE=1 voice-studio speak --text "Xin chào" --instruct "female, young adult" --out <trạm>/out/thu.wav --json
+# PowerShell: $env:OMNIVOICE_ONLINE = "1"; voice-studio speak …; Remove-Item Env:OMNIVOICE_ONLINE
 ```
 
 Mặc định engine chạy **offline** (`HF_HUB_OFFLINE=1`) để lịch chạy không bao giờ treo vì mạng;
-`OMNIVOICE_ONLINE=1` mở mạng đúng một lần. `doctor` thoát mã 3 kèm hướng dẫn nếu còn thiếu gì.
+`OMNIVOICE_ONLINE=1` mở mạng cho **đúng lần tổng hợp đó** — chỉ lệnh nạp model (`speak`,
+`make-profile`, `narrate`…) mới tải weights; `doctor` thì không bao giờ. Sau đó doctor báo
+`[PASS] weights`. `doctor` thoát mã 3 kèm hướng dẫn nếu còn thiếu gì.
 
 Thử cả chuỗi không cần ghi âm ai: làm theo `omnivoice/voices/_example/README.md` trong trạm
 (tạo giọng `sample` bằng thiết kế giọng, rồi `voice-studio speak`).

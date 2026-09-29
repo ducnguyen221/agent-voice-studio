@@ -243,7 +243,9 @@ def test_synth_without_any_voice_refuses_random_speaker(torch_env, monkeypatch):
     torch_env()
     from voice_studio import profiles
     monkeypatch.setattr(profiles, "get_clone_prompt", lambda model, name=None: None)
-    with pytest.raises(profiles.ProfileError):
+    from voice_studio.contract import StationMissing
+    # Máy chưa có trạm ⇒ mã 3; có trạm mà không profile ⇒ mã 2. Cả hai đều TỪ CHỐI giọng ngẫu nhiên.
+    with pytest.raises((profiles.ProfileError, StationMissing)):
         engine.synth("a")
 
 

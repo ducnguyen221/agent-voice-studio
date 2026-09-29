@@ -44,6 +44,26 @@ required install order and no bundle.
 
 ## Install
 
+**Let your AI agent do it.** Paste this into Claude Code, Codex or Antigravity. The agent
+follows [`INSTALL.md`](INSTALL.md): it checks the machine, asks before installing anything or
+downloading the engine, lets *you* choose where the voice station lives, and reports every
+`voice-studio doctor` line. Windows and macOS.
+
+```text
+Install Agent Voice Studio on this machine (Windows or macOS) for the AI app you are running in.
+Single source: https://github.com/ducnguyen221/agent-voice-studio
+First read, then follow every step of the agent guide at
+https://raw.githubusercontent.com/ducnguyen221/agent-voice-studio/main/INSTALL.md
+(if the link cannot be opened, clone the repo and read its INSTALL.md).
+Ask me before installing software, anything needing admin rights, downloading the multi-GB engine,
+or choosing where the voice station lives. Do not change system policy, do not download-and-run
+scripts, never read or write passwords, keys or .env files. Run voice-studio doctor and copy every
+line; on any error stop and explain in plain words. Finish with a summary: repo path, station
+location, doctor result, software added, and what I need to do next.
+```
+
+By hand (Vietnamese walkthrough: [`START-HERE.md`](START-HERE.md)):
+
 ```bash
 git clone https://github.com/ducnguyen221/agent-voice-studio
 cd agent-voice-studio
@@ -61,6 +81,11 @@ pip install -e .          # inside the engine venv — provides the voice-studio
 voice-studio init         # asks: station inside the repo (embedded, recommended) or outside (separate)
 voice-studio doctor       # tells you what is still missing
 ```
+
+`-e` is for a development machine. A machine that runs `voice-studio` on a **schedule** installs a
+**copy** instead (no `-e`), so editing or pulling the repo never changes a run in progress — the
+one rule, with Windows and macOS commands, lives in
+[`docs/INSTALL.md` section 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **presents a two-option table before doing anything**, rather than asking an open
 question. `embedded` — station at `<repo>/workspace/`, configuration in `<repo>/.env` — is
@@ -129,6 +154,7 @@ from drifting apart:
 | `backup` | zip the whole station (no venv/cache/out) |
 | `migrate` | move an embedded station out of the repo |
 | `update` | update the clone (`git pull --ff-only`) |
+| `uninstall` | remove the package + pre-commit hook, **keep** the station and voices (`--dry-run` to preview) |
 
 ```bash
 voice-studio speak --text "Xin chào" --profile narrator --out a.wav --json   # for other pipelines

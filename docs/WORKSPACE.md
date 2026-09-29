@@ -57,11 +57,19 @@ git mà đường dẫn trong `.env` trỏ tới (ở `separate`: `~/.secret/voi
 
 ```
 --station  →  VOICE_STATION  →  OMNIVOICE_DIR (tên cũ, trỏ thư mục engine)  →
-<repo>/studio.local.json  →  <repo>/workspace/ nếu có  →  ~/.voice
+<repo>/studio.local.json  →  <repo>/workspace/ nếu có  →  ~/.voice nếu ĐÃ là một trạm  →
+<repo>/workspace/ (mặc định, `init` tạo)  →  chưa xác định (mã 3)
 ```
 
-`<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO`). Cài dạng wheel thì
-không có repo — chỉ dùng được `separate`.
+**Không đặt gì thì trạm là thư mục trong repo** (`<repo>/workspace/`, bị git bỏ qua) — không
+bao giờ là một thư mục ẩn mới dưới home. `~/.voice` chỉ được dùng khi bạn đã chọn nó (biến,
+`--station`, chế độ `separate`) hoặc nó đã là một trạm từ trước (doctor nhắc đặt
+`VOICE_STATION` cho tường minh).
+
+`<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO` — cách bản sao của máy
+chạy lịch tìm về bản clone, xem [`INSTALL.md`](INSTALL.md) mục 3). Cài dạng wheel không đặt biến thì
+không có repo — chỉ dùng được `separate`, và chưa đặt `VOICE_STATION` thì mọi lệnh cần trạm dừng
+với mã 3 kèm cách đặt.
 
 ## Cây trạm
 
@@ -102,7 +110,8 @@ gốc). Chúng không do `init` tạo.
 | `cache/` | nháp | cache công cụ | công cụ | không | không | thấp | được |
 
 Weights của engine (~4 GB) **không** nằm trong trạm mà trong cache Hugging Face (`HF_HOME`,
-mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại (`OMNIVOICE_ONLINE=1 voice-studio doctor`).
+mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại: lần tổng hợp đầu ở máy mới chạy với `OMNIVOICE_ONLINE=1` (doctor
+không tải gì).
 
 ## Vận hành
 

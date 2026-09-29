@@ -2,7 +2,7 @@
 #
 # Nguyên tắc: DENY-BY-DEFAULT với mọi thứ là audio hoặc model. Repo này dạy cách tạo
 # giọng, nó KHÔNG chứa giọng. Muốn kèm file nào vào fixture thì mở lại ĐÍCH DANH bằng
-# dòng `!` và ghi vào docs/example/ABOUT.md — không bao giờ mở cả thư mục.
+# dòng `!` và ghi lý do vào samples/README.md — không bao giờ mở cả thư mục.
 #
 # Cạm bẫy đã trả giá: một dòng `!` mở lại thư mục sẽ ghi đè LUÔN các luật chặn nằm
 # trên nó. Mở xong phải chặn lại từng thứ không muốn, và kiểm bằng `git ls-files`
@@ -64,14 +64,8 @@ tmp/
 *.local.*
 *.log
 
-# ══════════════════════════════════════════════════════════════════════════════
-# NGOẠI LỆ cho fixture công khai — mở TỪNG FILE, không mở thư mục.
-# Fixture mặc định KHÔNG có audio: report các cổng kiểm + ảnh waveform + manifest
-# đã đủ dạy, mà không phát tán giọng của ai.
-# ══════════════════════════════════════════════════════════════════════════════
-!docs/example/**/*.png
-!docs/example/**/*.json
-!docs/example/**/*.md
+# ── bài mẫu công khai: samples/ — CHỈ text + JSON hợp đồng, KHÔNG audio. Không cần dòng `!`
+# nào: luật audio ở trên vẫn chặn mọi *.wav/*.mp3 lỡ đặt vào đó (tests/test_samples.py kiểm).
 
-# Plan/thiet ke noi bo -> quan ly tap trung o ~/.opcos/repo/<repo>/plans/ (repo opc-os, PRIVATE)
+# Plan/thiết kế nội bộ không thuộc repo public — giữ ngoài repo, không bao giờ commit.
 docs/plans/
