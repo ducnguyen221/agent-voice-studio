@@ -26,8 +26,8 @@ constraint is selection, never volume.
 ## 1. Install
 
 See [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md): venv →
-torch for your OS → `pip install -e "<repo>[engine]"` (a scheduled machine installs a copy
-instead — [`docs/INSTALL.md`](docs/INSTALL.md) section 3) → `voice-studio init` →
+torch for your OS → `pip install -e "<repo>[engine]"` (only a scheduled Windows workshop machine
+with its own station installs a copy — [`docs/INSTALL.md`](docs/INSTALL.md) section 3) → `voice-studio init` →
 `voice-studio doctor`. `init` asks where the **voice station** lives — inside the repo
 (`embedded`, the default) or outside it (`separate`); every station folder is explained in
 [`docs/WORKSPACE.md`](docs/WORKSPACE.md). Output goes to the station, never into the repo's code,

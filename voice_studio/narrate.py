@@ -18,7 +18,7 @@ import argparse
 import os
 import time
 
-from . import API_VERSION, av, contract, engine
+from . import API_VERSION, __version__, av, contract, engine
 from .contract import ContractError, log
 from .speak import add_voice_args, read_text, resolve_profile, synthesize
 
@@ -81,7 +81,8 @@ def narrate(args):
         "profile": profile,
         "timings": {"load": round(t1 - t0, 3), "synth": round(t2 - t1, 3),
                     "total": round(time.perf_counter() - t0, 3)},
-        "engine": {"voice_studio": API_VERSION, "device": engine.loaded_device()},
+        "engine": {"voice_studio": API_VERSION, "version": __version__,
+                   "device": engine.loaded_device()},
     }
 
 

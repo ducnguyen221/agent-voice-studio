@@ -11,7 +11,7 @@ Cài có **hai phần**, phần sau chỉ làm khi người dùng đồng ý:
 | Phần | Gồm | Cỡ | Kết quả |
 |---|---|---|---|
 | **A · Khung** | clone, venv nhẹ, lệnh `voice-studio`, trạm giọng, bài mẫu | ~100 MB, vài phút | `doctor` chạy được, bài mẫu `[PASS]` |
-| **B · Engine** | torch theo hệ điều hành, `omnivoice==0.2.1`, weights | ~2,5 GB + ~4 GB, cần mạng | đọc được thành tiếng |
+| **B · Engine** | torch theo hệ điều hành, `omnivoice==0.2.1`, weights | torch: CUDA ~2,5 GB · macOS arm64 ~130 MB; weights ~3,3 GB; cần mạng | đọc được thành tiếng |
 
 ## 0. Phạm vi và luật an toàn
 
@@ -66,7 +66,7 @@ macOS:
 
 ```bash
 git --version
-python3 --version
+python3.12 --version
 ffmpeg -version
 brew --version
 df -h ~
@@ -143,16 +143,21 @@ py -3.12 -m venv .venv
 macOS:
 
 ```bash
-python3 -m venv .venv
+python3.12 -m venv .venv
 .venv/bin/python -m pip install -e .
 .venv/bin/voice-studio --version
 ```
 
+Trên macOS gọi đúng `python3.12` (Homebrew `python@3.12`): `python3` của máy là 3.9 (Command Line
+Tools) và cài sẽ báo "requires a different Python". Máy đã quản lý Python bằng **uv** hoặc
+**pyenv** thì tạo venv bằng Python 3.12 của công cụ đó (`uv venv --python 3.12 .venv`,
+hoặc `pyenv` chọn 3.12 rồi `python -m venv .venv`) — miễn là venv chạy 3.10–3.13.
+
 Từ đây, `voice-studio` trong các lệnh dưới nghĩa là `.\.venv\Scripts\voice-studio.exe` (Windows)
-hoặc `.venv/bin/voice-studio` (macOS). `-e` giữ cho `git pull` là đủ để cập nhật. Máy sẽ **chạy
-lịch** (scheduled task, launchd) thì phần B cài **bản sao** thay cho `-e` — luật và lệnh ở
-[`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao); hỏi người dùng máy này
-có chạy lịch không, đừng tự đoán.
+hoặc `.venv/bin/voice-studio` (macOS). `-e` giữ cho `git pull` là đủ để cập nhật. Luật `-e` hay
+bản sao ở [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao): **bản sao chỉ
+dành cho xưởng Windows chạy lịch có trạm giọng riêng**; máy embedded (giọng nằm trong venv của repo
+video, kể cả Mac chạy launchd) luôn `-e`. Hỏi người dùng máy này thuộc loại nào, đừng tự đoán.
 
 ## 6. Dựng trạm giọng — người dùng chọn
 
@@ -187,7 +192,8 @@ Mỗi dòng: `[TRẠNG THÁI] khu vực chi tiết`, có thể kèm một dòng 
 | `[FAIL] two-sources` | vừa có `workspace/` vừa có trạm ngoài | **dừng**, hỏi người dùng giữ trạm nào |
 | `[FAIL] torch` / `omnivoice` | engine chưa cài | **bình thường khi chưa làm phần B**; doctor thoát mã 3 vì vậy |
 | `[WARN] default-profile` | chưa có giọng nào | bình thường với máy mới; tạo profile là việc sau cài |
-| `[WARN] ffmpeg` / `bgm-library` | thiếu ffmpeg / thư viện nhạc nền | cài ffmpeg (mục 3) khi cần mp3 hay ghép video |
+| `[WARN] ffmpeg` | thiếu ffmpeg | cài ffmpeg (mục 3) khi cần mp3 hay ghép video |
+| `[WARN] bgm-library` | chưa có thư viện nhạc nền, hoặc style khai trong `bgm-library.json` chưa có `<style>.mp3` | bình thường với máy mới; trước khi chạy pipeline có nhạc nền: thêm mp3 (nhạc có quyền dùng) hoặc sinh theo [docs/bgm-generation.md](docs/bgm-generation.md) |
 | `[WARN] win-path` | đường venv engine dài, cài torch có thể gãy trên Windows | trước phần B: clone lại vào đường ngắn, hoặc chọn `separate` với thư mục ngắn |
 | `[WARN] env-name` / `station-source` | tên biến cũ / trạm cũ được nhận ngầm | làm theo gợi ý nếu người dùng đồng ý |
 | `[NOT_CHECKED] weights` / `synthesis` | doctor không kiểm được lúc này | **không phải lỗi**; phần B mới kiểm được |
@@ -203,14 +209,20 @@ thì báo nguyên văn, không sửa file mẫu cho khớp.
 
 ## 9. Phần B — engine (chỉ khi người dùng đồng ý)
 
-Nhắc lại trước khi làm: torch ~2,5 GB, weights ~4 GB tải lần đầu, giấy phép weights **CC-BY-NC**.
+Nhắc lại trước khi làm: torch (bản CUDA ~2,5 GB; macOS arm64 ~130 MB), weights ~3,3 GB tải lần
+đầu (cache Hugging Face — đã có thì không tải lại), giấy phép weights **CC-BY-NC**.
+
+**Máy đã có repo video** (`agent-video-studio`): engine giọng cài vào **`.venv` của repo video**
+theo mục 5b của INSTALL bên đó, **không** tạo venv engine riêng ở `<trạm>/omnivoice/.venv`. `init`
+nhận ra khi `voice_studio` đang chạy từ venv của dự án khác và in lời theo đúng trường hợp đó.
 Làm đúng các lệnh `init` đã in ở mục "Bước tiếp theo" (đường venv engine là
 `<trạm>/omnivoice/.venv`); chi tiết từng hệ điều hành và bẫy phiên bản torch ở
 [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md). Tóm tắt:
 
 1. Tạo venv engine; cài torch đúng phần cứng (NVIDIA: bản CUDA; Mac Apple Silicon: bản mặc định).
 2. `pip install -e "<repo>[engine]"` **vào venv engine** (omnivoice ghim + transformers trong khoảng
-   đã đo). Máy chạy lịch: bỏ `-e` (bản sao, [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao)).
+   đã đo). Chỉ xưởng Windows chạy lịch có trạm riêng mới bỏ `-e` (bản sao,
+   [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao)).
 3. Chạy `voice-studio doctor` bằng python của venv engine: `torch`, `omnivoice` phải `[PASS]`.
    Doctor **không tải gì** — `weights` còn `[WARN]` là đúng.
 4. Lần tổng hợp đầu tải weights, nên chạy với `OMNIVOICE_ONLINE=1` **cho riêng lệnh đó**

@@ -109,7 +109,7 @@ gốc). Chúng không do `init` tạo.
 | `out/` (= `VOICE_STUDIO_WORK`) | nháp | output mặc định, `out/lab/<tên>/` của bộ dựng giọng | mọi lệnh | **không** | **không** | **CÓ** — audio giọng thật | được, trừ khi đang giữa mẻ `lab mine → build` |
 | `cache/` | nháp | cache công cụ | công cụ | không | không | thấp | được |
 
-Weights của engine (~4 GB) **không** nằm trong trạm mà trong cache Hugging Face (`HF_HOME`,
+Weights của engine (~3,3 GB) **không** nằm trong trạm mà trong cache Hugging Face (`HF_HOME`,
 mặc định `~/.cache/huggingface`). Chuyển máy thì tải lại: lần tổng hợp đầu ở máy mới chạy với `OMNIVOICE_ONLINE=1` (doctor
 không tải gì).
 

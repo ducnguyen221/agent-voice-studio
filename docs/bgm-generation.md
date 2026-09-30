@@ -1,7 +1,13 @@
 # Sinh nhạc nền bằng MusicGen
 
-Repo **không phát hành file nhạc nào**. Thư viện nhạc nền của trạm (`<trạm>/assets/bgm/`) do bạn
-tự lấp: tự sinh bằng MusicGen theo hướng dẫn này, hoặc bỏ vào nhạc bạn có quyền dùng.
+Repo **không phát hành file nhạc nào**, và cũng **không có lệnh `voice-studio` nào sinh nhạc** —
+vì giấy phép weights (dưới). Thư viện nhạc nền của trạm (`<trạm>/assets/bgm/`, đổi bằng
+`VOICE_BGM_DIR`; `<trạm>` theo `VOICE_STATION`, mặc định `<repo>/workspace/`) do bạn tự lấp: tự sinh
+bằng MusicGen theo hướng dẫn này, hoặc bỏ vào nhạc bạn có quyền dùng.
+
+`voice-studio doctor` báo `[WARN] bgm-library` khi một style khai trong `bgm-library.json` chưa có
+`<style>.mp3` — lấp đủ trước khi chạy pipeline có nhạc nền, vì chọn đúng style thiếu file thì lượt
+chạy dừng ở bước ghép.
 
 ## ⚠️ Giấy phép — đọc trước khi sinh
 
@@ -40,7 +46,8 @@ python extras/musicgen/gen_pack.py --model small --seconds 20       # thử nhan
 - Nhạc ghi thẳng vào thư viện của trạm (`VOICE_BGM_DIR`, mặc định `<trạm>/assets/bgm/`), và
   style được **thêm** vào `bgm-library.json`. Mô tả, style mặc định, âm lượng bạn đã chỉnh
   **không bị đè**. File đã có thì bỏ qua; `--force` để sinh lại.
-- Kiểm: `voice-studio bgm list` — không style nào báo `[THIẾU FILE]`.
+- Kiểm: `voice-studio bgm list` — không style nào báo `[THIẾU FILE]`; `voice-studio doctor` dòng
+  `bgm-library` là `[PASS]`.
 
 ## Sinh một bản lẻ
 
@@ -48,8 +55,9 @@ python extras/musicgen/gen_pack.py --model small --seconds 20       # thử nhan
 python extras/musicgen/gen.py --prompt "calm ambient pad, 80 BPM, instrumental" --name calm --mp3
 ```
 
-Mặc định ghi vào `<VOICE_STUDIO_WORK>/musicgen/` (trong trạm, không bao giờ trong repo). Nghe
-thử, ưng thì chép vào thư viện và khai trong `bgm-library.json`.
+Mặc định ghi vào `<trạm>/out/musicgen/` (thư mục làm việc của trạm — đổi bằng `VOICE_STUDIO_WORK`;
+không bao giờ trong repo). Nghe thử, ưng thì chép vào thư viện (`VOICE_BGM_DIR`, mặc định
+`<trạm>/assets/bgm/`) và khai trong `bgm-library.json`.
 
 ## Viết prompt cho nhạc nền
 

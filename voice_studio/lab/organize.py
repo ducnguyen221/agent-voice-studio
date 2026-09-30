@@ -55,13 +55,15 @@ def main(argv=None):
     ap.add_argument("--apply", action="store_true", help="Thực thi (mặc định chỉ xem trước).")
     args = ap.parse_args(argv)
 
-    keep = set(args.keep)
     stamp = datetime.date.today().isoformat()
     arch = os.path.join(_voices(), "_archive", stamp)
     dry = not args.apply
     tag = "[xem trước]" if dry else "[thực thi]"
 
     have = profile_names()
+    # So tên theo NFC (tên trên đĩa có thể là NFD); phần sau dùng tên THẬT trên đĩa.
+    on_disk = {profiles.nfc(h): h for h in have}
+    keep = {on_disk.get(profiles.nfc(k), k) for k in args.keep}
     missing = keep - set(have)
     if missing:
         sys.exit(f"[organize] DỪNG: không thấy profile {sorted(missing)}. "

@@ -59,7 +59,8 @@ _prompt_cache = {}
 
 
 def manifest_path(name):
-    return os.path.join(_voices(), name + ".profile.json")
+    # Tên thật trên đĩa (so theo NFC) — cùng luật với `profiles`, không đổi tên file.
+    return os.path.join(_voices(), profiles._disk_name(name) + ".profile.json")
 
 
 def load_profile(name):

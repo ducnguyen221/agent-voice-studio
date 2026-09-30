@@ -25,7 +25,7 @@ không bao giờ là lượng.
 ## 1. Cài
 
 Xem [`install-omnivoice.md`](skills/voice-routing/references/install-omnivoice.md): venv →
-torch theo hệ điều hành → `pip install -e "<repo>[engine]"` (máy chạy lịch cài bản sao —
+torch theo hệ điều hành → `pip install -e "<repo>[engine]"` (chỉ xưởng Windows chạy lịch có trạm riêng cài bản sao —
 [`docs/INSTALL.md`](docs/INSTALL.md) mục 3) → `voice-studio init` →
 `voice-studio doctor`. `init` hỏi đặt **trạm giọng** ở đâu — trong repo (`embedded`, mặc định) hay
 ngoài repo (`separate`); từng thư mục của trạm giải thích ở [`docs/WORKSPACE.md`](docs/WORKSPACE.md).

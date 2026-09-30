@@ -32,7 +32,7 @@ cd "$HOME/agent-voice-studio"
 
 | Bước | Windows (PowerShell) | macOS (Terminal) |
 |---|---|---|
-| venv nhẹ | `py -3.12 -m venv .venv` | `python3 -m venv .venv` |
+| venv nhẹ | `py -3.12 -m venv .venv` | `python3.12 -m venv .venv` (không dùng `python3` = 3.9 của máy) |
 | cài lệnh | `.\.venv\Scripts\python.exe -m pip install -e .` | `.venv/bin/python -m pip install -e .` |
 | gọi lệnh | `.\.venv\Scripts\voice-studio.exe …` | `.venv/bin/voice-studio …` |
 
@@ -41,7 +41,7 @@ Rồi, với `voice-studio` là lệnh ở dòng cuối bảng:
 1. `voice-studio init` — trình bảng hai chỗ đặt trạm; Enter = `embedded` (trong repo, khuyến nghị).
 2. `voice-studio doctor` — đọc từng dòng. Chưa cài engine thì `[FAIL] torch/omnivoice` là đúng;
    dòng `[PASS] samples` xác nhận bài mẫu ([samples/README.md](samples/README.md)).
-3. Engine (torch ~2,5 GB + weights ~4 GB, giấy phép weights **không thương mại**): làm đúng các lệnh
+3. Engine (torch: CUDA ~2,5 GB, macOS arm64 ~130 MB · weights ~3,3 GB, giấy phép weights **không thương mại**): làm đúng các lệnh
    `init` in ra, chi tiết ở [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md).
    Máy chạy lịch cài **bản sao** thay cho `-e`: [docs/INSTALL.md](docs/INSTALL.md) mục 3.
 4. Thử đọc: `voice-studio speak --file samples/cau-ngan.script.txt --instruct "female, young adult" --out workspace/out/thu.wav --json`

@@ -75,8 +75,9 @@ voice-studio init         # hỏi đặt trạm trong repo (embedded, khuyến n
 voice-studio doctor       # thiếu gì thì chỉ bước cài tiếp
 ```
 
-`-e` dành cho máy phát triển. Máy **chạy lịch** cài **bản sao** (không `-e`) để sửa hay `git pull`
-repo không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windows và macOS, ở
+`-e` dành cho máy phát triển và máy embedded (giọng nằm trong venv của repo video). Chỉ **xưởng
+Windows chạy lịch có trạm giọng riêng** cài **bản sao** (không `-e`) để sửa hay `git pull` repo
+không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windows và macOS, ở
 [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở

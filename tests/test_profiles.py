@@ -229,3 +229,57 @@ def test_no_hardcoded_personal_default():
     for word in banned:
         assert word not in src
     assert "PREFERRED_DEFAULT" not in src
+
+
+# ── P1-4: tên có dấu ở dạng NFD trên đĩa (chép từ macOS / gói khác) ────────────────────
+import unicodedata  # noqa: E402
+
+NAME_NFC = unicodedata.normalize("NFC", "Giọng thử")
+NAME_NFD = unicodedata.normalize("NFD", "Giọng thử")
+
+
+@pytest.fixture
+def nfd_voices(tmp_path, monkeypatch):
+    assert NAME_NFC != NAME_NFD                       # cùng chữ, khác byte
+    d = _make_voices(tmp_path / "voices", [NAME_NFD, "beta"])
+    monkeypatch.setenv("VOICES_DIR", str(d))
+    profiles.clear_cache()
+    return d
+
+
+def test_list_profiles_returns_nfc_for_nfd_files(nfd_voices):
+    names = profiles.list_profiles()
+    assert NAME_NFC in names and NAME_NFD not in names
+    assert names == sorted(names) and len(names) == 2
+
+
+def test_nfc_and_nfd_names_both_find_the_nfd_file(nfd_voices):
+    for asked in (NAME_NFC, NAME_NFD):
+        assert profiles._exists(asked)
+        wav, txt = profiles._paths(asked)
+        assert os.path.isfile(wav) and os.path.isfile(txt)
+        assert profiles.ensure_default(name=asked) == NAME_NFC
+
+
+def test_default_file_in_nfc_matches_nfd_profile(nfd_voices):
+    (nfd_voices / "_default.txt").write_text(NAME_NFC, encoding="utf-8")
+    assert profiles.get_default() == NAME_NFC
+    assert profiles.get_default() in profiles.list_profiles()
+
+
+def test_user_files_are_never_renamed(nfd_voices):
+    before = sorted(os.listdir(nfd_voices))
+    profiles.list_profiles()
+    profiles.get_clone_prompt(FakeModel(), NAME_NFC)
+    profiles.set_default(NAME_NFD)
+    after = [n for n in sorted(os.listdir(nfd_voices))
+             if not n.endswith(".prompt.pt") and n != "_default.txt"]
+    assert after == before
+    assert (nfd_voices / "_default.txt").read_text(encoding="utf-8") == NAME_NFC
+
+
+def test_prompt_cache_key_is_normalised(nfd_voices):
+    m = FakeModel()
+    p1 = profiles.get_clone_prompt(m, NAME_NFC)
+    p2 = profiles.get_clone_prompt(m, NAME_NFD)
+    assert p1 is p2 and len(m.calls) == 1

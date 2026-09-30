@@ -26,7 +26,8 @@ Cài xong thì `voice-studio doctor` phải xanh.
 | **Python ≥ 3.10** | chính package này (đã đo trên 3.12) | `winget install Python.Python.3.12` | `brew install python@3.12` |
 | **ffmpeg + ffprobe** | xuất mp3, ghép tiếng vào video, chuẩn âm lượng | `winget install Gyan.FFmpeg` | `brew install ffmpeg` |
 | **torch** | engine chạy trên nó — bản phải khớp phần cứng | xem tài liệu engine | xem tài liệu engine |
-| **~4 GB đĩa** | weights tải về cache lần chạy đầu | | |
+| **~3,3 GB đĩa** cho weights | tải về cache Hugging Face lần chạy đầu (dùng chung mọi venv của máy) | | |
+| **đĩa cho torch** | bản CUDA (NVIDIA) ~2,5 GB · bản macOS arm64 ~130 MB (cả engine ≈ 300 MB) | | |
 
 Không nằm trên PATH thì đặt `FFMPEG_DIR` trỏ thư mục chứa ffmpeg/ffprobe.
 
@@ -39,7 +40,7 @@ mức đổi cả cách làm việc.
 |---|---|
 | Tổng hợp giọng thật (mọi việc có tiếng) | **venv của engine**, đường chuẩn `<trạm>/omnivoice/.venv` — nơi đã cài torch |
 | Chỉ `init` / `doctor` / đọc tài liệu | venv nào cũng được |
-| Trạm **video** cũng phải lồng tiếng | cài `agent-video-studio` vào **cùng venv engine** này |
+| Trạm **video** cũng phải lồng tiếng | **một** venv cho cả hai: engine giọng nằm trong venv của repo video (máy embedded) hoặc repo video cài vào venv engine này (xưởng Windows) — mục 3 |
 
 Lồng tiếng đi qua một lần `import voice_studio` **trong cùng tiến trình**: model nặng hàng GB, nạp
 một lần cho cả bài. Hai venv khác nhau thì không có đường nào để import, và lỗi hiện ra ở giữa lượt
@@ -53,10 +54,15 @@ chỉ trỏ về đây.
 | Máy của bạn | Cài | Vì sao |
 |---|---|---|
 | **Máy phát triển** — bạn sửa repo, hoặc tự gọi lệnh bằng tay | `pip install -e` | sửa mã hay `git pull` là có hiệu lực ngay, không phải cài lại |
-| **Máy chạy lịch** — scheduled task, cron, launchd gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
+| **Máy embedded** — giọng cài vào **venv của repo video** (repo giọng là bản clone cạnh repo video, trạm ở `<repo giọng>/workspace/`), kể cả khi máy đó chạy lịch (vd Mac mini) | **`pip install -e`** vào venv của repo video | repo giọng tìm trạm của nó **qua bản clone**; bản sao không biết trạm nằm đâu và lượt render dừng mã 3. Trùng luật ở `agent-video-studio/INSTALL.md` mục 5b |
+| **Xưởng Windows chạy lịch** — trạm giọng **riêng** (`separate`, `VOICE_STATION`) với venv engine riêng `<trạm>/omnivoice/.venv`, scheduled task gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
 
-Không chắc thì dùng `-e`. Máy vừa phát triển vừa chạy lịch: cho lịch một venv engine riêng cài bản
-sao, đừng dùng chung venv `-e`.
+Bản sao **chỉ** dành cho dòng cuối. Không chắc thì dùng `-e`. Máy phát triển kiêm xưởng chạy lịch:
+cho lịch một venv engine riêng cài bản sao, đừng dùng chung venv `-e`.
+
+**Máy embedded chạy lịch** giữ an toàn bằng cách cập nhật, không phải bằng bản sao: chỉ đổi mã
+ngoài giờ lịch chạy, bằng `git fetch --tags` rồi `git checkout <tag>` (không `git pull` giữa lượt);
+`pyproject.toml` đổi thì chạy lại `pip install -e` vào venv của repo video; xong chạy `doctor`.
 
 ### Máy phát triển (`-e`)
 
