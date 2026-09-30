@@ -31,8 +31,8 @@ Hai điều không được làm thay người dùng:
 - **Chọn chế độ trạm.** `voice-studio init` không có người trả lời thì in bảng hai lựa chọn rồi
   thoát **mã 2, chưa ghi gì**. Trình nguyên bảng đó cho người dùng, chờ họ chọn, rồi chạy lại với
   `--mode embedded|separate` (hoặc `--yes` = embedded, khuyến nghị).
-- **Tải engine.** torch (~2,5 GB) và weights (~4 GB, giấy phép **CC-BY-NC**) chỉ tải khi người dùng
-  đồng ý. Khung (CLI, trạm, test) chạy được không cần chúng.
+- **Tải engine.** torch (CUDA ~2,5 GB, macOS arm64 ~130 MB) và weights (~3,3 GB, giấy phép
+  **CC-BY-NC**) chỉ tải khi người dùng đồng ý. Khung (CLI, trạm, test) chạy được không cần chúng.
 
 ## 2. Làm việc với giọng
 
