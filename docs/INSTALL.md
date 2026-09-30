@@ -200,9 +200,9 @@ xoá thư mục trạm — sau khi đã `voice-studio backup`.
 | Nền tảng | Bộ khung (CLI, trạm, test) | Tổng hợp giọng thật |
 |---|---|---|
 | Windows | đã chạy thật | đã chạy thật |
-| macOS (Apple Silicon) | CI chạy mỗi lần đẩy mã: cài gói, `--help`, `init` cả hai chế độ, toàn bộ test | **chưa kiểm** — test trên CI dùng module engine **giả**; engine thật trên MPS chưa ai chạy qua package này |
+| macOS (Apple Silicon) | CI chạy mỗi lần đẩy mã: cài gói, `--help`, `init` cả hai chế độ, toàn bộ test | **đã chạy thật 30/09/2026** trên một máy M1 16 GB (Python 3.12, torch arm64, MPS, fp16): `doctor` 16 PASS, `speak` mã 0, RTF 1,65 với `--instruct`, 2,7–4,8 với profile clone (chậm hơn thời gian thực). Test trên CI vẫn dùng module engine **giả** |
 | Linux | CI chạy cổng kiểm repo | **chưa kiểm** |
 
 Thứ đã được chứng minh trên mọi nền tảng là **bộ khung**: lệnh chạy, trạm dựng đúng, hợp đồng gọi
-giữ nguyên. Phần tổng hợp giọng mới chỉ có số đo thật trên Windows — đừng đọc bảng này rộng hơn
-thứ nó nói.
+giữ nguyên. Phần tổng hợp giọng có số đo thật trên Windows và trên **một** máy Mac Apple Silicon
+(M1, 30/09/2026) — đừng đọc bảng này rộng hơn thứ nó nói.

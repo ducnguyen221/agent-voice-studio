@@ -33,7 +33,8 @@ Trên macOS đặt sẵn (nếu chưa có) hai biến:
   · `HF_DEACTIVATE_ASYNC_LOAD=1` — transformers 5.17 nạp weights song song gây segfault khi
     dtype là fp16 trên MPS (đo trong spike). Tắt nạp bất đồng bộ là đổi vài giây khởi động
     lấy một lượt không sập.
-[chưa kiểm trên Apple Silicon thật từ máy này — số đo lấy từ spike; Windows không có MPS.]
+[Engine thật đã chạy trên Apple Silicon 30/09/2026 (M1, MPS, fp16, `speak` mã 0). Lý do của từng
+biến trên vẫn lấy từ spike; Windows không có MPS.]
 """
 import os
 import subprocess

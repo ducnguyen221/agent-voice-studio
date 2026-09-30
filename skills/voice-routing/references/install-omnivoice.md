@@ -22,8 +22,9 @@ rủi ro giấy phép bạn phải tự cân nhắc. Giấy phép weights đi đ
 ## Cần gì
 
 - **Python 3.10+** (đã đo trên 3.12).
-- GPU **NVIDIA** cho tốc độ dùng được. Apple Silicon chạy qua **MPS** `[chưa đo tốc độ]`. CPU chạy
-  được nhưng chậm tới mức đổi cả cách làm việc.
+- GPU **NVIDIA** cho tốc độ dùng được. Apple Silicon chạy qua **MPS** — đo 30/09/2026 trên một máy
+  M1 16 GB, fp16: RTF 1,65 với `--instruct`, 2,7–4,8 với profile clone (chậm hơn thời gian thực;
+  fp32 chậm hơn fp16 ~12 %). CPU chạy được nhưng chậm tới mức đổi cả cách làm việc.
 - **~3,3 GB** đĩa cho weights (cache Hugging Face, lần chạy đầu; dùng chung mọi venv của máy).
 - torch: bản CUDA ~2,5 GB; bản macOS arm64 ~130 MB (cả engine ≈ 300 MB).
 - Internet **một lần** — tải weights và (nếu dùng phiên âm tự động) model ASR. Sau đó chạy offline.

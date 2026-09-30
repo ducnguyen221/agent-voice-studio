@@ -409,7 +409,7 @@
         <li class="m"><b class="num" data-to="6">6</b> cổng kiểm</li>
         <li><b class="num" data-to="7">7</b> tài liệu skill</li>
         <li>CI <b>Windows + macOS</b></li>
-        <li>phiên bản <b>v0.3.1</b></li>
+        <li>phiên bản <b>v0.3.2</b></li>
         <li><b>0</b> file audio trong repo</li>
       </ul>
     </div>
@@ -688,14 +688,14 @@
         <tbody>
           <tr><td class="rule">Windows</td><td>đã chạy thật</td><td>đã chạy thật</td></tr>
           <tr><td class="rule">macOS (Apple Silicon)</td><td>CI chạy mỗi lần đẩy mã: cài gói, <code>--help</code>, <code>init</code> cả hai chế độ, toàn bộ test</td>
-            <td><b>chưa kiểm.</b> Test trên CI dùng module engine <b>giả</b>; engine thật trên MPS chưa ai chạy qua package này</td></tr>
+            <td><b>đã chạy thật 30/09/2026</b> trên một máy M1 16 GB (MPS, fp16): <code>doctor</code> 16 PASS, <code>speak</code> mã 0, RTF 1,65 với <code>--instruct</code>, 2,7–4,8 với profile clone (chậm hơn thời gian thực). Test trên CI vẫn dùng module engine <b>giả</b></td></tr>
           <tr><td class="rule">Linux</td><td>CI chạy cổng kiểm repo</td><td><b>chưa kiểm</b></td></tr>
         </tbody>
       </table>
     </div>
     <p class="prose reveal">Nói thẳng ra: cái đã được chứng minh trên mọi nền tảng là <b>bộ khung</b> —
-      lệnh chạy, trạm dựng đúng, hợp đồng gọi giữ nguyên. Phần tổng hợp giọng mới chỉ có số đo thật
-      trên Windows. Đừng đọc bảng này rộng hơn thứ nó nói.</p>
+      lệnh chạy, trạm dựng đúng, hợp đồng gọi giữ nguyên. Phần tổng hợp giọng có số đo thật trên
+      Windows và trên <b>một</b> máy Mac Apple Silicon (M1, 30/09/2026). Đừng đọc bảng này rộng hơn thứ nó nói.</p>
   </div>
 </section>
 
@@ -704,7 +704,7 @@
   <div class="wrap">
     <div class="sec-head reveal">
       <span class="eyebrow"><span class="dot"></span>Bảng lệnh</span>
-      <h2>Toàn bộ lệnh của bản v0.3.1</h2>
+      <h2>Toàn bộ lệnh của bản v0.3.2</h2>
       <p>Chính là bảng mà <code>voice-studio --help</code> in ra — một cổng trong bộ test giữ cho hai
         bên không trôi khỏi nhau.</p>
     </div>

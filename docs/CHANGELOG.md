@@ -4,6 +4,24 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+## 0.3.2 — 2026-09-30
+
+**Dọn theo review, hành vi chạy không đổi** — engine, profile, trạm, CLI và mã thoát giữ nguyên
+trên cả Windows lẫn macOS; chỉ đổi `.gitignore`, CI và chữ tài liệu.
+
+- `.gitignore` chặn thêm `*.zip` (gói giọng của `export --personal`) và video `*.mp4 *.mkv *.mov
+  *.webm`: làm theo ví dụ README rồi `git add .` không còn đẩy giọng thật lên repo. Bước CI
+  "No audio or model binaries committed" chặn cùng các đuôi đó.
+- `.gitignore` bỏ qua thư mục công cụ agent `/.claude/ /.codex/ /.gemini/` (manifest
+  `.claude-plugin/`, `.codex-plugin/` vẫn được theo dõi) và cache công cụ Python `.mypy_cache/
+  .ruff_cache/ .coverage htmlcov/ .hypothesis/`, cùng `.python-version`, `.envrc`.
+  `tests/test_repo_gates.py` có ca cho từng dòng.
+- Tài liệu hết ghi macOS "chưa kiểm": số đo thật trên một máy M1 16 GB ngày 30/09/2026 (MPS, fp16,
+  `doctor` 16 PASS, `speak` mã 0, RTF 1,65 với `--instruct`, 2,7–4,8 với profile clone).
+  `.env.example` ghi weights ~3,3 GB (thay "~4 GB"), torch CUDA ~2,5 GB / macOS arm64 ~130 MB.
+- CI: `actions/checkout` v5.1.0, `actions/setup-python` v6.3.0 (chạy Node 24 thay Node 20 đã bị
+  GitHub báo lỗi thời), vẫn ghim SHA đầy đủ.
+
 ## 0.3.1 — 2026-09-30
 
 **Chạy ổn trên Mac mini (máy embedded), Windows giữ nguyên.**
