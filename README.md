@@ -82,9 +82,11 @@ voice-studio init         # asks: station inside the repo (embedded, recommended
 voice-studio doctor       # tells you what is still missing
 ```
 
-`-e` is for a development machine. A machine that runs `voice-studio` on a **schedule** installs a
-**copy** instead (no `-e`), so editing or pulling the repo never changes a run in progress — the
-one rule, with Windows and macOS commands, lives in
+`-e` is for a development machine and for an embedded machine (voice installed into the video
+repo's venv, even when it runs on a schedule). Only a **Windows workshop machine with its own
+voice station** that runs `voice-studio` on a schedule installs a **copy** (no `-e`), so editing or
+pulling the repo never changes a run in progress — the one rule, with Windows and macOS commands,
+lives in
 [`docs/INSTALL.md` section 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **presents a two-option table before doing anything**, rather than asking an open

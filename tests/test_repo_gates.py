@@ -194,3 +194,46 @@ def test_doctor_warns_outside_measured_transformers():
     bad = doctor.transformers_check("5.20.1")
     # Ngoài khoảng là CẢNH BÁO, không chặn: chưa ai đo không có nghĩa là hỏng.
     assert bad["level"] == "warn" and "[engine]" in bad["hint"]
+
+
+# ── P0-4: doctor cảnh báo style khai trong bgm-library.json mà thiếu <style>.mp3 ───────────
+def _lib(tmp_path, styles, mp3=()):
+    d = tmp_path / "bgm"
+    d.mkdir()
+    (d / bgm.LIBRARY_FILE).write_text(json.dumps(
+        {"default": styles[0] if styles else None,
+         "styles": [{"name": s} for s in styles]}), encoding="utf-8")
+    for s in mp3:
+        (d / f"{s}.mp3").write_bytes(b"ID3")
+    return d
+
+
+def test_doctor_bgm_warns_when_style_has_no_mp3(tmp_path):
+    from voice_studio import doctor
+    c = doctor.bgm_check(str(_lib(tmp_path, ["neutral", "uplifting", "ambient"], mp3=["neutral"])))
+    assert c["level"] == "warn" and c["ok"] is False
+    assert "2/3" in c["detail"] and "uplifting" in c["detail"] and "ambient" in c["detail"]
+    assert "neutral," not in c["detail"]
+    assert "bgm-generation.md" in c["hint"] and "CC-BY-NC" in c["hint"]
+
+
+def test_doctor_bgm_passes_when_every_style_has_mp3(tmp_path):
+    from voice_studio import doctor
+    c = doctor.bgm_check(str(_lib(tmp_path, ["neutral", "ambient"], mp3=["neutral", "ambient"])))
+    assert c["level"] == "ok" and "đủ file mp3" in c["detail"]
+
+
+@pytest.mark.parametrize("content", ["{không phải json", "[1, 2]"])
+def test_doctor_bgm_warns_on_broken_json_instead_of_crashing(tmp_path, content):
+    from voice_studio import doctor
+    d = tmp_path / "bgm"
+    d.mkdir()
+    (d / bgm.LIBRARY_FILE).write_text(content, encoding="utf-8")
+    c = doctor.bgm_check(str(d))
+    assert c["level"] == "warn" and "hỏng" in c["hint"]
+
+
+def test_doctor_bgm_warns_when_library_missing_or_empty(tmp_path):
+    from voice_studio import doctor
+    assert doctor.bgm_check(str(tmp_path / "none"))["level"] == "warn"
+    assert "0 style" in doctor.bgm_check(str(_lib(tmp_path, [])))["detail"]

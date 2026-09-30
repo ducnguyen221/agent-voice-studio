@@ -6,7 +6,7 @@
 Kiểm: python · trạm (`VOICE_STATION`, tên cũ `OMNIVOICE_DIR` bị nhắc đổi) · `station.json` ·
 hai chế độ cài (F17: ĐỎ khi vừa có <repo>/workspace/ vừa có trạm ngoài; embedded: workspace/.env
 không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám mây, quyền .env) · kho giọng + profile
-mặc định · thư viện nhạc nền · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
+mặc định · thư viện nhạc nền (json + `<style>.mp3` của từng style khai) · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
 trong cache (chạy offline được). Không tải gì, không nạp model.
 
 Bốn trạng thái mỗi dòng: `PASS` đã kiểm, đạt · `WARN` dùng được nhưng nên sửa · `FAIL` thiếu thứ
@@ -25,11 +25,11 @@ import os
 import subprocess
 import sys
 
-from . import API_VERSION, _env, contract, engine
+from . import API_VERSION, __version__, _env, contract, engine
 
 INSTALL_HINT = (
     "Cài trạm giọng: tạo venv → cài torch theo hệ điều hành → "
-    "`pip install -e \"<repo agent-voice-studio>[engine]\"` (máy chạy lịch: bỏ `-e`, xem "
+    "`pip install -e \"<repo agent-voice-studio>[engine]\"` (xưởng Windows chạy lịch có trạm riêng: bỏ `-e`, xem "
     "docs/INSTALL.md mục 3) → `voice-studio init` → lần tổng hợp đầu chạy "
     "với OMNIVOICE_ONLINE=1 để tải weights (doctor không tải gì). Chi tiết: "
     "skills/voice-routing/references/install-omnivoice.md")
@@ -228,12 +228,43 @@ def run_checks():
                          hint="chưa có profile mặc định — ghi tên vào voices/_default.txt "
                               "hoặc đặt VOICE_DEFAULT_PROFILE; pipeline phải truyền --profile"))
 
-    from . import bgm
-    lib_file = os.path.join(_env.bgm_dir(), bgm.LIBRARY_FILE)
-    checks.append(_check("bgm-library", os.path.isfile(lib_file), lib_file, level="warn",
-                         hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng"))
+    checks.append(bgm_check(_env.bgm_dir()))
 
     return checks + engine_checks()
+
+
+BGM_DOC = "docs/bgm-generation.md"
+
+
+def bgm_check(lib_dir):
+    """Thư viện nhạc nền: có `bgm-library.json` chưa, và MỖI style khai trong đó có `<style>.mp3`
+    chưa. Thiếu file là WARN, không FAIL — trạm vẫn đọc được giọng; nhưng pipeline chọn đúng style
+    thiếu file sẽ dừng ở bước ghép (`bgm.pick` fail-closed), tức là sau khi đã tốn cả lượt tổng
+    hợp. Báo ở đây để người dùng biết TRƯỚC lượt chạy. Doctor không sinh nhạc."""
+    from . import bgm
+    lib_file = os.path.join(lib_dir, bgm.LIBRARY_FILE)
+    if not os.path.isfile(lib_file):
+        return _check("bgm-library", False, lib_file, level="warn",
+                      hint="chưa có thư viện nhạc nền — `voice-studio init` dựng khung rỗng")
+    try:
+        lib = bgm.library(lib_dir)
+    except (OSError, ValueError, AttributeError) as e:     # AttributeError: json không phải object
+        return _check("bgm-library", False, f"{lib_file}: {e}", level="warn",
+                      hint="bgm-library.json hỏng — sửa tay hoặc xoá rồi `voice-studio init`")
+    names = lib.names()
+    missing = [n for n in names if not os.path.isfile(lib.path_of(n))]
+    if not names:
+        return _check("bgm-library", False, f"{lib_file} (0 style)", level="warn",
+                      hint=f"thư viện chưa khai style nào — thêm style + <style>.mp3 ({BGM_DOC})")
+    if missing:
+        return _check("bgm-library", False,
+                      f"{lib.dir} — {len(missing)}/{len(names)} style thiếu file mp3: "
+                      + ", ".join(missing), level="warn",
+                      hint=f"thêm <style>.mp3 (nhạc bạn có quyền dùng) vào {lib.dir}, hoặc sinh theo "
+                           f"{BGM_DOC} (weights MusicGen là CC-BY-NC — không thương mại), hoặc bỏ "
+                           "style đó khỏi bgm-library.json; pipeline chọn style thiếu file sẽ dừng "
+                           "ở bước ghép")
+    return _check("bgm-library", True, f"{lib.dir} ({len(names)} style, đủ file mp3)")
 
 
 # Windows chưa bật đường dài: thư mục sâu nhất tối đa 248 ký tự. Gói torch (bản CUDA 2.13) có
@@ -325,7 +356,7 @@ def doctor(args):
     errors = [c["name"] for c in checks if c["level"] == "error"]
     warns = [c["name"] for c in checks if c["level"] == "warn"]
     unchecked = [c["name"] for c in checks if c["level"] == NOT_CHECKED]
-    result = {"voice_studio": API_VERSION, "station": _env.resolve_station()[0],
+    result = {"voice_studio": API_VERSION, "version": __version__, "station": _env.resolve_station()[0],
               "checks": checks, "errors": errors, "warnings": warns, "not_checked": unchecked}
     if errors:
         contract.log("\n" + INSTALL_HINT)

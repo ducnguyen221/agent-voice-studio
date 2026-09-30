@@ -127,10 +127,58 @@ def venv_commands(st, windows=None):
         f"{run} -m {torch}",
         # Phần phụ `engine` = omnivoice==0.2.1 + transformers trong khoảng đã đo (pyproject.toml).
         f"{run} -m pip install -e \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio; "
-        "máy chạy lịch: bỏ -e (docs/INSTALL.md mục 3)",
+        "xưởng Windows chạy lịch có trạm riêng: bỏ -e (docs/INSTALL.md mục 3)",
         f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)",
-        online + "   # lần tổng hợp đầu: tải weights (~4 GB)",
+        online + "   # lần tổng hợp đầu: tải weights (~3,3 GB)",
     ]
+
+
+def _under(path, root):
+    """`path` nằm trong (hoặc là) `root`? So không phân biệt hoa/thường trên Windows."""
+    if not root:
+        return False
+    a, b = os.path.normcase(os.path.abspath(path)), os.path.normcase(os.path.abspath(root))
+    try:
+        return os.path.commonpath([a, b]) == b
+    except ValueError:              # khác ổ đĩa trên Windows
+        return False
+
+
+def _project_of(prefix):
+    """Thư mục dự án chứa venv `prefix` (cha có `pyproject.toml` hoặc `.git`), hoặc None."""
+    parent = os.path.dirname(os.path.abspath(prefix))
+    if any(os.path.exists(os.path.join(parent, m)) for m in ("pyproject.toml", ".git")):
+        return parent
+    return None
+
+
+def host_venv(st, repo=None, prefix=None, base_prefix=None, engine_ok=None):
+    """`voice_studio` đang chạy từ một venv KHÁC venv engine chuẩn mà ta nên dùng luôn (vd `.venv`
+    của repo video, nơi engine giọng được cài `-e` cùng tiến trình render)? -> dict, hoặc None.
+
+    None (in lệnh tạo venv engine như cũ) khi: python hệ thống · chính `<trạm>/omnivoice/.venv` ·
+    venv nằm TRONG bản clone repo giọng (phần A của INSTALL) · venv lẻ chưa có engine và không thuộc
+    dự án nào. Còn lại — venv đã có engine, hoặc venv của một dự án khác — thì bảo người dùng tạo
+    thêm `<trạm>/omnivoice/.venv` và tải lại weights là SAI: engine phải nằm cùng venv với bên gọi,
+    và weights dùng chung cache Hugging Face của máy.
+    """
+    prefix = os.path.abspath(prefix or sys.prefix)
+    base = os.path.abspath(base_prefix or sys.base_prefix)
+    if os.path.normcase(prefix) == os.path.normcase(base):
+        return None
+    repo = repo if repo is not None else _env.repo_root()
+    if _under(prefix, os.path.join(st, "omnivoice", ".venv")) or _under(prefix, repo):
+        return None
+    if engine_ok is None:
+        import importlib.util
+        engine_ok = all(importlib.util.find_spec(m) is not None for m in ("torch", "omnivoice"))
+    project = _project_of(prefix)
+    if not engine_ok and not project:
+        return None
+    from . import doctor, engine
+    cached, hub = doctor._hf_cache_has(engine.MODEL_ID)
+    return {"prefix": prefix, "project": project, "engine": bool(engine_ok),
+            "weights_cached": cached, "hf_cache": hub}
 
 
 # ── nhận diện + chọn chế độ ────────────────────────────────────────────────────────────
@@ -357,6 +405,7 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
         _write_json(path, data)
         created.append(_env.STATION_FILE)
     res["venv_exists"] = venv_exists
+    res["host_venv"] = None if venv_exists else host_venv(st, repo)
     res["default_profile"] = data.get("default_profile")
     if repo and os.path.isdir(repo):
         local_path = os.path.join(repo, _env.LOCAL_CONFIG)
@@ -388,7 +437,23 @@ def _print_init(res):
         log(f"  ! chưa có {m}/ (--existing không tự tạo — `voice-studio init --station … ` không cờ để dựng)")
     if res.get("hook") == "installed":
         log("[init] đã cài hook pre-commit chặn commit workspace/, .env, studio.local.json, token")
-    if not res.get("venv_exists"):
+    hv = res.get("host_venv")
+    if hv:
+        who = f"dự án {hv['project']}" if hv.get("project") else "venv khác"
+        log(f"\nvoice_studio đang chạy từ venv của {who}: {hv['prefix']}")
+        log("  Dùng CHÍNH venv đó cho engine — KHÔNG tạo thêm <trạm>/omnivoice/.venv "
+            "(bên gọi import voice_studio trong cùng tiến trình).")
+        if hv["engine"]:
+            log("  Engine (torch + omnivoice) đã có trong venv này — kiểm: voice-studio doctor")
+        else:
+            log("  Chưa có engine: cài torch rồi `pip install -e \"<repo agent-voice-studio>[engine]\"` "
+                "VÀO venv này, theo INSTALL của dự án đó (agent-video-studio: mục 5b).")
+        if hv["weights_cached"]:
+            log(f"  Weights đã có trong cache ({hv['hf_cache']}) — không tải lại.")
+        else:
+            log("  Weights chưa có trong cache: lần tổng hợp đầu tải ~3,3 GB "
+                "(OMNIVOICE_ONLINE=1 cho riêng lệnh đó).")
+    elif not res.get("venv_exists"):
         log("\nBước tiếp theo — tạo venv engine và cài (init không làm thay):")
         for c in venv_commands(res["station"]):
             log("  " + c)

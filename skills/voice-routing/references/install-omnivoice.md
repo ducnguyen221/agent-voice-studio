@@ -24,13 +24,15 @@ rủi ro giấy phép bạn phải tự cân nhắc. Giấy phép weights đi đ
 - **Python 3.10+** (đã đo trên 3.12).
 - GPU **NVIDIA** cho tốc độ dùng được. Apple Silicon chạy qua **MPS** `[chưa đo tốc độ]`. CPU chạy
   được nhưng chậm tới mức đổi cả cách làm việc.
-- **~4 GB** đĩa cho weights (cache Hugging Face, lần chạy đầu).
+- **~3,3 GB** đĩa cho weights (cache Hugging Face, lần chạy đầu; dùng chung mọi venv của máy).
+- torch: bản CUDA ~2,5 GB; bản macOS arm64 ~130 MB (cả engine ≈ 300 MB).
 - Internet **một lần** — tải weights và (nếu dùng phiên âm tự động) model ASR. Sau đó chạy offline.
 - `ffmpeg` trên PATH (hoặc `FFMPEG_DIR`) — cho mp3 và ghép video.
 
 ## Cài — sáu bước
 
-**`-e` hay bản sao:** lệnh dưới dùng `-e` (máy phát triển). Máy **chạy lịch** cài bản sao — luật
+**`-e` hay bản sao:** lệnh dưới dùng `-e` (máy phát triển, và máy embedded nơi giọng nằm trong venv
+của repo video). Chỉ xưởng Windows **chạy lịch** có trạm riêng cài bản sao — luật
 và lệnh Windows/macOS chỉ nằm ở `docs/INSTALL.md` mục 3 của repo; đừng chép sang đây.
 
 **1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
@@ -174,6 +176,10 @@ engine.save(wav, "a.mp3", sr)
 ```
 
 Ghim phiên bản hợp đồng bằng `voice_studio.API_VERSION` (semver — đổi số đầu là đổi chữ ký).
+Trong JSON của `speak` / `narrate` / `doctor`, khoá `voice_studio` **luôn** là `API_VERSION`; bản
+phát hành của package (`voice_studio.__version__`) nằm ở khoá riêng `version`. Bên gọi muốn báo
+lại phiên bản giọng trong JSON của mình thì giữ đúng hai nghĩa đó, đừng đặt bản phát hành vào khoá
+`voice_studio`.
 
 ## Trạm video gọi giọng
 

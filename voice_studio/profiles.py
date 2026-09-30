@@ -20,8 +20,14 @@ khoảng 50 lần; nó chỉ là cache, hỏng thì im lặng dựng lại và g
 
 Kho giọng lấy từ `voice_studio._env.voices_dir()` (VOICES_DIR → trạm giọng), đọc lại mỗi
 lần gọi; `set_voices_dir()` ghim cứng một thư mục cho cả tiến trình nếu cần.
+
+Tên profile so theo Unicode **NFC**. Tên file tiếng Việt có dấu có thể nằm trên đĩa ở dạng NFD
+(chép từ máy khác, giải nén trên macOS) trong khi cấu hình và lời gọi viết NFC: nhìn giống hệt
+nhau nhưng `==` ra sai. Vì thế `list_profiles()` và `get_default()` trả tên NFC, và mọi chỗ mở
+file tìm tên thật trên đĩa theo NFC — **không bao giờ đổi tên file của người dùng**.
 """
 import os
+import unicodedata
 
 from . import _env
 
@@ -38,7 +44,7 @@ __all__ = [
     "VOICES_DIR", "FROZEN_SAMPLE_TEXT", "ProfileError",
     "voices_dir", "set_voices_dir", "list_profiles", "get_default", "set_default",
     "ensure_default", "get_clone_prompt", "save_profile_from_wav",
-    "save_profile_from_instruct", "clear_cache",
+    "save_profile_from_instruct", "clear_cache", "nfc",
 ]
 
 
@@ -67,14 +73,36 @@ def clear_cache():
     _prompt_cache.clear()
 
 
-def _paths(name):
+def nfc(name):
+    """Tên ở dạng Unicode NFC — dạng dùng để SO tên profile (xem docstring module)."""
+    return unicodedata.normalize("NFC", name) if name else name
+
+
+def _disk_name(name):
+    """Tên thật trên đĩa của profile `name`: chính `name` nếu `<name>.wav` mở được, không thì
+    file `.wav` có tên trùng `name` theo NFC. Không thấy ⇒ trả nguyên `name` (profile mới)."""
     d = voices_dir()
-    return os.path.join(d, name + ".wav"), os.path.join(d, name + ".txt")
+    if not name or os.path.isfile(os.path.join(d, name + ".wav")):
+        return name
+    key = nfc(name)
+    try:
+        entries = sorted(os.listdir(d))
+    except OSError:
+        return name
+    for n in entries:
+        if n.endswith(".wav") and nfc(n[:-4]) == key:
+            return n[:-4]
+    return name
+
+
+def _paths(name):
+    d, stem = voices_dir(), _disk_name(name)
+    return os.path.join(d, stem + ".wav"), os.path.join(d, stem + ".txt")
 
 
 def _prompt_path(name):
     """Cache đĩa của clip prompt đã token hoá (omnivoice >= 0.2.0), nằm cạnh profile."""
-    return os.path.join(voices_dir(), name + ".prompt.pt")
+    return os.path.join(voices_dir(), _disk_name(name) + ".prompt.pt")
 
 
 def _exists(name):
@@ -83,7 +111,7 @@ def _exists(name):
 
 def _drop_prompt_cache(name):
     """Quên prompt của profile ở RAM *và* trên đĩa (gọi mỗi khi wav/txt của nó đổi)."""
-    _prompt_cache.pop((voices_dir(), name), None)
+    _prompt_cache.pop((voices_dir(), nfc(name)), None)
     try:
         os.remove(_prompt_path(name))
     except OSError:
@@ -91,11 +119,12 @@ def _drop_prompt_cache(name):
 
 
 def list_profiles():
+    """Tên các profile trong kho, dạng NFC, đã sắp xếp."""
     d = voices_dir()
     if not os.path.isdir(d):
         return []
-    return sorted(n[:-4] for n in os.listdir(d)
-                  if n.endswith(".wav") and not n.startswith("_"))
+    return sorted({nfc(n[:-4]) for n in os.listdir(d)
+                   if n.endswith(".wav") and not n.startswith("_")})
 
 
 def get_default():
@@ -105,10 +134,10 @@ def get_default():
         with open(f, "r", encoding="utf-8") as fh:
             n = fh.read().strip()
         if _exists(n):
-            return n
+            return nfc(n)
     n = (os.environ.get(DEFAULT_ENV) or "").strip()
     if _exists(n):
-        return n
+        return nfc(n)
     names = list_profiles()
     if len(names) == 1:
         return names[0]
@@ -120,6 +149,7 @@ def set_default(name):
         raise FileNotFoundError(f"không có profile giọng '{name}' (thiếu {name}.wav)")
     d = voices_dir()
     os.makedirs(d, exist_ok=True)
+    name = nfc(name)
     with open(os.path.join(d, _DEFAULT_FILE), "w", encoding="utf-8") as f:
         f.write(name)
     return name
@@ -133,7 +163,7 @@ def ensure_default(model=None, instruct=None, name=None):
     """
     if name:
         if _exists(name):
-            return name
+            return nfc(name)
         raise ProfileError(f"không có profile giọng '{name}' trong {voices_dir()}")
     d = get_default()
     if d:
@@ -218,7 +248,7 @@ def get_clone_prompt(model, name=None):
     name = name or get_default()
     if not name:
         return None
-    key = (voices_dir(), name)
+    key = (voices_dir(), nfc(name))
     if key in _prompt_cache:
         return _prompt_cache[key]
     wav, txt = _paths(name)

@@ -323,7 +323,9 @@ def test_rerun_keeps_user_edits(repo, tmp_path):
     assert lib.read_text(encoding="utf-8") == '{"styles": []}'
 
 
-def test_init_prints_venv_commands_not_creating_venv(repo, tmp_path, capsys):
+def test_init_prints_venv_commands_not_creating_venv(repo, tmp_path, capsys, monkeypatch):
+    # Không có venv dự án khác (máy giọng độc lập) — tách khỏi venv đang chạy test.
+    monkeypatch.setattr(station, "host_venv", lambda *a, **k: None)
     rc = cli.main(["init", "--station", str(tmp_path / "st"), "--json"])
     out, err = capsys.readouterr()
     assert rc == 0 and last_json(out)["ok"]
@@ -345,3 +347,65 @@ def test_venv_commands_use_the_os_shell_syntax(windows, tmp_path):
         assert cmds[-1].startswith("OMNIVOICE_ONLINE=1 ")
     # doctor không tải gì — lệnh tải weights là lần tổng hợp đầu, không phải doctor
     assert "doctor" not in cmds[-1] and "speak" in cmds[-1]
+
+
+# ── P2-8: voice_studio chạy từ venv của dự án khác (vd .venv của repo video) ──────────────
+
+def _host(engine_ok, cached, prefix="/somewhere/agent-video-studio/.venv"):
+    return {"prefix": prefix, "project": os.path.dirname(prefix), "engine": engine_ok,
+            "weights_cached": cached, "hf_cache": "/hf/hub"}
+
+
+def test_init_in_other_projects_venv_does_not_ask_for_engine_venv(repo, tmp_path, capsys, monkeypatch):
+    monkeypatch.setattr(station, "host_venv", lambda *a, **k: _host(True, True))
+    rc = cli.main(["init", "--station", str(tmp_path / "st"), "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 0 and last_json(out)["host_venv"]["engine"] is True
+    assert "agent-video-studio/.venv" in err
+    assert "Bước tiếp theo" not in err and "python -m venv" not in err
+    assert "GB" not in err                                  # weights đã có: không nói chuyện tải
+    assert "không tải lại" in err
+
+
+def test_init_in_other_projects_venv_without_engine_points_to_that_venv(repo, tmp_path, capsys,
+                                                                        monkeypatch):
+    monkeypatch.setattr(station, "host_venv", lambda *a, **k: _host(False, False))
+    rc = cli.main(["init", "--station", str(tmp_path / "st")])
+    _, err = capsys.readouterr()
+    assert rc == 0
+    assert "python -m venv" not in err and "omnivoice/.venv" in err   # nói rõ: KHÔNG tạo nó
+    assert "VÀO venv này" in err and "[engine]" in err and "-e" in err
+    assert "3,3 GB" in err and "4 GB" not in err
+
+
+def test_host_venv_classifies_prefixes(tmp_path):
+    st = tmp_path / "st"
+    rep = tmp_path / "voice-repo"
+    video = tmp_path / "agent-video-studio"
+    video.mkdir()
+    (video / "pyproject.toml").write_text("[project]\n", encoding="utf-8")
+    base = str(tmp_path / "python312")
+
+    def hv(prefix, engine_ok):
+        return station.host_venv(str(st), str(rep), prefix=str(prefix), base_prefix=base,
+                                 engine_ok=engine_ok)
+
+    # python hệ thống (không phải venv) · venv engine chuẩn · venv nhẹ trong repo giọng
+    assert station.host_venv(str(st), str(rep), prefix=base, base_prefix=base) is None
+    assert hv(st / "omnivoice" / ".venv", True) is None
+    assert hv(rep / ".venv", True) is None
+    # venv lẻ chưa có engine, không thuộc dự án nào ⇒ vẫn in lệnh tạo venv engine
+    assert hv(tmp_path / "loose-venv", False) is None
+    # venv lẻ ĐÃ có engine ⇒ dùng luôn
+    assert hv(tmp_path / "loose-venv", True)["project"] is None
+    # venv của dự án khác (repo video), có hay chưa có engine
+    for engine_ok in (True, False):
+        got = hv(video / ".venv", engine_ok)
+        assert got["project"] == str(video) and got["engine"] is engine_ok
+        assert set(got) == {"prefix", "project", "engine", "weights_cached", "hf_cache"}
+        assert got["weights_cached"] is False               # HOME giả: cache rỗng
+
+
+def test_venv_commands_weights_size_is_measured_value(tmp_path):
+    cmds = "\n".join(station.venv_commands(str(tmp_path / "st"), windows=False))
+    assert "3,3 GB" in cmds and "4 GB" not in cmds

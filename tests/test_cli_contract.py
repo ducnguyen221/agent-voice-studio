@@ -40,7 +40,10 @@ def test_speak_ok_writes_file_and_one_json_line(station, fake_engine, tmp_path, 
     assert os.path.samefile(res["outputs"][0]["path"], out)
     assert res["outputs"][0]["duration"] > 0
     assert set(res["timings"]) == {"load", "synth", "total"}
-    assert res["engine"]["voice_studio"]
+    # P2-17: `voice_studio` = phiên bản HỢP ĐỒNG, `version` = bản phát hành — hai khoá, không đảo.
+    import voice_studio
+    assert res["engine"]["voice_studio"] == voice_studio.API_VERSION
+    assert res["engine"]["version"] == voice_studio.__version__
     assert "[speak]" in stderr
     # hai câu ⇒ hai lần generate, cùng một clone prompt (giọng nhất quán)
     prompts = {id(c.get("voice_clone_prompt")) for c in fake_engine.calls}

@@ -4,6 +4,27 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+## 0.3.1 — 2026-09-30
+
+**Chạy ổn trên Mac mini (máy embedded), Windows giữ nguyên.**
+
+- `doctor` dòng `bgm-library` giờ kiểm cả **file nhạc**: style khai trong `bgm-library.json` mà
+  thiếu `<style>.mp3` là `[WARN]` kèm tên style thiếu — trước đây chỉ kiểm file json, và pipeline
+  chọn đúng style đó chết ở bước ghép sau khi đã tốn cả lượt tổng hợp. Repo không có lệnh sinh
+  nhạc; cách tự sinh (và giấy phép CC-BY-NC của weights MusicGen) ở `docs/bgm-generation.md`.
+- Tên profile so theo Unicode **NFC**: file tên có dấu ở dạng NFD (chép từ gói/máy khác) giờ khớp
+  tên viết trong cấu hình; `list_profiles()` / `get_default()` trả tên NFC. Không đổi tên file nào.
+- Luật cài package có thêm dòng **máy embedded**: giọng cài vào venv của repo video thì luôn
+  `pip install -e` (trùng `agent-video-studio/INSTALL.md` mục 5b); bản sao chỉ dành cho xưởng
+  Windows chạy lịch có trạm giọng riêng. `docs/INSTALL.md` mục 3.
+- `voice-studio init` nhận ra khi `voice_studio` đang chạy từ venv của dự án khác (vd `.venv` của
+  repo video): không còn bảo tạo `<trạm>/omnivoice/.venv` hay tải lại weights đã có trong cache.
+- Tài liệu cài: macOS dùng `python3.12` (không phải `python3` = 3.9), ghi chú uv/pyenv; dung lượng
+  tách theo máy — torch CUDA ~2,5 GB, macOS arm64 ~130 MB, weights ~3,3 GB.
+- JSON của `speak`, `narrate`, `doctor` (và `get_status` của MCP) thêm khoá `version` = phiên bản
+  package; `voice_studio` **vẫn** là phiên bản hợp đồng (`API_VERSION`, nay `1.1.0` vì thêm khoá —
+  không phá khoá cũ). Bên gọi ghim theo `voice_studio`, truy lỗi theo `version`.
+
 ## 0.3.0 — 2026-09-29
 
 **Cài đặt cho agent, hai hệ điều hành.**

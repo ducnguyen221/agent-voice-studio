@@ -17,14 +17,16 @@
 Kết quả (`--json`, dòng cuối stdout):
     {"ok": true, "outputs": [{"kind": "audio", "path": …, "duration": …}],
      "profile": …, "timings": {"load": …, "synth": …, "total": …},
-     "engine": {"voice_studio": API_VERSION, "device": …}}
+     "engine": {"voice_studio": API_VERSION, "version": __version__, "device": …}}
+    `engine.voice_studio` = phiên bản HỢP ĐỒNG (để ghim), `engine.version` = bản phát hành
+    của package (để truy lỗi) — hai nghĩa, hai khoá, không đảo.
 Mã thoát: 0 ok · 1 engine lỗi · 2 hợp đồng sai · 3 trạm/engine chưa cài.
 """
 import argparse
 import os
 import time
 
-from . import API_VERSION, contract, engine, profiles
+from . import API_VERSION, __version__, contract, engine, profiles
 from .contract import ContractError, StationMissing, log
 
 DEFAULT_SEED = 42
@@ -122,7 +124,8 @@ def speak(args):
         "profile": profile,
         "timings": {"load": round(t1 - t0, 3), "synth": round(t2 - t1, 3),
                     "total": round(time.perf_counter() - t0, 3)},
-        "engine": {"voice_studio": API_VERSION, "device": engine.loaded_device()},
+        "engine": {"voice_studio": API_VERSION, "version": __version__,
+                   "device": engine.loaded_device()},
     }
 
 

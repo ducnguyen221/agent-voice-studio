@@ -19,7 +19,7 @@ mới import FastMCP và đăng ký chúng. Model nạp một lần, lười, �
 """
 import os
 
-from . import API_VERSION, av, compat, engine, profiles
+from . import API_VERSION, __version__, av, compat, engine, profiles
 
 SERVER_NAME = "omnivoice-tts"      # giữ tên cũ: cấu hình MCP hiện có của người dùng trỏ tên này
 DEFAULT_INSTRUCT = "female, young adult, moderate pitch"
@@ -30,7 +30,7 @@ TOOLS = ("synthesize_speech", "clone_voice", "narrate_video", "make_voice_profil
 
 def _check_profile(voice_profile):
     """Profile ĐƯỢC NÊU TÊN mà không có ⇒ báo lỗi, không lặng lẽ đổi sang giọng khác."""
-    if voice_profile and voice_profile not in profiles.list_profiles():
+    if voice_profile and profiles.nfc(voice_profile) not in profiles.list_profiles():
         return f"ERROR: không có profile giọng '{voice_profile}' trong {profiles.voices_dir()}"
     return None
 
@@ -198,7 +198,7 @@ def list_voice_options() -> dict:
 
 def get_status() -> dict:
     """Report runtime status: device, whether the model is loaded, sample rate, offline mode."""
-    status = {"model_id": engine.MODEL_ID, "voice_studio": API_VERSION,
+    status = {"model_id": engine.MODEL_ID, "voice_studio": API_VERSION, "version": __version__,
               "model_loaded": engine._model is not None, "device": engine.loaded_device(),
               "sample_rate": getattr(engine._model, "sampling_rate", None),
               "offline": os.environ.get("HF_HUB_OFFLINE") == "1",
