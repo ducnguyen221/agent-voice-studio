@@ -16,6 +16,13 @@
 *.ogg
 *.opus
 
+# ── gói giọng (`voice-studio export --personal` ra .zip) và video có tiếng: cùng loại rò
+*.zip
+*.mp4
+*.mkv
+*.mov
+*.webm
+
 # ── model / prompt cache
 *.pt
 *.ckpt
@@ -57,6 +64,19 @@ desktop.ini
 .idea/
 *.swp
 node_modules/
+
+# ── thư mục công cụ agent + cache công cụ Python. Neo gốc (`/.claude/`) có chủ đích: manifest
+# plugin `.claude-plugin/`, `.codex-plugin/` vẫn được theo dõi (tests/test_repo_gates.py kiểm)
+/.claude/
+/.codex/
+/.gemini/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.hypothesis/
+.python-version
+.envrc
 
 # ── nháp
 .tmp/

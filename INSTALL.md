@@ -81,8 +81,10 @@ df -h ~
 | GPU | phần B: NVIDIA (CUDA) hoặc Apple Silicon (MPS); CPU chạy được nhưng rất chậm | — | — |
 
 Windows: `python --version` mở Microsoft Store hoặc báo lỗi dù `py -0p` trống nghĩa là máy chỉ có
-"Python giả" của Store — coi như chưa có Python. Tổng hợp giọng thật mới được đo trên Windows;
-trên macOS phần A chạy trong CI, phần B **chưa kiểm** qua package này — nói rõ với người dùng Mac.
+"Python giả" của Store — coi như chưa có Python. Tổng hợp giọng thật đã đo trên Windows (CUDA) và
+trên macOS Apple Silicon (một máy M1 16 GB, MPS, fp16, ngày 30/09/2026): `doctor` 16 PASS, `speak`
+mã 0, RTF (thời gian tổng hợp ÷ độ dài audio) 1,65 với `--instruct`, 2,7–4,8 với profile clone —
+tức chậm hơn thời gian thực. Nói rõ với người dùng Mac: chạy được, nhưng chậm hơn máy NVIDIA.
 
 ## 3. Trình kế hoạch và chờ đồng ý
 

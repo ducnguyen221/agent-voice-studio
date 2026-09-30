@@ -47,6 +47,28 @@ def _in_git():
     ("templates/workspace/omnivoice/voices/a.prompt.pt", True),
     ("templates/workspace/out/a.mp3", True),
     ("some/where/voices/a.txt", True),
+    # gói giọng `export --personal` + video có tiếng: ví dụ README ghi ra .zip, `git add .` là rò
+    ("voice.zip", True),
+    ("some/where/voice.zip", True),
+    ("a.mp4", True),
+    ("some/where/a.mkv", True),
+    ("a.mov", True),
+    ("a.webm", True),
+    # thư mục công cụ agent bị bỏ qua, nhưng manifest plugin cùng tiền tố thì KHÔNG
+    (".claude/settings.local.json", True),
+    (".codex/config.toml", True),
+    (".gemini/settings.json", True),
+    (".claude-plugin/plugin.json", False),
+    (".claude-plugin/marketplace.json", False),
+    (".codex-plugin/plugin.json", False),
+    # cache công cụ Python + cấu hình máy riêng
+    (".mypy_cache/x.json", True),
+    (".ruff_cache/x", True),
+    (".coverage", True),
+    ("htmlcov/index.html", True),
+    (".hypothesis/x", True),
+    (".python-version", True),
+    (".envrc", True),
 ])
 def test_git_really_ignores(path, ignored):
     r = subprocess.run(["git", "-C", str(ROOT), "check-ignore", "-q", "--no-index", path])
