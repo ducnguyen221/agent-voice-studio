@@ -71,7 +71,7 @@ Phần phụ `[engine]` ghim `omnivoice` và giữ `transformers` trong **khoả
 `pyproject.toml`). Cài `omnivoice` trần thì pip kéo transformers mới nhất — chưa ai đo; doctor
 báo `[WARN] transformers` khi bản đang có nằm ngoài khoảng.
 
-Nhóm tuỳ chọn khác: `[ui]` (gradio), `[clone]` (faster-whisper, yt-dlp). **Đừng cài phần phụ
+Nhóm tuỳ chọn khác: `[ui]` (gradio), `[clone]` (faster-whisper + av ghim theo cặp, yt-dlp). **Đừng cài phần phụ
 chuẩn hoá văn bản của engine trên Windows** — một phụ thuộc không có wheel, đòi cả bộ build MSVC;
 và bạn cũng không muốn nó (xem cảnh báo bộ chuẩn hoá trong `vietnamese-tts-script.md`).
 

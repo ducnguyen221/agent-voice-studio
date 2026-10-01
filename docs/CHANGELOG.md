@@ -4,6 +4,25 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+## 0.3.3 — 2026-10-01
+
+**Extra `[clone]` ghim faster-whisper + PyAV theo cặp đã đo.** Engine, profile, trạm, CLI và mã thoát
+không đổi.
+
+- `clone = ["faster-whisper>=1.2,<1.3", "av>=15,<19", "yt-dlp"]`. Trước đây `av` không ghim nên pip
+  kéo PyAV 19 — bản đã bỏ `metadata_errors` mà `faster_whisper.audio.decode_audio` truyền — và mọi
+  thứ gọi faster-whisper (clone từ media, căn phụ đề của runner truyện marketing-studio dùng chung
+  venv giọng) chết với `TypeError` (Mac mini, 01/10/2026). Cùng cặp với
+  `requirements-runners.txt` của agent-marketing-studio 1.1.6.
+- CI job mới `clone-runtime` (Windows + macOS): cài `.[test,clone]` thật rồi gọi `decode_audio`
+  trên wav 1 giây; `VOICE_STUDIO_REQUIRE_CLONE=1` biến skip thành đỏ. Cổng cấu hình
+  `tests/test_clone_runtime.py` giữ khoảng ghim.
+- INSTALL (`INSTALL.md`, `docs/INSTALL.md`): macOS cài `ffmpeg-full` thay `ffmpeg`. `narrate` không
+  cần bộ lọc chữ, nhưng ffmpeg của máy dùng chung với runner truyện — bản Homebrew core thiếu
+  `drawtext`/`subtitles`.
+- **Nâng cấp venv giọng đang chạy**: `pip install -e ".[clone]"` (hoặc
+  `pip install -r <marketing>/requirements-runners.txt`) để đưa `av` về trong khoảng ghim.
+
 ## 0.3.2 — 2026-09-30
 
 **Dọn theo review, hành vi chạy không đổi** — engine, profile, trạm, CLI và mã thoát giữ nguyên
