@@ -24,7 +24,7 @@ Cài xong thì `voice-studio doctor` phải xanh.
 | Thứ | Vì sao | Windows | macOS |
 |---|---|---|---|
 | **Python ≥ 3.10** | chính package này (đã đo trên 3.12) | `winget install Python.Python.3.12` | `brew install python@3.12` |
-| **ffmpeg + ffprobe** | xuất mp3, ghép tiếng vào video, chuẩn âm lượng | `winget install Gyan.FFmpeg` | `brew install ffmpeg` |
+| **ffmpeg + ffprobe** (bản có libfreetype + libass) | xuất mp3, ghép tiếng vào video, chuẩn âm lượng; máy chạy lượt truyện của marketing-studio cần `drawtext`/`subtitles` | `winget install Gyan.FFmpeg` | `brew install ffmpeg-full` (keg-only; `ffmpeg` core thiếu hai bộ lọc đó) |
 | **torch** | engine chạy trên nó — bản phải khớp phần cứng | xem tài liệu engine | xem tài liệu engine |
 | **~3,3 GB đĩa** cho weights | tải về cache Hugging Face lần chạy đầu (dùng chung mọi venv của máy) | | |
 | **đĩa cho torch** | bản CUDA (NVIDIA) ~2,5 GB · bản macOS arm64 ~130 MB (cả engine ≈ 300 MB) | | |

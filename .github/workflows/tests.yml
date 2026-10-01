@@ -53,3 +53,28 @@ jobs:
         env:
           PYTHONIOENCODING: utf-8
         run: python -m pytest -q
+
+  # Extra `[clone]` cài THẬT rồi gọi `decode_audio` (Mac mini 01/10/2026: không ghim `av` ⇒ pip
+  # kéo PyAV 19 ⇒ TypeError). Job pytest ở trên không cài extra nào ngoài `test`, nên không thấy
+  # được lỗi này. `VOICE_STUDIO_REQUIRE_CLONE=1` biến skip thành đỏ.
+  clone-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6.3.0
+        with:
+          python-version: "3.12"
+
+      - name: Install package + [clone]
+        run: python -m pip install -e ".[test,clone]"
+
+      - name: decode_audio really runs with the pinned pair
+        env:
+          PYTHONIOENCODING: utf-8
+          VOICE_STUDIO_REQUIRE_CLONE: "1"
+        run: python -m pytest -q -rs tests/test_clone_runtime.py
