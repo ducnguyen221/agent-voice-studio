@@ -211,3 +211,7 @@ its output commercially.
 ## Licence
 
 MIT — see [LICENSE](LICENSE).
+
+## 🤝 ACD Ecosystem Integration
+
+Khai báo vai của repo trong hệ thống nhiều repo ACD (Role, Upstream, Downstream, Bundles, Handoff) tại [ECOSYSTEM.md](ECOSYSTEM.md).
