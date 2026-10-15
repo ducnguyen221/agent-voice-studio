@@ -76,7 +76,7 @@ df -h ~
 |---|---|---|---|
 | Git | **bắt buộc** | `Git.Git` | `git` |
 | Python 3.10–3.13 (khuyến nghị 3.12) | **bắt buộc** | `Python.Python.3.12` | `python@3.12` |
-| ffmpeg (bản có libfreetype + libass) | xuất mp3, ghép video (không chặn phần A); máy chạy lượt truyện của marketing-studio cần bộ lọc `drawtext`/`subtitles` | `Gyan.FFmpeg` | `ffmpeg-full` |
+| ffmpeg (bản có libfreetype + libass) | xuất mp3, ghép video (không chặn phần A); máy chạy lượt truyện của marketing-team cần bộ lọc `drawtext`/`subtitles` | `Gyan.FFmpeg` | `ffmpeg-full` |
 | Đĩa trống | ~1 GB cho phần A; **≥ 8 GB** nếu làm phần B | — | — |
 | GPU | phần B: NVIDIA (CUDA) hoặc Apple Silicon (MPS); CPU chạy được nhưng rất chậm | — | — |
 
@@ -108,7 +108,7 @@ brew install git python@3.12 ffmpeg-full
 
 `ffmpeg-full`, không phải `ffmpeg`: bản Homebrew core đã bỏ libfreetype + libass nên không có
 `drawtext`/`subtitles`/`ass`. `narrate` của repo này không cần các bộ lọc đó, nhưng venv giọng và
-ffmpeg của máy được dùng chung với runner truyện của agent-marketing-studio — runner đó chết ở bước
+ffmpeg của máy được dùng chung với runner truyện của agent-marketing-team — runner đó chết ở bước
 dựng video sau hàng giờ đọc nếu thiếu (Mac mini, 01/10/2026). `ffmpeg-full` là keg-only: các repo
 anh em tự dò `/opt/homebrew/opt/ffmpeg-full/bin`; công cụ khác cần nó trên `PATH` thì đặt
 `FFMPEG_DIR` hoặc thêm thư mục đó vào `PATH`.

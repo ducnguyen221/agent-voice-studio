@@ -29,7 +29,7 @@ ui = ["gradio"]
 # faster-whisper + av ghim THEO CẶP đã đo: faster-whisper truyền `metadata_errors` cho `av.open`,
 # PyAV 19.0 đã bỏ tham số đó ⇒ `decode_audio` ném TypeError (Mac mini 01/10/2026 — pip tự kéo
 # PyAV 19 vì không ai ghim). av 15–18 có wheel macOS arm64 + Windows; 1.2.1 là faster-whisper mới
-# nhất lúc đo. Cùng cặp với `requirements-runners.txt` của agent-marketing-studio (cùng venv giọng).
+# nhất lúc đo. Cùng cặp với `requirements-runners.txt` của agent-marketing-team (cùng venv giọng).
 # Nới trần chỉ sau khi `tests/test_clone_runtime.py` xanh với bản mới (CI job `clone-runtime`).
 clone = ["faster-whisper>=1.2,<1.3", "av>=15,<19", "yt-dlp"]
 lab = ["librosa", "scikit-learn"]

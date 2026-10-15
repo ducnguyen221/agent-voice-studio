@@ -46,7 +46,7 @@ WORKSPACE = "workspace"
 STATION_FILE = "station.json"
 ENV_FILE = ".env"
 ENV_EXAMPLE = ".env.example"
-# Hợp đồng F17 — tên chế độ dùng chung với `agent-marketing-studio`, `agent-video-studio`.
+# Hợp đồng F17 — tên chế độ dùng chung với `agent-marketing-team`, `agent-video-studio`.
 MODES = ("embedded", "separate")
 
 _LEGACY = {

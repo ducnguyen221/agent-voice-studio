@@ -86,5 +86,5 @@ def test_page_does_not_hardcode_a_test_count():
 def test_page_links_the_current_marketing_path():
     text = _page()
     # Chỉ so phần đường: tên miền là tên tác giả, cổng rò danh tính không cho nó vào test.
-    assert "/marketing-agent/" not in text, "đường cũ; trang marketing là /agent-marketing-studio/"
-    assert ".vn/agent-marketing-studio/" in text
+    assert "/marketing-agent/" not in text, "đường cũ; trang marketing là /agent-marketing-team/"
+    assert ".vn/agent-marketing-team/" in text

@@ -37,7 +37,7 @@ this repository contains **no audio at all**, by design.
 
 Also not one piece of a suite you have to install whole. This repository stands alone:
 install it when you need a speaking voice, and only then. A content pipeline (for example
-`agent-marketing-studio`) *can* call it through the shared contract — exit code plus a final
+`agent-marketing-team`) *can* call it through the shared contract — exit code plus a final
 JSON line on stdout — when it is present, but that pipeline runs fine without it and says
 plainly that the voice capability is missing rather than failing mid-run. There is no
 required install order and no bundle.

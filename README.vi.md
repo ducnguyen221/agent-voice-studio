@@ -34,7 +34,7 @@ Không phải engine — anh tự cài. Không phải dịch vụ. Không phải
 
 Cũng **không phải một mảnh của bộ nào phải cài đủ**. Repo này đứng một mình: cài nó khi anh
 cần một giọng đọc, và chỉ khi đó. Một quy trình sản xuất nội dung (ví dụ
-`agent-marketing-studio`) *gọi được* nó qua hợp đồng mã thoát + dòng JSON cuối stdout nếu nó
+`agent-marketing-team`) *gọi được* nó qua hợp đồng mã thoát + dòng JSON cuối stdout nếu nó
 có mặt — nhưng quy trình đó chạy bình thường khi anh chưa cài, và sẽ nói rõ là đang thiếu
 năng lực giọng thay vì nổ giữa chừng. Không có thứ tự cài bắt buộc, không có "bộ ba".
 
