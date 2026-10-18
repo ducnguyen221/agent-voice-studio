@@ -505,7 +505,7 @@ def test_init_prev_separate_without_station_path_ignores_opcos(repo, opcos, sand
     (repo / "studio.local.json").write_text(json.dumps({"mode": "separate"}), encoding="utf-8")
     res = station.do_init(ask=never_ask, dry_run=True)
     assert res["mode"] == "separate"
-    assert os.path.normcase(res["station"]) == os.path.normcase(_env.default_station())
+    assert os.path.normcase(res["station"]) == os.path.normcase(_env.legacy_station())
     assert os.path.normcase(res["station"]) != os.path.normcase(str(opcos))
 
 
@@ -514,7 +514,7 @@ def test_init_mode_separate_opcos_dir_without_marker_uses_default(repo, tmp_path
     (tmp_path / "bare-ws" / "voice").mkdir(parents=True)     # thư mục có, không dấu trạm
     monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
     res = station.do_init(mode="separate", ask=never_ask, dry_run=True)
-    assert os.path.normcase(res["station"]) == os.path.normcase(_env.default_station())
+    assert os.path.normcase(res["station"]) == os.path.normcase(_env.legacy_station())
 
 
 def test_init_without_opcos_var_unchanged(repo, sandbox_home):

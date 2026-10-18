@@ -177,7 +177,7 @@ def opcos_check(src):
     `workspace`/`unset` ⇒ gợi ý lệnh `init`. Có mà chưa là trạm ⇒ ghi đường đã thử.
     Nguồn đã là biến trạm / `studio.local.json` ⇒ im lặng.
     """
-    base = (os.environ.get("OPCOS_WORKSPACES") or "").strip()
+    base = _env.opcos_base()
     if not base:
         return None
     oc = _env.opcos_station()
@@ -187,7 +187,7 @@ def opcos_check(src):
                           hint=f"có trạm OpcOS: `voice-studio init --mode separate --station \"{oc}\"` "
                                "để dùng chung trạm đó")
         return None
-    tried = os.path.join(os.path.expanduser(base), "voice")
+    tried = _env.opcos_dir()
     if src in (_env.WORKSPACE, _env.UNSET):
         return _check("opcos-station", False, f"OPCOS_WORKSPACES={base}: {tried} chưa là trạm",
                       level="warn", hint="thư mục đó chưa có station.json hoặc omnivoice/voices/ — bỏ qua nếu "

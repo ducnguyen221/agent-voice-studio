@@ -97,8 +97,8 @@ def make_opcos_station(tmp_path, name="ocws"):
 def test_sandbox_home_hides_real_home(sandbox_home, tmp_path):
     assert os.path.expanduser("~").startswith(str(tmp_path))
     assert "OPCOS_WORKSPACES" not in os.environ and "VOICE_STATION" not in os.environ
-    assert _env.has_marker(_env.default_station())           # trạm mồi có thật trong HOME giả
-    assert str(tmp_path) in _env.default_station()
+    assert _env.has_marker(_env.legacy_station())            # trạm mồi có thật trong HOME giả
+    assert str(tmp_path) in _env.legacy_station()
 
 
 def test_sandbox_home_voice_source_is_workspace_before_and_after_init(repo, sandbox_home):

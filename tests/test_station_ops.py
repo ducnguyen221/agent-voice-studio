@@ -600,13 +600,13 @@ def test_doctor_notes_opcos_dir_without_marker(bare_repo, tmp_path, monkeypatch)
 
 
 def test_doctor_has_no_home_station_warning(bare_repo, sandbox_home):
-    assert _env.has_marker(_env.default_station())           # trạm mồi ~/.voice có thật
+    assert _env.has_marker(_env.legacy_station())            # trạm mồi ~/.voice có thật
     names = by_name(doctor.run_checks())
     assert "station-source" not in names
     assert not any("được nhận vì nó đã có sẵn" in c["hint"] for c in names.values())
 
 
 def test_doctor_two_sources_ignores_home_station(embedded_repo, sandbox_home):
-    assert _env.has_marker(_env.default_station())
+    assert _env.has_marker(_env.legacy_station())
     c = by_name(doctor.run_checks())
     assert "two-sources" not in c or c["two-sources"]["ok"]

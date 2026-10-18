@@ -190,7 +190,7 @@ def detect_external():
     if _env.env("OMNIVOICE_DIR"):
         return (os.path.dirname(_env._expand(_env.env("OMNIVOICE_DIR"))),
                 "biến OMNIVOICE_DIR (tên cũ) đã đặt")
-    home = _env.default_station()
+    home = _env.legacy_station()
     if _env.has_marker(home):
         return home, "~/.voice đã là một trạm (có station.json hoặc omnivoice/voices/)"
     return None
@@ -277,7 +277,7 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
     oc = None if from_prev else _env.opcos_station()
     if oc:
         return "separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm"
-    return "separate", _env.default_station(), why
+    return "separate", _env.legacy_station(), why
 
 
 # ── init ───────────────────────────────────────────────────────────────────────────────
@@ -750,7 +750,7 @@ def migrate_to_separate(target=None):
     ws = os.path.join(repo, _env.WORKSPACE)
     if not os.path.isdir(ws):
         raise ContractError(f"không có {ws} — máy này không ở chế độ embedded")
-    target = _env._expand(target) if target else _env.default_station()
+    target = _env._expand(target) if target else _env.legacy_station()
     if os.path.exists(target) and os.listdir(target):
         raise ContractError(f"thư mục đích không rỗng: {target} — chọn chỗ khác (--station)")
     env_file = os.path.join(repo, ".env")

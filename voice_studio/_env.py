@@ -200,7 +200,9 @@ def read_env_file(repo=None):
     return out
 
 
-def default_station():
+def legacy_station():
+    """Thư mục trạm đời cũ dưới home. KHÔNG phải đường mặc định của bất kỳ lệnh nào: `init` chỉ
+    dùng nó để nhận ra rằng máy còn một trạm cũ và HỎI người dùng quyết định."""
     return os.path.join(os.path.expanduser("~"), ".voice")
 
 
@@ -210,18 +212,30 @@ def has_marker(path):
                            os.path.isdir(os.path.join(path, "omnivoice", "voices")))
 
 
+def opcos_base():
+    """Giá trị `OPCOS_WORKSPACES` thành đường TUYỆT ĐỐI (`~` mở rộng, tương đối thì theo cwd lúc
+    gọi); biến vắng hoặc rỗng ⇒ None. ĐÂY LÀ NƠI DUY NHẤT đọc biến này: `os.environ` thật, không
+    qua `env()`/`.env` của repo — nó là con trỏ cấp máy."""
+    base = (os.environ.get("OPCOS_WORKSPACES") or "").strip()
+    if not base:
+        return None
+    return os.path.abspath(os.path.expanduser(base))
+
+
+def opcos_dir(station="voice"):
+    """`<OPCOS_WORKSPACES>/<station>` tuyệt đối, DÙ thư mục đó đã mang dấu trạm hay chưa; biến vắng ⇒ None."""
+    base = opcos_base()
+    return os.path.join(base, station) if base else None
+
+
 def opcos_station(station="voice"):
     """Trạm OpcOS `<OPCOS_WORKSPACES>/<station>` nếu biến đặt, khác rỗng và thư mục đó MANG DẤU
     trạm; không thì None. Chỉ `init`/`doctor` gọi — `resolve_station()` không bao giờ đọc nó.
 
-    Đọc `os.environ` thật (không qua `env()`/`.env` của repo): đây là con trỏ cấp máy. Không tạo,
-    không ghi, không cảnh báo; `~` được mở rộng; biến trỏ file thì không có thư mục con → None.
+    Không tạo, không ghi, không cảnh báo; biến trỏ file thì không có thư mục con → None.
     """
-    base = (os.environ.get("OPCOS_WORKSPACES") or "").strip()
-    if not base:
-        return None
-    path = os.path.abspath(os.path.join(os.path.expanduser(base), station))
-    return path if has_marker(path) else None
+    path = opcos_dir(station)
+    return path if path and has_marker(path) else None
 
 
 UNSET = "unset"
