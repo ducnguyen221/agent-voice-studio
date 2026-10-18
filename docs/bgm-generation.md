@@ -2,7 +2,7 @@
 
 Repo **không phát hành file nhạc nào**, và cũng **không có lệnh `voice-studio` nào sinh nhạc** —
 vì giấy phép weights (dưới). Thư viện nhạc nền của trạm (`<trạm>/assets/bgm/`, đổi bằng
-`VOICE_BGM_DIR`; `<trạm>` theo `VOICE_STATION`, mặc định `<repo>/workspace/`) do bạn tự lấp: tự sinh
+`VOICE_BGM_DIR`; `<trạm>` theo `VOICE_STATION`, mặc định `<repo>/workspaces/`) do bạn tự lấp: tự sinh
 bằng MusicGen theo hướng dẫn này, hoặc bỏ vào nhạc bạn có quyền dùng.
 
 `voice-studio doctor` báo `[WARN] bgm-library` khi một style khai trong `bgm-library.json` chưa có

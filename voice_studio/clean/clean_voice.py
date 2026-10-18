@@ -55,7 +55,7 @@ def resolve_clean_dir(explicit=None):
     eng = _envv("OMNIVOICE_DIR")
     if eng:
         return Path(eng).expanduser().resolve().parent / "voice-clean"
-    # Tầng cuối dùng CHUNG thứ tự phân giải trạm của package (studio.local.json, workspace/…).
+    # Tầng cuối dùng CHUNG thứ tự phân giải trạm của package (studio.local.json, workspaces/…).
     # Khi file chạy tự chứa trong venv tách, tiến trình cha đã truyền --clean-dir nên không tới đây.
     try:
         from voice_studio import _env

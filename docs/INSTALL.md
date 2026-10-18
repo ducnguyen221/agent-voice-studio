@@ -54,7 +54,7 @@ chỉ trỏ về đây.
 | Máy của bạn | Cài | Vì sao |
 |---|---|---|
 | **Máy phát triển** — bạn sửa repo, hoặc tự gọi lệnh bằng tay | `pip install -e` | sửa mã hay `git pull` là có hiệu lực ngay, không phải cài lại |
-| **Máy embedded** — giọng cài vào **venv của repo video** (repo giọng là bản clone cạnh repo video, trạm ở `<repo giọng>/workspace/`), kể cả khi máy đó chạy lịch (vd Mac mini) | **`pip install -e`** vào venv của repo video | repo giọng tìm trạm của nó **qua bản clone**; bản sao không biết trạm nằm đâu và lượt render dừng mã 3. Trùng luật ở `agent-video-studio/INSTALL.md` mục 5b |
+| **Máy embedded** — giọng cài vào **venv của repo video** (repo giọng là bản clone cạnh repo video, trạm ở `<repo giọng>/workspaces/`), kể cả khi máy đó chạy lịch (vd Mac mini) | **`pip install -e`** vào venv của repo video | repo giọng tìm trạm của nó **qua bản clone**; bản sao không biết trạm nằm đâu và lượt render dừng mã 3. Trùng luật ở `agent-video-studio/INSTALL.md` mục 5b |
 | **Xưởng Windows chạy lịch** — trạm giọng **riêng** (`separate`, `VOICE_STATION`) với venv engine riêng `<trạm>/omnivoice/.venv`, scheduled task gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
 
 Bản sao **chỉ** dành cho dòng cuối. Không chắc thì dùng `-e`. Máy phát triển kiêm xưởng chạy lịch:
@@ -134,7 +134,7 @@ voice-studio init --station <đường trạm>   # chọn thẳng separate, khô
 voice-studio init --station <trạm cũ> --existing   # nhận trạm đang chạy: chỉ ghi station.json
 ```
 
-**`embedded` là mặc định và là khuyến nghị**: trạm ở `<repo>/workspace/`, biến cấu hình ở
+**`embedded` là mặc định và là khuyến nghị**: trạm ở `<repo>/workspaces/`, biến cấu hình ở
 `<repo>/.env`, bấm Enter là xong, không phải đặt biến môi trường nào. Chọn **`separate`** khi bạn
 dùng nhiều máy, rành kỹ thuật, hoặc repo này là bản public của chính bạn — tức là trạm phải sống
 lâu hơn bản clone.
@@ -153,7 +153,7 @@ lặng**.
 chạy lại **không đè** file bạn đã điền. Thứ tự đọc một biến: **biến môi trường thật → `<repo>/.env`
 (chỉ khi `mode = embedded`) → chưa đặt**.
 
-`.env` giữ **đường dẫn và cấu hình**, **không bao giờ** giữ token. Cả `workspace/` lẫn `.env` bị
+`.env` giữ **đường dẫn và cấu hình**, **không bao giờ** giữ token. Cả `workspaces/` lẫn `.env` bị
 `.gitignore` chặn, và hook `pre-commit` chặn lần nữa. Một biến mà mã đọc nhưng khuôn không khai là
 **test đỏ**: người dùng không thể biết mình phải điền gì nếu không ai kể.
 

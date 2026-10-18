@@ -12,28 +12,31 @@ thường khi máy chưa cài nó. Không có "bộ" nào phải cài đủ.
 
 | Chế độ | Trạm | Secret | Dành cho |
 |---|---|---|---|
-| **`embedded`** — gọn trong repo (**mặc định, khuyến nghị cho người mới**) | `<repo>/workspace/` | `<repo>/.env` | một máy, "mở một folder là thấy hết" |
+| **`embedded`** — gọn trong repo (**mặc định, khuyến nghị cho người mới**) | `<repo>/workspaces/` | `<repo>/.env` | một máy, "mở một folder là thấy hết" |
 | **`separate`** — trạm ngoài repo | nơi bạn chỉ (`--station DIR`, hoặc trạm OpcOS) | kho secret riêng của máy (`~/.secret/…`) | nhiều máy, repo public của chính bạn, nhiều repo dùng chung trạm |
 
-`voice-studio init` hỏi bạn chọn (Enter = `embedded`) và ghi lựa chọn vào
-`<repo>/studio.local.json`. Chọn `separate` mà chưa chỉ nơi đặt thì nó hỏi tiếp đường dẫn — không
-có đường mặc định. Không hỏi (hoặc chỉ hỏi xác nhận) trong các trường hợp:
+Tên thư mục thống nhất: gốc luôn là `workspaces`, trạm giọng khi cài cạnh OpcOS là thư mục con
+`voice` của nó (`<OPCOS_WORKSPACES>/voice`). Cài riêng lẻ thì trạm là chính `<repo>/workspaces/` —
+nằm trong repo nên không cần thêm `voice`. Tên số ít cũ `<repo>/workspace/` còn được **nhận** nếu nó
+đã là một trạm mà `workspaces/` chưa có (kèm một dòng nhắc đổi tên); có cả hai thì `workspaces/` thắng
+và có dòng nhắc. `init` mới không bao giờ tạo tên số ít, và không tự dời gì.
 
+`voice-studio init` ghi lựa chọn vào `<repo>/studio.local.json`:
+
+- Có `OPCOS_WORKSPACES` và có người trả lời: một câu xác nhận/đổi — Enter ra `<biến>/voice`.
+- Không có biến, có người trả lời: câu hỏi hai đường (Enter = `embedded`, `<repo>/workspaces/`);
+  chọn `separate` thì hỏi tiếp đường dẫn — không có đường mặc định.
+- `--yes` không bao giờ hỏi (có hay không có terminal): dùng trạm nhúng `<repo>/workspaces/`, không tự
+  đặt vào thư mục dùng chung. Vậy khi có `OPCOS_WORKSPACES`: Enter/xác nhận ra `<biến>/voice`, còn
+  `--yes` ra `<repo>/workspaces/`.
 - `--station DIR` — bạn chỉ thẳng trạm ⇒ `separate`.
 - Máy **đã đặt trạm ngoài**: biến `VOICE_STATION` (hoặc tên cũ `OMNIVOICE_DIR`) ⇒ tự `separate`,
-  **không bao giờ** tạo `workspace/` (hai trạm cho một repo = hai nguồn sự thật).
-- `--mode embedded` hoặc `--yes` (= nhận khuyến nghị `embedded`; không bao giờ hỏi).
+  **không bao giờ** tạo `workspaces/` (hai trạm cho một repo = hai nguồn sự thật).
+- `--mode embedded` ⇒ trạm nhúng, không hỏi.
 - `--mode separate` khi `OPCOS_WORKSPACES` đang đặt: đích là `<biến>/voice` (tuyệt đối, kể cả khi
-  thư mục đó chưa là trạm). Đã mang dấu trạm thì dùng thẳng, không hỏi; chưa thì có người ngồi đó `init` hỏi xác nhận hoặc đổi; không có người thì
-  dùng luôn và in một dòng nêu đường. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2
-  (cần `--station DIR`).
-
-Còn một thư mục trạm **cũ** dưới home (`~/.voice` có `station.json` / `omnivoice/voices/`) thì
-`init` **hỏi**, không tự nhận: [1] dùng trạm mới (khuyến nghị, Enter; bảng nêu đúng đường:
-`<OPCOS_WORKSPACES>/voice` nếu biến đặt, không thì `<repo>/workspace/`) · [2] nhận trạm cũ làm trạm
-hiện có · [3] dời dữ liệu sang trạm mới (dừng, bạn dời tay rồi chạy lại). `--yes` không bao giờ
-hỏi (có hay không có terminal): dùng trạm mới `<repo>/workspace/` và in một dòng nêu trạm cũ cùng cách
-nhận nó (`--station <đường>`).
+  thư mục đó chưa là trạm). Đã mang dấu trạm thì dùng thẳng, không hỏi; chưa thì có người ngồi đó
+  `init` hỏi xác nhận hoặc đổi; không có người thì dùng luôn và in một dòng nêu đường. Không đặt
+  biến: có người thì hỏi đường, không thì dừng mã 2 (cần `--station DIR`).
 
 Chạy không có người trả lời (`--non-interactive`, hoặc không có terminal) mà thiếu cả `--yes` lẫn
 `--mode` ⇒ `init` in bảng lựa chọn rồi thoát mã 2 (không đoán chế độ). Hành vi theo từng cách gọi nằm
@@ -70,16 +73,14 @@ git mà đường dẫn trong `.env` trỏ tới (ở `separate`: `~/.secret/voi
 
 ```
 --station  →  VOICE_STATION  →  OMNIVOICE_DIR (tên cũ, trỏ thư mục engine)  →
-<repo>/studio.local.json  →  <repo>/workspace/ (có hay chưa; `init` tạo)  →  chưa xác định (mã 3)
+<repo>/studio.local.json  →  <repo>/workspaces/ (có hay chưa; `init` tạo)  →  chưa xác định (mã 3)
 ```
 
-**Không đặt gì thì trạm là thư mục trong repo** (`<repo>/workspace/`, bị git bỏ qua) — không
-bao giờ là một thư mục ẩn dưới home. Trạm cũ `~/.voice` chỉ được dùng khi bạn đã chọn nó (biến,
-`--station`, hoặc trả lời nhận nó khi `init` hỏi, ghi vào `studio.local.json`); dù nó đã là một
-trạm thật, các lệnh **không** tự nhận, và `init` cũng chỉ hỏi chứ không tự nhận. Máy còn `~/.voice`
-cũ mà chưa cấu hình: đặt `VOICE_STATION` hoặc chạy `voice-studio init`. Nếu máy có biến `OPCOS_WORKSPACES` trỏ thư mục
-chứa trạm `voice/`, `init` đề xuất trạm đó (không tự nhận khi `--yes`) và `doctor` nhắc — resolver
-không đọc biến này.
+**Không đặt gì thì trạm là thư mục trong repo** (`<repo>/workspaces/`, bị git bỏ qua) — không
+bao giờ là một thư mục ẩn dưới thư mục cá nhân. Muốn dùng trạm ở nơi khác thì chỉ rõ: biến,
+`--station`, hoặc câu trả lời khi `init` hỏi (ghi vào `studio.local.json`). Nếu máy có biến
+`OPCOS_WORKSPACES`, `init` đề xuất `<biến>/voice` (không tự đặt vào đó khi `--yes`) và `doctor` nhắc —
+resolver không đọc biến này.
 
 `<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO` — cách bản sao của máy
 chạy lịch tìm về bản clone, xem [`INSTALL.md`](INSTALL.md) mục 3). Cài dạng wheel không đặt biến thì
@@ -132,19 +133,19 @@ không tải gì).
 
 | Việc | Lệnh | Ghi chú |
 |---|---|---|
-| Kiểm trạm | `voice-studio doctor` | ĐỎ khi vừa có `workspace/` vừa có trạm ngoài; embedded: kiểm `workspace/`, `.env` không bị git theo dõi, repo không nằm trong OneDrive/Drive/iCloud/Dropbox, `.env` quyền 600 |
+| Kiểm trạm | `voice-studio doctor` | ĐỎ khi vừa có `workspaces/` vừa có trạm ngoài; embedded: kiểm `workspaces/`, `.env` không bị git theo dõi, repo không nằm trong OneDrive/Drive/iCloud/Dropbox, `.env` quyền 600 |
 | Cập nhật repo | `voice-studio update` | = `git pull --ff-only`. **Không bao giờ** xoá hay `git clean`. **Đừng xoá folder repo để cài lại** — ở chế độ embedded đó là xoá luôn giọng của bạn |
 | Sao lưu | `voice-studio backup --out trạm.zip` | cả trạm trừ venv, `cache/`, `out/`, `*.prompt.pt`; `.env` chỉ kèm khi thêm `--with-env` |
 | Chuyển máy | `voice-studio export --personal --out giong.zip` → máy mới: `voice-studio import giong.zip` | gói `voices/`, `assets/bgm/`, `station.json`; từ chối file trông như secret (`*token*`, `*secret*`, `.env`…); `import` không đè file trùng trừ khi `--force` |
-| Tách trạm ra ngoài | `voice-studio migrate --to separate [--station DIR]` | dời `workspace/` → DIR, `.env` → `~/.secret/voice-studio/.env`, ghi lại `studio.local.json`; đích phải rỗng. Thiếu `--station` thì HỎI nơi dời (gợi ý `<OPCOS_WORKSPACES>/voice` nếu có), hiện đường tuyệt đối + số file và dung lượng (KB/MB) và xin xác nhận y/N; từ chối đích nằm trong chính `workspace/`; đường dán có ngoặc kép (Copy as path) được bóc; không có người trả lời thì dừng mã 2 (`--non-interactive` cũng vậy) — không có đích mặc định |
+| Tách trạm ra ngoài | `voice-studio migrate --to separate [--station DIR]` | dời `workspaces/` → DIR, `.env` → `~/.secret/voice-studio/.env`, ghi lại `studio.local.json`; đích phải rỗng. Thiếu `--station` thì HỎI nơi dời (gợi ý `<OPCOS_WORKSPACES>/voice` nếu có), hiện đường tuyệt đối + số file và dung lượng (KB/MB) và xin xác nhận y/N; từ chối đích nằm trong chính `workspaces/`; đường dán có ngoặc kép (Copy as path) được bóc; không có người trả lời thì dừng mã 2 (`--non-interactive` cũng vậy) — không có đích mặc định |
 
 ## Rào của chế độ embedded (init tự dựng)
 
-- `.gitignore` của repo khoá `/workspace/`, `.env`, `.env.*` (trừ `.env.example`), `studio.local.json`
+- `.gitignore` của repo khoá `/workspaces/`, `.env`, `.env.*` (trừ `.env.example`), `studio.local.json`
   — test `tests/test_repo_gates.py` đỏ nếu ai xoá một dòng.
 - `<repo>/.env` được dọn sẵn từ `.env.example`, quyền 600 trên POSIX. Cùng bộ test còn kiểm
   rằng **mọi biến mã đọc đều có trong khuôn** — thiếu một dòng là người dùng không biết mình
   phải điền gì, và chỉ phát hiện ra lúc lệnh nổ giữa chừng.
-- Hook `pre-commit` (cài vào `.git/hooks/` nếu chưa có hook): chặn commit file dưới `workspace/`,
+- Hook `pre-commit` (cài vào `.git/hooks/` nếu chưa có hook): chặn commit file dưới `workspaces/`,
   `.env`, `studio.local.json`, và dòng thêm mới trông giống token. Hook đã có sẵn thì giữ nguyên.
 - `doctor` kiểm lại các rào trên mỗi lần chạy.

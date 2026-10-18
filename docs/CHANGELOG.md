@@ -6,25 +6,30 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
 
 ## Chưa phát hành
 
-**Đổi hành vi (hỏi thay vì đoán):** bản 0.4.0 còn để `init` tự nhận `~/.voice` nếu nó đã là trạm; nay
-không còn.
+**Đổi bố cục và đổi cách hỏi.**
 
-- `init` gặp một thư mục trạm cũ dưới home thì **hỏi** ba đường: dùng trạm mới (bảng nêu đúng đường
-  sẽ dùng — `<OPCOS_WORKSPACES>/voice` nếu biến đặt, không thì `<repo>/workspace/`; Enter = đường này)
-  · nhận trạm cũ · dời sang trạm mới (dừng, bạn dời tay rồi chạy lại). `--yes` (có hay không có
-  terminal) không bao giờ hỏi: dùng trạm mới `<repo>/workspace/` và in một dòng nêu trạm cũ cùng cách nhận
-  nó (`--station <đường>`). `--non-interactive` thiếu cả `--yes` lẫn `--mode` thì thoát mã 2, không đoán
-  chế độ. Ai quen `--mode separate` để nhận trạm cũ nay dùng `--station <đường>` hoặc trả lời [2] ở
-  bảng hỏi.
-- `separate` không còn đường mặc định ở home. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
+- **Tên thư mục trạm thống nhất.** Gốc luôn tên `workspaces`; trạm giọng khi cài cạnh OpcOS là
+  `<OPCOS_WORKSPACES>/voice`, còn cài riêng lẻ thì trạm là chính `<repo>/workspaces/` (đã nằm trong
+  repo nên không thêm `voice`). Trạm nhúng cũ tên số ít `<repo>/workspace/` vẫn dùng được: nếu nó đã là
+  một trạm mà `workspaces/` chưa có thì được nhận kèm một dòng nhắc đổi tên (không tự dời); có cả hai
+  thì `workspaces/` thắng và có dòng nhắc. `init` mới không bao giờ tạo tên số ít; `doctor` có dòng
+  `legacy-workspace` nhắc.
+- Thư mục trạm cũ ẩn trong thư mục cá nhân không còn được tự nhận; trỏ vào bằng `--station <đường>`.
+- **Cảnh báo:** có `OPCOS_WORKSPACES` thì Enter/xác nhận ở câu hỏi của `init` ra `<biến>/voice`, còn
+  `--yes` ra `<repo>/workspaces/` (`--yes` không bao giờ hỏi và không tự đặt vào thư mục dùng chung).
+- `init`: có `OPCOS_WORKSPACES` và có người trả lời thì hỏi một câu xác nhận/đổi (Enter = `<biến>/voice`);
+  không có biến thì câu hỏi hai đường (Enter = `<repo>/workspaces/`, nhãn in đúng đường). `--non-interactive`
+  thiếu cả `--yes` lẫn `--mode` thì thoát mã 2, không đoán chế độ.
+- `separate` không còn đường mặc định ở thư mục cá nhân. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
   `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — nếu thư mục đó đã mang dấu trạm thì dùng thẳng,
-  không hỏi; nếu chưa, có người thì hỏi xác nhận/đổi, không có người
-  thì (kể cả `--yes`) dùng luôn và in một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng
-  mã 2. `--station` trỏ vào một file giờ thoát mã 2 thay vì lỗi hệ điều hành.
-- `migrate --to separate` thiếu `--station` thì **hỏi nơi dời** (gợi ý `<OPCOS_WORKSPACES>/voice` nếu
-  có), hiện đường tuyệt đối cùng số file và dung lượng (KB/MB) rồi xin xác nhận y/N; không có người trả
-  lời (hoặc `--non-interactive`) thì dừng mã 2. Từ chối đích nằm trong chính `workspace/`; đường dán
-  kèm ngoặc kép ('Copy as path') được bóc ở mọi chỗ nhập đường.
+  không hỏi; nếu chưa, có người thì hỏi xác nhận/đổi, không có người thì (kể cả `--yes`) dùng luôn và in
+  một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2. `--station` trỏ vào một file
+  giờ thoát mã 2 thay vì lỗi hệ điều hành.
+- `migrate --to separate` (nguồn là `<repo>/workspaces/`, hoặc tên số ít cũ nếu chỉ có nó) thiếu
+  `--station` thì **hỏi nơi dời** (gợi ý `<OPCOS_WORKSPACES>/voice` nếu có), hiện đường tuyệt đối cùng
+  số file và dung lượng (KB/MB) rồi xin xác nhận y/N; không có người trả lời (hoặc `--non-interactive`)
+  thì dừng mã 2. Từ chối đích là file hoặc nằm trong chính thư mục đang dời; đường dán kèm ngoặc kép
+  ('Copy as path') được bóc ở mọi chỗ nhập đường.
 
 ## 0.4.0 — 2026-10-18
 

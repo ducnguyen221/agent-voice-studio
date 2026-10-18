@@ -249,10 +249,10 @@ def embedded_repo(tmp_path, monkeypatch, live):
     r = tmp_path / "repo"
     (r / "voice_studio").mkdir(parents=True)
     (r / "pyproject.toml").write_text("", encoding="utf-8")
-    shutil.move(str(live), str(r / "workspace"))
+    shutil.move(str(live), str(r / "workspaces"))
     (r / ".env").write_text("HF_TOKEN=gia\n", encoding="utf-8")
     (r / "studio.local.json").write_text(json.dumps(
-        {"mode": "embedded", "station_path": "workspace", "secrets": ".env"}), encoding="utf-8")
+        {"mode": "embedded", "station_path": "workspaces", "secrets": ".env"}), encoding="utf-8")
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
     return r
 
@@ -271,9 +271,9 @@ def test_backup_zips_workspace_without_env_by_default(embedded_repo, tmp_path):
 
 
 def test_migrate_to_separate_moves_workspace_and_env(embedded_repo, tmp_path):
-    target = tmp_path / "home" / ".voice"
+    target = tmp_path / "home" / "dich"
     res = station.migrate_to_separate(str(target))
-    assert not (embedded_repo / "workspace").exists()
+    assert not (embedded_repo / "workspaces").exists()
     assert (target / "omnivoice" / "voices" / "demo.wav").is_file()
     assert not (embedded_repo / ".env").exists()
     moved_env = tmp_path / "home" / ".secret" / "voice-studio" / ".env"
@@ -290,9 +290,9 @@ def test_migrate_checks_env_conflict_before_moving_anything(embedded_repo, tmp_p
     existing.parent.mkdir(parents=True)
     existing.write_text("CU=1\n", encoding="utf-8")
     with pytest.raises(station.ContractError, match="gộp tay"):
-        station.migrate_to_separate(str(tmp_path / "home" / ".voice"))
-    assert (embedded_repo / "workspace" / "station.json").is_file()
-    assert (embedded_repo / ".env").is_file() and not (tmp_path / "home" / ".voice").exists()
+        station.migrate_to_separate(str(tmp_path / "home" / "dich"))
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
+    assert (embedded_repo / ".env").is_file() and not (tmp_path / "home" / "dich").exists()
 
 
 def test_migrate_refuses_non_empty_target(embedded_repo, tmp_path):
@@ -301,7 +301,7 @@ def test_migrate_refuses_non_empty_target(embedded_repo, tmp_path):
     (target / "x").write_text("x", encoding="utf-8")
     with pytest.raises(station.ContractError):
         station.migrate_to_separate(str(target))
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 # ── migrate: hỏi rõ nơi dời; không bao giờ đoán một thư mục ẩn dưới home ──────────────────
@@ -325,11 +325,25 @@ def _opcos_var(tmp_path, monkeypatch, value=None):
     return ws
 
 
+def test_migrate_accepts_the_old_singular_workspace_as_source(tmp_path, monkeypatch):
+    r = tmp_path / "repo"
+    (r / "voice_studio").mkdir(parents=True)
+    (r / "pyproject.toml").write_text("", encoding="utf-8")
+    old = r / "workspace"
+    (old / "omnivoice" / "voices").mkdir(parents=True)
+    (old / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
+    dest = tmp_path / "ngoai"
+    res = station.migrate_to_separate(str(dest))
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(dest))
+    assert (dest / "station.json").is_file() and not old.exists()
+
+
 def test_migrate_without_a_target_has_no_default(embedded_repo, tmp_path):
     with pytest.raises(station.ContractError, match="--station"):
         station.migrate_to_separate(None)
-    assert (embedded_repo / "workspace" / "station.json").is_file()
-    assert not (tmp_path / "home" / ".voice").exists()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
+    assert not (tmp_path / "home" / "dich").exists()
 
 
 @pytest.mark.parametrize("argv", [["migrate", "--to", "separate", "--non-interactive", "--json"],
@@ -354,7 +368,7 @@ def test_migrate_cli_with_station_moves_without_asking(embedded_repo, tmp_path, 
 
 def test_migrate_asks_where_and_confirms_with_counts(embedded_repo, tmp_path, monkeypatch):
     ws = _opcos_var(tmp_path, monkeypatch)
-    files = [os.path.join(dp, n) for dp, _d, fn in os.walk(embedded_repo / "workspace") for n in fn]
+    files = [os.path.join(dp, n) for dp, _d, fn in os.walk(embedded_repo / "workspaces") for n in fn]
     files.append(str(embedded_repo / ".env"))                   # .env đi theo trạm
     n_files, size = len(files), sum(os.path.getsize(f) for f in files)
     prompts = []
@@ -363,7 +377,7 @@ def test_migrate_asks_where_and_confirms_with_counts(embedded_repo, tmp_path, mo
     want = os.path.abspath(str(ws / "voice"))
     assert os.path.normcase(res["station"]) == os.path.normcase(want)
     assert (ws / "voice" / "omnivoice" / "voices" / "demo.wav").is_file()
-    assert not (embedded_repo / "workspace").exists()
+    assert not (embedded_repo / "workspaces").exists()
     ask_where, confirm = prompts
     assert want in ask_where                                    # gợi ý hiện đường tuyệt đối
     assert want in confirm and "y/N" in confirm
@@ -384,8 +398,8 @@ def test_migrate_without_opcos_var_has_no_suggestion_and_enter_cancels(embedded_
     prompts = []
     with pytest.raises(station.ContractError, match="huỷ"):
         station.do_migrate(ask=lambda p: prompts.append(p) or "")
-    assert len(prompts) == 1 and ".voice" not in prompts[0]
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert len(prompts) == 1 and "Gợi ý" not in prompts[0]
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 def test_migrate_typed_path_is_made_absolute_and_confirmed(embedded_repo, tmp_path, monkeypatch):
@@ -419,12 +433,12 @@ def test_migrate_rejects_busy_target_before_confirming(embedded_repo, tmp_path, 
     with pytest.raises(station.ContractError, match="không rỗng"):
         station.do_migrate(ask=lambda p: prompts.append(p) or "")
     assert len(prompts) == 1                                    # chưa tới câu xác nhận
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 @pytest.mark.parametrize("sub", ["sub/x", "sub", ""])
 def test_migrate_target_inside_the_source_is_refused_cleanly(sub, embedded_repo):
-    ws = embedded_repo / "workspace"
+    ws = embedded_repo / "workspaces"
     target = ws / sub if sub else ws
     before = _tree_snapshot(embedded_repo)
     with pytest.raises(station.ContractError, match="nằm trong"):
@@ -434,10 +448,10 @@ def test_migrate_target_inside_the_source_is_refused_cleanly(sub, embedded_repo)
 
 def test_migrate_typed_target_inside_the_source_is_refused_before_confirming(embedded_repo):
     prompts = []
-    inside = embedded_repo / "workspace" / "sub" / "x"
+    inside = embedded_repo / "workspaces" / "sub" / "x"
     with pytest.raises(station.ContractError, match="nằm trong"):
         station.do_migrate(ask=lambda p: prompts.append(p) or str(inside))
-    assert len(prompts) == 1 and not (embedded_repo / "workspace" / "sub").exists()
+    assert len(prompts) == 1 and not (embedded_repo / "workspaces" / "sub").exists()
 
 
 def test_migrate_typed_path_with_quotes_is_unwrapped(embedded_repo, tmp_path):
@@ -489,7 +503,7 @@ def test_migrate_failure_leaves_the_users_empty_target_directory_in_place(embedd
     with pytest.raises(station.ContractError, match="giả"):
         station.migrate_to_separate(str(dest))
     assert dest.is_dir() and not os.listdir(dest)
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 def test_migrate_station_pointing_at_a_file_is_code_2(embedded_repo, tmp_path, capsys):
@@ -499,7 +513,7 @@ def test_migrate_station_pointing_at_a_file_is_code_2(embedded_repo, tmp_path, c
     out, err = capsys.readouterr()
     assert rc == 2 and last_json(out)["ok"] is False and "thư mục" in err
     assert "Traceback" not in err and f.read_text(encoding="utf-8") == "x"
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 def test_migrate_typed_file_answer_is_a_contract_error(embedded_repo, tmp_path):
@@ -534,7 +548,7 @@ def test_migrate_eof_is_a_contract_error(embedded_repo, tmp_path, monkeypatch):
         raise EOFError
     with pytest.raises(station.ContractError, match="--station"):
         station.do_migrate(ask=eof)
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 # ── update = git pull --ff-only, không bao giờ xoá ────────────────────────────────────────
@@ -615,14 +629,14 @@ def test_doctor_red_on_broken_station_json(tmp_path, monkeypatch):
 @pytest.mark.skipif(not HAS_GIT, reason="cần git")
 def test_doctor_red_when_workspace_is_tracked(embedded_repo):
     git(embedded_repo, "init")
-    git(embedded_repo, "add", "-f", "workspace/station.json")
+    git(embedded_repo, "add", "-f", "workspaces/station.json")
     c = by_name(doctor.run_checks())
     assert c["git-tracked"]["level"] == "error"
 
 
 def test_doctor_warns_cloud_synced_repo(tmp_path, monkeypatch):
     r = tmp_path / "OneDrive - X" / "repo"
-    (r / "workspace").mkdir(parents=True)
+    (r / "workspaces").mkdir(parents=True)
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
     assert by_name(doctor.run_checks())["cloud-sync"]["level"] == "warn"
 
@@ -647,7 +661,8 @@ def stage(repo, rel, text):
 
 
 @pytest.mark.parametrize("rel,text,blocked", [
-    ("workspace/omnivoice/voices/a.txt", "x", True),
+    ("workspaces/omnivoice/voices/a.txt", "x", True),
+    ("workspace/omnivoice/voices/a.txt", "x", True),          # tên cũ (số ít) vẫn bị chặn
     (".env", "A=1", True),
     ("studio.local.json", "{}", True),
     (".env.example", "HF_TOKEN=", False),
@@ -702,12 +717,12 @@ def test_uninstall_dry_run_touches_nothing(embedded_repo, pip_calls, capsys):
 def test_uninstall_yes_removes_hook_and_package_keeps_station(embedded_repo, pip_calls, capsys):
     import sys
     hook = put_hook(embedded_repo, station._hook_text())
-    before = tree_hash(embedded_repo / "workspace")
+    before = tree_hash(embedded_repo / "workspaces")
     rc = cli.main(["uninstall", "--yes", "--json"])
     res = last_json(capsys.readouterr().out)
     assert rc == 0 and not hook.exists()
     assert pip_calls == [[sys.executable, "-m", "pip", "uninstall", "-y", "agent-voice-studio"]]
-    assert tree_hash(embedded_repo / "workspace") == before          # giọng không suy suyển
+    assert tree_hash(embedded_repo / "workspaces") == before          # giọng không suy suyển
     assert (embedded_repo / ".env").is_file() and (embedded_repo / "studio.local.json").is_file()
     assert any("workspace" in k for k in res["kept"])
     assert any("claude plugin uninstall" in c for c in res["host_commands"])
@@ -735,7 +750,7 @@ def test_uninstall_pip_failure_is_1_and_names_the_command(embedded_repo, monkeyp
     rc = cli.main(["uninstall", "--yes", "--json"])
     res = last_json(capsys.readouterr().out)
     assert rc == 1 and "pip uninstall" in res["error"]
-    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert (embedded_repo / "workspaces" / "station.json").is_file()
 
 
 # ── doctor: bốn trạng thái ─────────────────────────────────────────────────────────────
@@ -832,14 +847,38 @@ def test_doctor_notes_opcos_dir_without_marker(bare_repo, tmp_path, monkeypatch)
     assert "chưa là trạm" in c["detail"] + c["hint"]
 
 
-def test_doctor_has_no_home_station_warning(bare_repo, sandbox_home):
-    assert _env.has_marker(_env.legacy_station())            # trạm mồi ~/.voice có thật
+def test_doctor_has_no_station_source_warning(bare_repo, sandbox_home):
     names = by_name(doctor.run_checks())
     assert "station-source" not in names
-    assert not any("được nhận vì nó đã có sẵn" in c["hint"] for c in names.values())
+    assert "legacy-workspace" not in names
 
 
-def test_doctor_two_sources_ignores_home_station(embedded_repo, sandbox_home):
-    assert _env.has_marker(_env.legacy_station())
-    c = by_name(doctor.run_checks())
-    assert "two-sources" not in c or c["two-sources"]["ok"]
+def _singular_station(repo):
+    d = repo / "workspace"
+    (d / "omnivoice" / "voices").mkdir(parents=True)
+    (d / "station.json").write_text("{}", encoding="utf-8")
+    return d
+
+
+def test_doctor_warns_when_the_station_still_uses_the_singular_name(tmp_path, monkeypatch):
+    r = tmp_path / "repo"
+    (r / "voice_studio").mkdir(parents=True)
+    (r / "pyproject.toml").write_text("", encoding="utf-8")
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
+    _singular_station(r)
+    c = by_name(doctor.run_checks())["legacy-workspace"]
+    assert c["level"] == "warn" and "workspaces" in c["hint"]
+
+
+def test_doctor_warns_when_both_layouts_exist(embedded_repo):
+    _singular_station(embedded_repo)
+    c = by_name(doctor.run_checks())["legacy-workspace"]
+    assert c["level"] == "warn" and "workspaces" in c["hint"]
+
+
+def test_doctor_tracked_check_covers_the_singular_name(embedded_repo):
+    git(embedded_repo, "init")
+    (embedded_repo / "workspace").mkdir()
+    (embedded_repo / "workspace" / "station.json").write_text("{}", encoding="utf-8")
+    git(embedded_repo, "add", "-f", "workspace/station.json")
+    assert by_name(doctor.run_checks())["git-tracked"]["level"] == "error"

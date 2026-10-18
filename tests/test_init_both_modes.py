@@ -58,7 +58,7 @@ def tree_ok(st):
 def test_enter_means_embedded(repo, home):
     prompts = []
     res = station.do_init(ask=lambda p: prompts.append(p) or "")
-    ws = repo / "workspace"
+    ws = repo / "workspaces"
     info = tree_ok(ws)
     assert res["mode"] == "embedded" and info["mode"] == "embedded"
     assert os.path.normcase(res["station"]) == os.path.normcase(str(ws))
@@ -66,7 +66,7 @@ def test_enter_means_embedded(repo, home):
     table = prompts[0]
     assert "embedded" in table and "separate" in table and "KHUYẾN NGHỊ" in table
     local = json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))
-    assert local["mode"] == "embedded" and local["station_path"] == "workspace"
+    assert local["mode"] == "embedded" and local["station_path"] == "workspaces"
     assert "secrets" in local
     # cây mẫu được chép: giọng ví dụ trung tính (không audio)
     assert (ws / "omnivoice" / "voices" / "_example" / "README.md").is_file()
@@ -74,7 +74,6 @@ def test_enter_means_embedded(repo, home):
     # từ giờ mọi script phân giải ra đúng trạm này
     st, src = _env.resolve_station()
     assert os.path.normcase(st) == os.path.normcase(str(ws)) and src == "studio.local.json"
-    assert not home.exists() or not (home / ".voice").exists()
 
 
 def test_the_choice_table_says_where_the_secrets_live(repo):
@@ -89,7 +88,7 @@ def test_the_choice_table_says_where_the_secrets_live(repo):
 
 def test_yes_flag_accepts_recommended_embedded(repo):
     res = station.do_init(yes=True, ask=never_ask)
-    assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
+    assert res["mode"] == "embedded" and (repo / "workspaces" / "station.json").is_file()
 
 
 def test_answer_2_asks_where_the_separate_station_goes(repo, tmp_path):
@@ -102,7 +101,7 @@ def test_answer_2_asks_where_the_separate_station_goes(repo, tmp_path):
     assert res["mode"] == "separate"
     tree_ok(dest)
     assert len(prompts) == 2 and "đường" in prompts[1]
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
     local = json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))
     assert local["mode"] == "separate"
     assert os.path.normcase(local["station_path"]) == os.path.normcase(str(dest))
@@ -112,14 +111,13 @@ def test_answer_2_with_empty_path_stops_and_writes_nothing(repo, tmp_path):
     answers = iter(["2", "  "])
     with pytest.raises(station.ContractError, match="--station"):
         station.do_init(ask=lambda p: next(answers))
-    assert not (repo / "workspace").exists() and not (repo / "studio.local.json").exists()
+    assert not (repo / "workspaces").exists() and not (repo / "studio.local.json").exists()
 
 
 def test_mode_separate_without_a_path_needs_station_when_nobody_can_answer(repo, home):
     """Không OPCOS_WORKSPACES, không --station, không người: không có đường mặc định nào để đoán."""
     with pytest.raises(station.ContractError, match="--station"):
         station.do_init(mode="separate", non_interactive=True)
-    assert not (home / ".voice").exists()
 
 
 def test_mode_separate_without_a_path_asks_for_one_when_someone_can_answer(repo, tmp_path):
@@ -135,7 +133,7 @@ def test_mode_separate_without_a_path_asks_for_one_when_someone_can_answer(repo,
 def test_mode_separate_empty_path_answer_stops(repo, home):
     with pytest.raises(station.ContractError, match="--station"):
         station.do_init(mode="separate", ask=lambda p: "")
-    assert not (repo / "workspace").exists() and not (repo / "studio.local.json").exists()
+    assert not (repo / "workspaces").exists() and not (repo / "studio.local.json").exists()
 
 
 @pytest.mark.parametrize("wrap", ['"{}"', "'{}'", ' "{}" '])
@@ -181,7 +179,7 @@ def test_opcos_workspaces_is_read_in_exactly_one_place():
 def test_bad_answer_is_contract_error(repo):
     with pytest.raises(station.ContractError):
         station.do_init(ask=lambda p: "ba")
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
 
 
 # ── embedded: `.env` phải có thật, và phải có người đọc nó ───────────────────────────────
@@ -241,7 +239,7 @@ def test_a_dotenv_can_never_move_the_repo_or_the_station(var, repo):
     assert _env.env(var) != "/khong/ton/tai"                 # nhưng env() không lấy từ đó
     assert os.path.normcase(_env.repo_root()) == os.path.normcase(str(repo))
     st, src = _env.resolve_station()
-    assert os.path.normcase(st) == os.path.normcase(str(repo / "workspace"))
+    assert os.path.normcase(st) == os.path.normcase(str(repo / "workspaces"))
     assert src == "studio.local.json"
 
 
@@ -257,12 +255,12 @@ def test_no_one_to_answer_is_code_2_and_writes_nothing(argv, repo, home, capsys)
     assert "embedded" in err and "separate" in err and "KHUYẾN NGHỊ" in err
     assert "--mode" in err                      # agent phải biết chạy lại thế nào
     assert last_json(out)["ok"] is False
-    assert snapshot(repo) == before and not (home / ".voice").exists()
+    assert snapshot(repo) == before
 
 
 def test_non_interactive_with_a_choice_goes_through(repo):
     rc = cli.main(["init", "--non-interactive", "--yes", "--json"])
-    assert rc == 0 and (repo / "workspace" / "station.json").is_file()
+    assert rc == 0 and (repo / "workspaces" / "station.json").is_file()
 
 
 def test_embedded_installs_precommit_hook_without_overwriting(repo):
@@ -290,7 +288,7 @@ def test_station_flag_is_separate_without_asking(repo, tmp_path):
     res = station.do_init(station=str(st), ask=never_ask)
     assert res["mode"] == "separate" and res["reason"] == "--station"
     tree_ok(st)
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
     local = json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))
     assert os.path.normcase(local["station_path"]) == os.path.normcase(str(st))
 
@@ -302,153 +300,93 @@ def test_env_station_forces_separate_even_with_yes(var, repo, tmp_path, monkeypa
     res = station.do_init(yes=True, ask=never_ask)
     assert res["mode"] == "separate" and var in res["reason"]
     assert os.path.normcase(res["station"]) == os.path.normcase(str(st))
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
 
 
 def test_env_station_refuses_explicit_embedded(repo, tmp_path, monkeypatch):
     monkeypatch.setenv("VOICE_STATION", str(tmp_path / "st"))
     with pytest.raises(station.ContractError, match="hai nguồn"):
         station.do_init(mode="embedded")
+    assert not (repo / "workspaces").exists()
+
+
+# ── bố cục trạm nhúng: <repo>/workspaces (tên số ít cũ vẫn được nhận, không bao giờ tạo mới) ──
+
+def _old_station(repo):
+    d = repo / "workspace"
+    (d / "omnivoice" / "voices").mkdir(parents=True)
+    (d / "station.json").write_text("{}", encoding="utf-8")
+    return d
+
+
+def test_new_station_lives_in_workspaces_and_never_singular(repo):
+    res = station.do_init(yes=True)
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(repo / "workspaces"))
+    assert (repo / "workspaces" / "station.json").is_file()
     assert not (repo / "workspace").exists()
 
 
-# Thay `test_home_voice_with_marker_forces_separate`: một thư mục ẩn dưới home mang dấu trạm là
-# trạm CŨ cần quyết định, không phải trạm mặc định — `init` hỏi, không tự nhận.
-
-def _legacy(home):
-    (home / ".voice" / "omnivoice" / "voices").mkdir(parents=True)
-    return home / ".voice"
-
-
-def test_legacy_home_station_is_asked_not_adopted(repo, home):
-    legacy = _legacy(home)
-    before = snapshot(home)
-    prompts = []
-    res = station.do_init(ask=lambda p: prompts.append(p) or "")      # Enter = lựa chọn đầu
-    assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
-    t = prompts[0]
-    # nhãn [1] khớp ĐƯỜNG THẬT sẽ dùng (không nói một đằng làm một nẻo)
-    option1 = t.split("[2]")[0]
-    assert str(legacy) in t and os.path.normcase(str(repo / "workspace")) in os.path.normcase(option1)
+def test_old_singular_workspace_is_adopted_with_one_line(repo, capsys):
+    old = _old_station(repo)
+    res = station.do_init(yes=True)
     assert res["mode"] == "embedded"
-    assert os.path.normcase(res["station"]) == os.path.normcase(str(repo / "workspace"))
-    assert "[1]" in t and "[2]" in t and "[3]" in t
-    assert "KHUYẾN NGHỊ" in t.split("[2]")[0]                          # [1] là khuyến nghị
-    assert snapshot(home) == before                                    # trạm cũ không bị đụng
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(old))
+    assert not (repo / "workspaces").exists()                      # không dựng trạm thứ hai
+    _out, err = capsys.readouterr()
+    lines = [ln for ln in err.splitlines() if "workspaces" in ln and "workspace" in ln]
+    assert len(lines) == 1 and str(old) in lines[0]                # MỘT dòng khuyến nghị đổi tên
 
 
-def test_legacy_home_station_answer_2_adopts_it(repo, home):
-    legacy = _legacy(home)
-    res = station.do_init(ask=lambda p: "2")
-    assert res["mode"] == "separate"
-    assert os.path.normcase(res["station"]) == os.path.normcase(str(legacy))
-    assert "người dùng" in res["reason"]
-    assert not (repo / "workspace").exists()
+def test_old_singular_workspace_resolves_for_every_command(repo, capsys):
+    old = _old_station(repo)
+    st, src = _env.resolve_station()
+    assert os.path.normcase(st) == os.path.normcase(str(old)) and src == "workspace"
 
 
-def test_legacy_home_station_answer_3_stops_with_move_instructions(repo, home):
-    legacy = _legacy(home)
-    before = snapshot(home)
-    with pytest.raises(station.ContractError, match="workspace"):
-        station.do_init(ask=lambda p: "3")
-    assert snapshot(home) == before
-    assert not (repo / "workspace").exists() and not (repo / "studio.local.json").exists()
-    assert legacy.is_dir()
+def test_both_layouts_prefer_workspaces_and_say_so(repo, capsys):
+    _old_station(repo)
+    (repo / "workspaces").mkdir(parents=True)
+    st, src = _env.resolve_station()
+    assert os.path.normcase(st) == os.path.normcase(str(repo / "workspaces"))
+    assert src == "workspaces"
+    _out, err = capsys.readouterr()
+    assert "workspace" in err and "workspaces" in err
 
 
-def test_legacy_home_station_bad_answer_or_eof_stops(repo, home):
-    _legacy(home)
-    with pytest.raises(station.ContractError):
-        station.do_init(ask=lambda p: "ba")
-
-    def eof(_p):
-        raise EOFError
-    with pytest.raises(station.ContractError, match="--station"):
-        station.do_init(ask=eof)
-    assert not (repo / "workspace").exists()
+def test_empty_singular_workspace_is_not_a_station(repo):
+    (repo / "workspace").mkdir()                                  # không có dấu trạm: bỏ qua
+    res = station.do_init(yes=True)
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(repo / "workspaces"))
 
 
-def test_legacy_home_station_answer_1_uses_opcos_station_when_there_is_one(repo, tmp_path, monkeypatch, home):
-    _legacy(home)
-    ws = tmp_path / "opcos-ws"
-    (ws / "voice").mkdir(parents=True)
-    (ws / "voice" / "station.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
-    res = station.do_init(ask=lambda p: "1")
-    assert res["mode"] == "separate"
-    assert os.path.normcase(res["station"]) == os.path.normcase(str(ws / "voice"))
-
-
-@pytest.mark.parametrize("flags", [["--yes"], ["--non-interactive", "--yes"]])
-def test_legacy_home_station_is_never_adopted_without_a_person(flags, repo, home, capsys):
-    legacy = _legacy(home)
-    rc = cli.main(["init", "--json", *flags])
-    out, err = capsys.readouterr()
-    res = last_json(out)
-    assert rc == 0 and res["mode"] == "embedded"
-    assert os.path.normcase(res["station"]) == os.path.normcase(str(repo / "workspace"))
-    # một dòng cho người đọc: trạm cũ có đó, nhận nó bằng cách nào
-    assert str(legacy) in err and f"--station {legacy}" in err
-    assert not (legacy / "station.json").exists()
-
-
-def test_legacy_home_station_without_a_choice_is_code_2(repo, home, capsys):
-    legacy = _legacy(home)
-    before = snapshot(home, repo)
-    rc = cli.main(["init", "--non-interactive", "--json"])
-    out, err = capsys.readouterr()
-    assert rc == 2 and last_json(out)["ok"] is False
-    assert str(legacy) in err and "--station" in err
-    assert snapshot(home, repo) == before
-
-
-def test_legacy_home_station_does_not_block_explicit_embedded(repo, home):
-    legacy = _legacy(home)
-    res = station.do_init(mode="embedded", ask=never_ask)
-    assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
-    assert not (legacy / "station.json").exists()
-
-
-def test_legacy_home_station_is_not_asked_again_after_a_choice(repo, home):
-    _legacy(home)
-    (repo / "studio.local.json").write_text(json.dumps({"mode": "embedded"}), encoding="utf-8")
-    res = station.do_init(ask=never_ask)
-    assert res["mode"] == "embedded"
-
-
-def test_explicit_station_flag_still_adopts_the_legacy_directory(repo, home):
-    legacy = _legacy(home)
-    res = station.do_init(station=str(legacy), existing=True, ask=never_ask)
-    assert res["mode"] == "separate" and res["reason"] == "--station"
-
-
-def test_no_default_home_station_wording_left_in_code():
-    """Không dòng mã/doc nào còn gọi `~/.voice` là đường mặc định."""
-    import re
+def test_no_home_directory_station_is_mentioned_anywhere():
+    """Không còn dạng thư mục trạm ẩn dưới home: mã, test, tài liệu, trợ giúp (trừ lịch sử phát hành)."""
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    bad = re.compile(r"(mặc định|mac dinh|default)[^\n]{0,24}~/\.voice|~/\.voice[^\n]{0,24}(mặc định|default)",
-                     re.IGNORECASE)
+    import re
+    # tên thư mục ẩn dưới home (ghép chuỗi để file này không tự bắt mình); `x.voices_dir` / `self.voice` không tính
+    needle = re.compile(r"(?<![A-Za-z0-9_)\]])\." + "voice" + r"(?![A-Za-z0-9_])")
+    allowed_changelog_prefix = "## 0.4.0"
     hits = []
-    for sub in ("voice_studio", "docs", "skills", "templates", "README.md", "README.vi.md",
-                "GUIDE.md", "GUIDE.vi.md", "INSTALL.md", "START-HERE.md"):
+    for sub in ("voice_studio", "studio", "tests", "docs", "skills", "templates", "hosts", "samples",
+                "extras", "README.md", "README.vi.md", "GUIDE.md", "GUIDE.vi.md", "INSTALL.md",
+                "START-HERE.md", "AGENTS.md", "ECOSYSTEM.md", ".env.example", ".gitignore", "pyproject.toml"):
         top = os.path.join(root, sub)
+        if not os.path.exists(top):
+            continue
         files = ([top] if os.path.isfile(top) else
                  [os.path.join(dp, n) for dp, _d, fn in os.walk(top) for n in fn
-                  if n.endswith((".py", ".md", ".html", ".json"))])
+                  if n.endswith((".py", ".md", ".html", ".json", ".txt", ".example", ".toml"))
+                  and "__pycache__" not in dp])
         for f in files:
+            text = open(f, encoding="utf-8", errors="replace").read()
             if os.path.basename(f) == "CHANGELOG.md":
-                continue                                  # lịch sử phát hành kể chuyện cũ
-            for i, line in enumerate(open(f, encoding="utf-8"), 1):
-                if bad.search(line):
+                head = text.split(allowed_changelog_prefix)[0]       # mục "Chưa phát hành" phải sạch
+                text = head
+            for i, line in enumerate(text.splitlines(), 1):
+                if needle.search(line):
                     hits.append(f"{os.path.relpath(f, root)}:{i}")
     assert not hits, hits
-    assert not hasattr(_env, "default_station")
-
-
-def test_home_voice_without_marker_is_not_a_station(repo, home):
-    (home / ".voice").mkdir(parents=True)          # thư mục rỗng: chưa phải trạm
-    res = station.do_init(ask=lambda p: "")
-    assert res["mode"] == "embedded"
+    assert not hasattr(_env, "legacy_station") and not hasattr(_env, "default_station")
 
 
 # ── --dry-run, --existing, chạy lại ──────────────────────────────────────────────────────
@@ -496,7 +434,7 @@ def test_eof_on_prompt_is_contract_error(repo):
         raise EOFError
     with pytest.raises(station.ContractError, match="--mode"):
         station.do_init(ask=eof)
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
 
 
 def test_existing_on_missing_dir_is_2(repo, tmp_path, capsys):
@@ -510,7 +448,7 @@ def test_rerun_reuses_previous_separate_station(repo, tmp_path):
     res = station.do_init(ask=never_ask)           # chạy lại không cờ: không hỏi, cùng trạm
     assert res["mode"] == "separate"
     assert os.path.normcase(res["station"]) == os.path.normcase(str(st))
-    assert not (repo / "workspace").exists()
+    assert not (repo / "workspaces").exists()
 
 
 def test_rerun_keeps_user_edits(repo, tmp_path):
@@ -626,7 +564,6 @@ def read_local(repo):
 
 
 def test_init_mode_separate_defaults_to_opcos_station_and_writes_absolute_path(repo, opcos, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()      # chỉ còn trạm OpcOS, không ext ở home
     before = set(os.listdir(opcos.parent))
     res = station.do_init(mode="separate", ask=never_ask)
     assert res["mode"] == "separate"
@@ -634,13 +571,11 @@ def test_init_mode_separate_defaults_to_opcos_station_and_writes_absolute_path(r
     local = read_local(repo)
     assert local["mode"] == "separate" and local["station_path"] == os.path.abspath(str(opcos))
     assert set(os.listdir(opcos.parent)) == before           # không tạo trạm/thư mục anh em
-    assert not (repo / "workspace").exists()
-    assert not (sandbox_home / ".voice" / "omnivoice").exists()
+    assert not (repo / "workspaces").exists()
 
 
 def test_init_separate_relative_opcos_workspaces_writes_absolute_path(repo, tmp_path, monkeypatch, sandbox_home):
     """OPCOS_WORKSPACES tương đối + cwd ≠ repo: station_path vẫn tuyệt đối và resolve_station() đúng."""
-    (sandbox_home / ".voice" / "station.json").unlink()
     cwd = tmp_path / "elsewhere"
     (cwd / "ws" / "voice").mkdir(parents=True)
     (cwd / "ws" / "voice" / "station.json").write_text("{}", encoding="utf-8")
@@ -656,56 +591,52 @@ def test_init_separate_relative_opcos_workspaces_writes_absolute_path(repo, tmp_
     assert os.path.normcase(got) == os.path.normcase(want)
 
 
-def test_init_interactive_proposes_opcos_station(repo, opcos, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
+def test_init_interactive_with_opcos_var_asks_to_confirm_or_change(repo, opcos, sandbox_home, tmp_path):
     prompts = []
-    res = station.do_init(ask=lambda p: prompts.append(p) or "2")
-    assert str(opcos) in prompts[0]                          # bảng nêu đường trạm OpcOS
+    res = station.do_init(ask=lambda p: prompts.append(p) or "")          # Enter = nhận đề xuất
+    assert len(prompts) == 1 and os.path.normcase(str(opcos)) in os.path.normcase(prompts[0])
     assert res["mode"] == "separate"
     assert os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
     assert read_local(repo)["station_path"] == os.path.abspath(str(opcos))
-    # trả lời nhận embedded → embedded
+    # gõ đường khác → dùng đường đó
     (repo / "studio.local.json").unlink()
-    res = station.do_init(ask=lambda p: "1")
-    assert res["mode"] == "embedded"
-    assert read_local(repo)["station_path"] == "workspace"
+    other = tmp_path / "khac"
+    res = station.do_init(ask=lambda p: f'"{other}"')
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(other))
+    assert read_local(repo)["station_path"] == os.path.abspath(str(other))
+    assert not (repo / "workspaces").exists()
 
 
 def test_init_yes_with_opcos_var_stays_embedded(repo, opcos, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
     res = station.do_init(yes=True, ask=never_ask)
     assert res["mode"] == "embedded"
-    assert read_local(repo)["station_path"] == "workspace"
+    assert read_local(repo)["station_path"] == "workspaces"
     assert str(opcos) not in json.dumps(read_local(repo))
 
 
 def test_init_mode_embedded_allowed_with_opcos_var(repo, opcos, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
     res = station.do_init(mode="embedded", ask=never_ask)    # không ContractError
-    assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
+    assert res["mode"] == "embedded" and (repo / "workspaces" / "station.json").is_file()
 
 
 def test_init_again_on_embedded_clone_is_not_flipped(repo, opcos, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
     (repo / "studio.local.json").write_text(json.dumps({"mode": "embedded"}), encoding="utf-8")
     res = station.do_init(ask=never_ask)
     assert res["mode"] == "embedded"
-    assert read_local(repo)["station_path"] == "workspace"
+    assert read_local(repo)["station_path"] == "workspaces"
 
 
 def test_init_yes_ignores_opcos_dir_without_marker(repo, tmp_path, monkeypatch, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
     (tmp_path / "bare-ws" / "voice").mkdir(parents=True)     # thư mục có, không dấu trạm
     monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
     res = station.do_init(yes=True, ask=never_ask)
     assert res["mode"] == "embedded" and "station_path" in read_local(repo)
-    assert read_local(repo)["station_path"] == "workspace"
+    assert read_local(repo)["station_path"] == "workspaces"
 
 
 def test_init_prev_separate_without_station_path_needs_a_station(repo, opcos, sandbox_home):
     # Thay `..._ignores_opcos`: lựa chọn đã ghi (`mode: separate`, chưa có station_path) thắng —
     # KHÔNG đề xuất trạm OpcOS, và cũng không còn đường mặc định để đoán: phải chỉ `--station`.
-    (sandbox_home / ".voice" / "station.json").unlink()
     (repo / "studio.local.json").write_text(json.dumps({"mode": "separate"}), encoding="utf-8")
     with pytest.raises(station.ContractError, match="--station"):
         station.do_init(ask=never_ask, dry_run=True)
@@ -714,7 +645,6 @@ def test_init_prev_separate_without_station_path_needs_a_station(repo, opcos, sa
 @pytest.fixture
 def bare_opcos(repo, tmp_path, monkeypatch, sandbox_home):
     """OPCOS_WORKSPACES có, `<biến>/voice` CHƯA mang dấu trạm (thư mục trống hoặc chưa có)."""
-    (sandbox_home / ".voice" / "station.json").unlink()
     base = tmp_path / "bare-ws"
     (base / "voice").mkdir(parents=True)
     monkeypatch.setenv("OPCOS_WORKSPACES", str(base))
@@ -754,7 +684,6 @@ def test_init_mode_separate_opcos_cli_non_interactive(repo, bare_opcos, capsys):
 
 
 def test_init_mode_separate_relative_opcos_is_absolute(repo, tmp_path, monkeypatch, sandbox_home):
-    (sandbox_home / ".voice" / "station.json").unlink()
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("OPCOS_WORKSPACES", "rel-ws")
     res = station.do_init(mode="separate", non_interactive=True, dry_run=True)
@@ -769,12 +698,19 @@ def test_init_prev_separate_ignores_the_unmarked_opcos_dir(repo, bare_opcos):
         station.do_init(ask=never_ask, dry_run=True)
 
 
-def test_init_without_opcos_var_asks_about_the_marked_home_directory(repo, sandbox_home):
-    # Thay `..._unchanged`: biến vắng + trạm cũ mang dấu (trạm mồi) → hỏi, không tự nhận.
+def test_init_without_opcos_var_asks_the_two_way_question_and_names_the_real_path(repo, sandbox_home):
+    # Thay `..._asks_about_the_marked_home_directory`: không còn trạm cũ dưới home để hỏi.
     prompts = []
     res = station.do_init(ask=lambda p: prompts.append(p) or "")
     assert res["mode"] == "embedded"
-    assert os.path.normcase(str(repo / "workspace")) in os.path.normcase(prompts[0])
+    assert os.path.normcase(str(repo / "workspaces")) in os.path.normcase(prompts[0])
+
+
+def test_init_opcos_confirmation_non_interactive_without_yes_or_mode_is_code_2(repo, opcos, capsys):
+    rc = cli.main(["init", "--non-interactive", "--json"])
+    out, _err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["ok"] is False
+    assert not (repo / "workspaces").exists() and not (repo / "studio.local.json").exists()
 
 
 def test_init_opcos_var_does_not_override_detected_external(repo, opcos, tmp_path, monkeypatch):

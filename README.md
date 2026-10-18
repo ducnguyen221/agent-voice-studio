@@ -90,7 +90,7 @@ lives in
 [`docs/INSTALL.md` section 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **presents a two-option table before doing anything**, rather than asking an open
-question. `embedded` — station at `<repo>/workspace/`, configuration in `<repo>/.env` — is
+question. `embedded` — station at `<repo>/workspaces/`, configuration in `<repo>/.env` — is
 the **recommendation**: press Enter and you are done, with no environment variables to set.
 Choose `separate` when you work across machines, are comfortable with the technical side, or
 this repository is your own public fork. With nobody to answer (CI, a scheduled task) `init`
@@ -98,7 +98,7 @@ prints that table and **exits with code 2 without writing a byte** — an instal
 show the table to the user instead of choosing silently.
 
 `embedded` means clone-and-run: `init` lays down the station tree and copies `.env.example`
-to `<repo>/.env` for you to fill in. Both `workspace/` and `.env` are blocked by
+to `<repo>/.env` for you to fill in. Both `workspaces/` and `.env` are blocked by
 `.gitignore` and again by the `pre-commit` hook. `.env` holds **paths and configuration**,
 never tokens.
 

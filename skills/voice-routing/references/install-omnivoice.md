@@ -37,7 +37,7 @@ của repo video). Chỉ xưởng Windows **chạy lịch** có trạm riêng c�
 và lệnh Windows/macOS chỉ nằm ở `docs/INSTALL.md` mục 3 của repo; đừng chép sang đây.
 
 **1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
-phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspace/`).
+phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspaces/`).
 
 **2. Clone repo và tạo venv engine.** Đường venv chuẩn là `<trạm>/omnivoice/.venv`; `init` in đúng
 lệnh cho máy bạn — có thể chạy `init` trước (bước 5) rồi quay lại đây.
@@ -192,7 +192,7 @@ mỗi bên báo.
 ## Giữ giọng ngoài version control
 
 Clip tham chiếu là dữ liệu gần với sinh trắc học. Repo chặn cả họ audio mặc định (`.gitignore`),
-chế độ `embedded` thêm hook `pre-commit` chặn `workspace/` và `.env`, và ví dụ công khai **không có
+chế độ `embedded` thêm hook `pre-commit` chặn `workspaces/` và `.env`, và ví dụ công khai **không có
 audio nào** — cố ý.
 
 **Chỉ clone giọng của chính bạn, hoặc giọng mà chủ nhân đã đồng ý bằng văn bản.**

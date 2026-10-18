@@ -14,10 +14,10 @@ chép skill hay engine sang trạm; không đưa giọng vào repo.
 | Trạm giọng (git bỏ qua) | venv engine, profile giọng (`omnivoice/voices/`), nhạc nền, output (`out/`), `station.json` |
 
 Trạm nằm ở đâu — mọi lệnh dùng chung một thứ tự (chi tiết `docs/WORKSPACE.md`):
-`VOICE_STATION` → `studio.local.json` do `init` ghi → **mặc định `<repo>/workspace/`** (bị git bỏ
+`VOICE_STATION` → `studio.local.json` do `init` ghi → **mặc định `<repo>/workspaces/`** (bị git bỏ
 qua). Chưa biết trạm ở đâu thì chạy `voice-studio doctor`, dòng `station` ghi đường và nguồn.
 
-`workspace/` là dữ liệu riêng dù nằm trong checkout: không commit, không đóng gói. Repo **không
+`workspaces/` là dữ liệu riêng dù nằm trong checkout: không commit, không đóng gói. Repo **không
 chứa audio nào**; `.gitignore`, hook `pre-commit` (chế độ embedded) và `tests/test_no_identity_leak.py`
 chặn file audio/model, tên profile thật và đường dẫn máy.
 

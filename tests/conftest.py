@@ -32,10 +32,10 @@ CONTRACT_VARS = (
 def _clean_contract_env(monkeypatch, tmp_path):
     for name in CONTRACT_VARS:
         monkeypatch.delenv(name, raising=False)
-    # Trạm mặc định (~/.voice) cũng không được là trạm thật của máy chạy test.
+    # Thư mục cá nhân của máy chạy test không được lọt vào kết quả phân giải.
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setenv("USERPROFILE", str(tmp_path / "home"))
-    # Bản clone đang chạy test có thể có workspace/ hoặc studio.local.json thật (chế độ
+    # Bản clone đang chạy test có thể có workspaces/ hoặc studio.local.json thật (chế độ
     # embedded của người phát triển) — trỏ "repo" sang một thư mục tạm rỗng.
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(tmp_path / "no-repo"))
     # Cảnh báo tên biến cũ phát MỘT lần/tiến trình; mỗi test phải là một tờ giấy trắng,
@@ -47,7 +47,7 @@ def _clean_contract_env(monkeypatch, tmp_path):
 
 @pytest.fixture
 def sandbox_home(tmp_path, monkeypatch):
-    """HOME giả không junction, có trạm mồi `~/.voice/station.json`. Biến trạm và `OPCOS_*` đã bị
+    """HOME giả không junction. Biến trạm và `OPCOS_*` đã bị
     `_clean_contract_env` (autouse) xoá — fixture này KHÔNG tự xoá lại.
 
     Đặt đủ bốn biến home (`expanduser` trên Windows đọc USERPROFILE, PowerShell con tính lại từ
@@ -62,9 +62,6 @@ def sandbox_home(tmp_path, monkeypatch):
     monkeypatch.setenv("USERPROFILE", str(home))
     monkeypatch.setenv("HOMEDRIVE", drive)
     monkeypatch.setenv("HOMEPATH", tail)
-    bait = home / ".voice"
-    bait.mkdir(exist_ok=True)
-    (bait / "station.json").write_text("{}", encoding="utf-8")
     return home
 
 

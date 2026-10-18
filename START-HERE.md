@@ -2,7 +2,7 @@
 
 Agent Voice Studio là quy trình dựng và dùng **giọng đọc của chính bạn** cho AI agent, chạy trên
 Windows và macOS. Repo chứa mã và phương pháp; giọng, nhạc nền, output nằm ở **trạm giọng** —
-mặc định `workspace/` trong repo, bị git bỏ qua. Repo không chứa một file audio nào.
+mặc định `workspaces/` trong repo, bị git bỏ qua. Repo không chứa một file audio nào.
 
 ## Cách nhanh: nhờ agent cài
 
@@ -44,7 +44,7 @@ Rồi, với `voice-studio` là lệnh ở dòng cuối bảng:
 3. Engine (torch: CUDA ~2,5 GB, macOS arm64 ~130 MB · weights ~3,3 GB, giấy phép weights **không thương mại**): làm đúng các lệnh
    `init` in ra, chi tiết ở [install-omnivoice.md](skills/voice-routing/references/install-omnivoice.md).
    Máy chạy lịch cài **bản sao** thay cho `-e`: [docs/INSTALL.md](docs/INSTALL.md) mục 3.
-4. Thử đọc: `voice-studio speak --file samples/cau-ngan.script.txt --instruct "female, young adult" --out workspace/out/thu.wav --json`
+4. Thử đọc: `voice-studio speak --file samples/cau-ngan.script.txt --instruct "female, young adult" --out workspaces/out/thu.wav --json`
    (lần đầu đặt `OMNIVOICE_ONLINE=1` để tải weights).
 
 Giọng của chính bạn: `voice-studio make-profile` hoặc bộ `voice-studio lab` — chỉ dùng bản ghi của

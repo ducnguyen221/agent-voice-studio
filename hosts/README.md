@@ -15,7 +15,7 @@ bước cho host đó. Tự cài thì theo [START-HERE.md](../START-HERE.md) r�
 
 - **Lệnh là `voice-studio`, chạy bằng python của venv đã cài package.** Agent gọi lệnh trong
   terminal của host; không có dịch vụ nền nào phải chạy.
-- **Trạm giọng tách khỏi host.** Trạm ở `<repo>/workspace/` (mặc định) hoặc nơi `VOICE_STATION`
+- **Trạm giọng tách khỏi host.** Trạm ở `<repo>/workspaces/` (mặc định) hoặc nơi `VOICE_STATION`
   trỏ tới. Đổi host không đụng tới giọng của bạn. Kiểm bằng `voice-studio doctor`.
 - **Skill đọc từ repo.** Mở thư mục repo trong host là agent thấy `AGENTS.md` và
   `skills/voice-routing/SKILL.md`. Plugin chỉ là đường tắt để skill có mặt khi bạn mở thư mục

@@ -78,11 +78,11 @@ Pipeline khác gọi `speak`/`narrate` với `--json`: đọc **mã thoát** (`0
 
 ## Đồ đạc nằm ở đâu
 
-Engine, kho giọng và bản ghi là **của bạn**, sống ở *trạm giọng* ngoài git: `<repo>/workspace/`
+Engine, kho giọng và bản ghi là **của bạn**, sống ở *trạm giọng* ngoài git: `<repo>/workspaces/`
 (chế độ `embedded`, mặc định — cũng là trạm khi không đặt biến nào) hoặc thư mục người dùng
 chỉ (chế độ `separate`, đặt `VOICE_STATION`). Repo chỉ giữ phương pháp và
 mã. Giữ nguyên như vậy: audio không bao giờ được vào repo — `.gitignore` chặn cả họ audio mặc
-định, và hook `pre-commit` của chế độ embedded chặn `workspace/` lẫn `.env`.
+định, và hook `pre-commit` của chế độ embedded chặn `workspaces/` lẫn `.env`.
 
 Khi cài cho người khác: `voice-studio init` sẽ hỏi chế độ. **Agent phải trình bảng lựa chọn cho
 người dùng và chờ họ chọn** (khuyến nghị `embedded`), không tự chọn im lặng. Máy đã có trạm

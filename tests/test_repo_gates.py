@@ -21,7 +21,7 @@ def _lines():
 
 
 # Xoá BẤT KỲ dòng nào dưới đây là test đỏ — kể cả khi một mẫu rộng hơn tình cờ vẫn chặn.
-REQUIRED = ["/workspace/", ".env", ".env.*", "!.env.example", "studio.local.json",
+REQUIRED = ["/workspaces/", "/workspace/", ".env", ".env.*", "!.env.example", "studio.local.json",
             "*.wav", "*.mp3", "*.pt", "*.onnx", "*.safetensors", "voices/", "out/"]
 
 
@@ -36,16 +36,17 @@ def _in_git():
 
 @pytest.mark.skipif(not _in_git(), reason="cần bản clone git")
 @pytest.mark.parametrize("path,ignored", [
-    ("workspace/omnivoice/voices/a.txt", True),
+    ("workspaces/omnivoice/voices/a.txt", True),
+    ("workspace/omnivoice/voices/a.txt", True),               # tên cũ (số ít) vẫn bị chặn
     (".env", True),
     (".env.local", True),
     (".env.example", False),
     ("studio.local.json", True),
-    ("templates/workspace/omnivoice/voices/_example/README.md", False),
-    ("templates/workspace/out/README.md", False),
-    ("templates/workspace/omnivoice/voices/a.wav", True),
-    ("templates/workspace/omnivoice/voices/a.prompt.pt", True),
-    ("templates/workspace/out/a.mp3", True),
+    ("templates/workspaces/omnivoice/voices/_example/README.md", False),
+    ("templates/workspaces/out/README.md", False),
+    ("templates/workspaces/omnivoice/voices/a.wav", True),
+    ("templates/workspaces/omnivoice/voices/a.prompt.pt", True),
+    ("templates/workspaces/out/a.mp3", True),
     ("some/where/voices/a.txt", True),
     # gói giọng `export --personal` + video có tiếng: ví dụ README ghi ra .zip, `git add .` là rò
     ("voice.zip", True),
@@ -131,7 +132,7 @@ def test_env_example_declares_nothing_the_code_never_reads_without_saying_why():
 
 # ── cây mẫu ────────────────────────────────────────────────────────────────────────────
 
-T = ROOT / "templates" / "workspace"
+T = ROOT / "templates" / "workspaces"
 
 
 def test_template_tree_complete():

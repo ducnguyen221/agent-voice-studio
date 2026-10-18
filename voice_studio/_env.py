@@ -6,7 +6,7 @@ dưới đây, đọc biến môi trường MỖI LẦN gọi (không đóng bă
 
 Biến hợp đồng (tên mới trước, tên cũ đọc được để tương thích):
 
-    VOICE_STATION      gốc trạm giọng                 (mặc định <repo>/workspace/)
+    VOICE_STATION      gốc trạm giọng                 (mặc định <repo>/workspaces/)
     OMNIVOICE_DIR      tên cũ: THƯ MỤC ENGINE (= $VOICE_STATION/omnivoice); đọc được,
                        không cảnh báo ở đây — `voice-studio doctor` mới là chỗ nhắc đổi tên
     VOICES_DIR         kho profile giọng              (mặc định <engine>/voices)
@@ -22,7 +22,7 @@ MỘT phiên bản, kèm DeprecationWarning, rồi sẽ bị bỏ.
 Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — `resolve_station()`:
 
     --station (lệnh đặt VOICE_STATION trong tiến trình) → VOICE_STATION → OMNIVOICE_DIR (cha)
-    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ (có hay chưa; `init` tạo)
+    → <repo>/studio.local.json ("station_path") → <repo>/workspaces/ (có hay chưa; `init` tạo; tên số ít cũ `workspace/` chỉ được nhận nếu đã là trạm)
     → chưa xác định (không repo)
 
 `<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
@@ -39,10 +39,13 @@ khuôn tên biến ở `<repo>/.env.example`.
 import json
 import os
 import shutil
+import sys
 import warnings
 
 LOCAL_CONFIG = "studio.local.json"
-WORKSPACE = "workspace"
+STATION_NAME = "voice"                   # tên trạm = thư mục con `voice` trong OPCOS_WORKSPACES khi cài cạnh OpcOS
+WORKSPACE = "workspaces"                 # trạm NHÚNG trong repo: chính `<repo>/workspaces` (nhãn nguồn phân giải)
+LEGACY_WORKSPACE = "workspace"           # tên số ít cũ: chỉ còn được NHẬN, không bao giờ được tạo
 STATION_FILE = "station.json"
 ENV_FILE = ".env"
 ENV_EXAMPLE = ".env.example"
@@ -59,7 +62,7 @@ _LEGACY = {
 # quyết định có đọc `.env` hay không:
 #   VOICE_STUDIO_REPO — nói repo nằm đâu, mà `.env` nằm TRONG repo. Đọc là đệ quy vô hạn.
 #   VOICE_STATION, OMNIVOICE_DIR — nói TRẠM NÀY nằm đâu. `.env` chỉ được nạp khi chế độ là
-#     `embedded`, tức là trạm đã được chốt ở `<repo>/workspace/`; để một dòng trong file đó
+#     `embedded`, tức là trạm đã được chốt ở `<repo>/workspaces/`; để một dòng trong file đó
 #     trỏ trạm đi nơi khác là tự tạo ra đúng cái "hai nguồn sự thật" mà cả bộ cài này sinh
 #     ra để chặn. Trỏ trạm đi chỗ khác là việc của biến môi trường thật, hoặc của `migrate`.
 _NEVER_FROM_DOTENV = frozenset({"VOICE_STUDIO_REPO", "VOICE_STATION", "OMNIVOICE_DIR"})
@@ -71,6 +74,13 @@ _warned = set()
 def reset_deprecation_warnings():
     """Quên danh sách tên cũ đã cảnh báo — chỉ dùng trong test (mỗi test là một 'tiến trình')."""
     _warned.clear()
+
+
+def _note_once(key, text):
+    """Một dòng thông tin ra stderr, MỘT lần cho mỗi `key` trong mỗi tiến trình (stdout giữ cho JSON)."""
+    if key not in _warned:
+        _warned.add(key)
+        print(text, file=sys.stderr, flush=True)
 
 
 def _deprecated(old, new):
@@ -200,12 +210,6 @@ def read_env_file(repo=None):
     return out
 
 
-def legacy_station():
-    """Thư mục trạm đời cũ dưới home. KHÔNG phải đường mặc định của bất kỳ lệnh nào: `init` chỉ
-    dùng nó để nhận ra rằng máy còn một trạm cũ và HỎI người dùng quyết định."""
-    return os.path.join(os.path.expanduser("~"), ".voice")
-
-
 def has_marker(path):
     """Thư mục có phải một trạm giọng không: có station.json hoặc omnivoice/voices/."""
     return bool(path) and (os.path.isfile(os.path.join(path, STATION_FILE)) or
@@ -238,6 +242,24 @@ def opcos_station(station="voice"):
     return path if path and has_marker(path) else None
 
 
+def embedded_station(repo):
+    """-> (đường, nguồn) của trạm NHÚNG trong `repo`: `<repo>/workspaces`. Chỉ khi nó chưa có mà tên số ít
+    cũ `<repo>/workspace` đã là một trạm thì nhận tên cũ (và nhắc đổi tên MỘT lần mỗi tiến trình); có cả
+    hai thì ưu tiên `workspaces` và nhắc. Không tạo, không ghi gì ra đĩa."""
+    new = os.path.join(repo, WORKSPACE)
+    old = os.path.join(repo, LEGACY_WORKSPACE)
+    if os.path.isdir(new):
+        if has_marker(old):
+            _note_once("layout-both", f"[voice-studio] có cả {old} (tên cũ) và {new}; đang dùng {new}. "
+                       f"Chuyển dữ liệu cần giữ sang {WORKSPACE}/ rồi xoá {LEGACY_WORKSPACE}/.")
+        return new, WORKSPACE
+    if has_marker(old):
+        _note_once("layout-old", f"[voice-studio] trạm nhúng đang ở tên cũ {old}; nên đổi tên thành {new} "
+                   f"(thư mục `{WORKSPACE}`). Vẫn dùng được như cũ, không tự dời.")
+        return old, LEGACY_WORKSPACE
+    return new, WORKSPACE
+
+
 UNSET = "unset"
 UNSET_HINT = ("chưa xác định được trạm giọng: bản cài này không nằm trong một bản clone repo "
               "và chưa đặt VOICE_STATION. Đặt VOICE_STATION=<thư mục trạm> (hoặc truyền "
@@ -247,13 +269,12 @@ UNSET_HINT = ("chưa xác định được trạm giọng: bản cài này khôn
 def resolve_station():
     """-> (gốc trạm | None, nguồn). Đọc lại mỗi lần gọi. Thứ tự:
 
-        VOICE_STATION → OMNIVOICE_DIR (cha) → <repo>/studio.local.json → <repo>/workspace/ nếu có
-        → <repo>/workspace/ (chưa có; `init` sẽ tạo) → (None, `unset`)
+        VOICE_STATION → OMNIVOICE_DIR (cha) → <repo>/studio.local.json → <repo>/workspaces/ (nếu chưa có mà
+        `<repo>/workspace/` cũ đã là trạm thì nhận tên cũ + nhắc đổi tên) → <repo>/workspaces/ (chưa
+        có; `init` sẽ tạo) → (None, `unset`)
 
     Không đặt gì thì trạm là THƯ MỤC TRONG REPO (bị git bỏ qua), không bao giờ là một thư mục
-    ẩn dưới home: `~/.voice` chỉ được dùng khi người dùng đã chọn nó (biến, `--station`,
-    hoặc trả lời nhận nó khi `init` hỏi, ghi vào `studio.local.json`) — dù nó đã là một trạm
-    thật, resolver KHÔNG tự nhận và `init` cũng không tự nhận, chỉ hỏi. Cài dạng wheel (không có repo) mà
+    ẩn dưới thư mục cá nhân. Cài dạng wheel (không có repo) mà
     chưa đặt gì ⇒ `unset` — `station_dir()` báo mã 3 kèm cách đặt, thay vì tự đẻ thư mục.
     """
     st = env("VOICE_STATION")
@@ -263,16 +284,13 @@ def resolve_station():
     if eng:
         return os.path.dirname(_expand(eng)), "OMNIVOICE_DIR"
     repo = repo_root()
-    ws = os.path.join(repo, WORKSPACE) if repo else None
     if repo:
         sp = (local_config(repo).get("station_path") or "").strip()
         if sp:
             sp = os.path.expanduser(sp)
             return (sp if os.path.isabs(sp) else os.path.abspath(os.path.join(repo, sp))), LOCAL_CONFIG
-        if os.path.isdir(ws):
-            return ws, WORKSPACE
     if repo and os.path.isdir(repo):
-        return ws, WORKSPACE
+        return embedded_station(repo)
     return None, UNSET
 
 

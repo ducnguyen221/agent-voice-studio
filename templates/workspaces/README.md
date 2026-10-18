@@ -3,7 +3,7 @@
 Thư mục này là **trạm giọng** của bạn: nơi chứa engine (venv), giọng của riêng bạn, nhạc nền và
 output. Repo `agent-voice-studio` chỉ chứa mã; mọi thứ ở đây là của bạn và **không bao giờ vào git**.
 
-Cây do `voice-studio init` dựng từ `templates/workspace/` của repo. Giải thích từng thư mục —
+Cây do `voice-studio init` dựng từ `templates/workspaces/` của repo. Giải thích từng thư mục —
 cái nào là nội dung, cái nào là quản lý, cái nào được sao lưu, cái nào xoá được — ở
 `docs/WORKSPACE.md` của repo.
 

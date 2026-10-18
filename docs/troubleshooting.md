@@ -18,18 +18,19 @@ chưa đủ. `[NOT_CHECKED]` **không phải lỗi**: doctor nói thẳng điề
 | `[FAIL] station <đường>` | trạm chưa dựng | `voice-studio init` |
 | `[FAIL] voices` | trạm có nhưng thiếu `omnivoice/voices/` | `voice-studio init` (chạy lại an toàn, không đè gì) |
 | `[FAIL] torch` / `omnivoice` | đang chạy bằng python không có engine | gọi bằng python của **venv engine** (`<trạm>/omnivoice/.venv`), hoặc cài engine theo [install-omnivoice.md](../skills/voice-routing/references/install-omnivoice.md) |
-| `[FAIL] two-sources` | vừa có `<repo>/workspace/` vừa có trạm ngoài (biến hoặc `studio.local.json: separate`) | giữ **một** trạm: gộp dữ liệu, rồi xoá `workspace/` hoặc gỡ biến; hoặc `voice-studio migrate --to separate` |
+| `[FAIL] two-sources` | vừa có `<repo>/workspaces/` vừa có trạm ngoài (biến hoặc `studio.local.json: separate`) | giữ **một** trạm: gộp dữ liệu, rồi xoá `workspaces/` hoặc gỡ biến; hoặc `voice-studio migrate --to separate` |
 
-Trạm nằm ở đâu khi không đặt gì: `<repo>/workspace/`. Thứ tự tìm đầy đủ ở
+Trạm nằm ở đâu khi không đặt gì: `<repo>/workspaces/`. Thứ tự tìm đầy đủ ở
 [WORKSPACE.md](WORKSPACE.md#thứ-tự-tìm-trạm-mọi-lệnh-dùng-chung-một-hàm).
 
 ## Tên biến cũ — `[WARN] env-name`
 
 `OMNIVOICE_DIR` là tên cũ, trỏ **thư mục engine** (`<trạm>/omnivoice`), không phải gốc trạm. Vẫn
 đọc được, nhưng đặt `VOICE_STATION=<gốc trạm>` rồi gỡ biến cũ. `NEWS_BGM*` tương tự → `VOICE_BGM*`.
-Trạm cũ `~/.voice` **không còn được tự nhận** (bỏ dòng `station-source`): đặt `VOICE_STATION`
-trỏ vào đó, hoặc chạy `voice-studio init` — nó HỎI bạn dùng trạm mới, nhận trạm cũ, hay
-dời sang trạm mới — rồi ghi lựa chọn vào `studio.local.json`. `[WARN] opcos-station` chỉ nhắc
+Không còn thư mục trạm nào ở thư mục cá nhân được tự nhận (bỏ dòng `station-source`): muốn dùng
+trạm ở nơi khác thì đặt `VOICE_STATION` hoặc chạy `voice-studio init --station <đường>` để ghi vào
+`studio.local.json`. `[WARN] legacy-workspace`: trạm nhúng còn tên số ít `workspace/` — đổi tên thành
+`workspaces/` (không tự dời). `[WARN] opcos-station` chỉ nhắc
 khi `OPCOS_WORKSPACES` có trạm mà bạn chưa dùng — chạy lệnh `init --mode separate --station …` nó in.
 
 ## Weights — offline theo mặc định
@@ -74,7 +75,7 @@ Engine chạy **offline** để lịch chạy không bao giờ treo vì mạng. 
 
 ## Repo trong thư mục đồng bộ đám mây — `[WARN] cloud-sync`
 
-OneDrive/iCloud/Dropbox/Google Drive sẽ đẩy giọng trong `workspace/` và `.env` lên cloud, và hay
+OneDrive/iCloud/Dropbox/Google Drive sẽ đẩy giọng trong `workspaces/` và `.env` lên cloud, và hay
 khoá file giữa lúc ghi. Chuyển trạm ra ngoài (`voice-studio migrate --to separate`) hoặc clone lại
 repo vào thư mục cục bộ.
 

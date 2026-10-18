@@ -4,7 +4,7 @@
     voice-studio doctor --json     # một dòng JSON cuối stdout cho bên gọi (marketing, trạm video)
 
 Kiểm: python · trạm (`VOICE_STATION`, tên cũ `OMNIVOICE_DIR` bị nhắc đổi) · `station.json` ·
-hai chế độ cài (F17: ĐỎ khi vừa có <repo>/workspace/ vừa có trạm ngoài; embedded: workspace/.env
+hai chế độ cài (F17: ĐỎ khi vừa có <repo>/workspaces/ vừa có trạm ngoài; embedded: workspaces/.env
 không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám mây, quyền .env) · kho giọng + profile
 mặc định · thư viện nhạc nền (json + `<style>.mp3` của từng style khai) · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
 trong cache (chạy offline được). Không tải gì, không nạp model.
@@ -135,8 +135,17 @@ def station_checks(st):
     if not repo or not os.path.isdir(repo):
         return out
     ws = os.path.join(repo, _env.WORKSPACE)
+    old = os.path.join(repo, _env.LEGACY_WORKSPACE)
     _, src = _env.resolve_station()
     local = _env.local_config(repo)
+    if _env.has_marker(old):
+        both = os.path.isdir(ws)
+        out.append(_check("legacy-workspace", False,
+                          f"{old} (tên cũ)" + (f" + {ws}" if both else ""), level="warn",
+                          hint=(f"có cả hai: đang dùng {_env.WORKSPACE}/ — chuyển dữ liệu cần giữ sang đó rồi "
+                                f"xoá {_env.LEGACY_WORKSPACE}/" if both else
+                                f"đổi tên thư mục {_env.LEGACY_WORKSPACE}/ thành {_env.WORKSPACE}/ "
+                                "(đóng chương trình đang dùng trạm trước; không tự dời)")))
     if os.path.isdir(ws):
         others = []
         if _env.env("VOICE_STATION"):
@@ -148,13 +157,13 @@ def station_checks(st):
         out.append(_check("two-sources", not others,
                           f"{ws} + {', '.join(others)}" if others else ws,
                           hint="hai nguồn sự thật cho một repo: giữ MỘT trạm — gộp dữ liệu rồi xoá "
-                               "workspace/ hoặc gỡ biến/trạm ngoài (`voice-studio migrate --to separate`)"))
-    embedded = src == _env.WORKSPACE or local.get("mode") == "embedded"
+                               "workspaces/ hoặc gỡ biến/trạm ngoài (`voice-studio migrate --to separate`)"))
+    embedded = src in (_env.WORKSPACE, _env.LEGACY_WORKSPACE) or local.get("mode") == "embedded"
     if not embedded:
         return out
     tracked = _git_tracked(repo)
     if tracked is not None:
-        out.append(_check("git-tracked", not tracked, ", ".join(tracked) or "workspace/, .env sạch",
+        out.append(_check("git-tracked", not tracked, ", ".join(tracked) or "workspaces/, .env sạch",
                           hint="dữ liệu trạm/secret đang bị git theo dõi — `git rm --cached` ngay, "
                                "kiểm .gitignore"))
     low = repo.lower()
@@ -182,7 +191,7 @@ def opcos_check(src):
         return None
     oc = _env.opcos_station()
     if oc:
-        if src in (_env.WORKSPACE, _env.UNSET):
+        if src in (_env.WORKSPACE, _env.LEGACY_WORKSPACE, _env.UNSET):
             return _check("opcos-station", False, f"{oc} (trạm OpcOS chưa được dùng)", level="warn",
                           hint=f"có trạm OpcOS: `voice-studio init --mode separate --station \"{oc}\"` "
                                "để dùng chung trạm đó")
@@ -199,7 +208,7 @@ def _git_tracked(repo):
     if not os.path.isdir(os.path.join(repo, ".git")):
         return None
     try:
-        r = subprocess.run(["git", "-C", repo, "ls-files", "--", _env.WORKSPACE, ".env",
+        r = subprocess.run(["git", "-C", repo, "ls-files", "--", _env.WORKSPACE, _env.LEGACY_WORKSPACE, ".env",
                             _env.LOCAL_CONFIG], capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError):
         return None

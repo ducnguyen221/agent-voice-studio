@@ -3,7 +3,7 @@
 Chế độ embedded đặt trạm (giọng thật) và `.env` NGAY TRONG repo. `.gitignore` đã chặn chúng,
 nhưng `git add -f` hay một `.gitignore` bị sửa là đủ để rò. Hook này là lớp rào thứ hai:
 
-    - file dưới `workspace/`, `.env` / `.env.*` (trừ `.env.example`), `studio.local.json`
+    - file dưới `workspaces/` (và tên số ít cũ `workspace/`), `.env` / `.env.*` (trừ `.env.example`), `studio.local.json`
     - dòng THÊM MỚI trong diff trông giống token (GitHub, Hugging Face, OpenAI/Anthropic, AWS,
       Slack, Google, khoá riêng PEM, hoặc `token|secret|api_key = "<chuỗi dài>"`)
 
@@ -14,7 +14,7 @@ import re
 import subprocess
 import sys
 
-BLOCKED_PREFIXES = ("workspace/",)
+BLOCKED_PREFIXES = ("workspaces/", "workspace/")
 BLOCKED_FILES = ("studio.local.json",)
 
 TOKEN_PATTERNS = [

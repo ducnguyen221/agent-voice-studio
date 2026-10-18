@@ -1,9 +1,9 @@
-"""Phân giải trạm giọng khi KHÔNG ai đặt gì (quyết định Đ4): mặc định là thư mục trong repo.
+"""Phân giải trạm giọng khi KHÔNG ai đặt gì: mặc định là thư mục trong repo.
 
-Người dùng public clone repo, không đặt biến nào ⇒ trạm là `<repo>/workspace/` (bị git bỏ
-qua), không phải một thư mục ẩn mới dưới home. `~/.voice` chỉ được dùng khi người dùng đã
-chọn nó hoặc nó đã là một trạm từ trước. Cài dạng wheel (không repo) mà chưa đặt gì ⇒ báo
-mã 3 kèm cách đặt, không tự tạo thư mục.
+Người dùng public clone repo, không đặt biến nào ⇒ trạm là `<repo>/workspaces/` (bị git bỏ
+qua), cùng tên `workspaces` với trạm dùng chung khi cài cạnh OpcOS — chỉ khác là nằm trong
+repo. Tên số ít cũ `<repo>/workspace/` còn được nhận nếu nó đã là một trạm và `workspaces`
+chưa có. Cài dạng wheel (không repo) mà chưa đặt gì ⇒ báo mã 3 kèm cách đặt, không tự tạo thư mục.
 
 HOME giả do conftest dựng (`tmp_path/home`), nên không test nào đọc được trạm thật của máy.
 """
@@ -37,16 +37,24 @@ def repo(tmp_path, monkeypatch):
     return r
 
 
-def make_home_station(home):
-    (home / ".voice" / "omnivoice" / "voices").mkdir(parents=True)
-    return home / ".voice"
+NEW = ("workspaces",)
+
+
+def new_dir(repo):
+    return repo.joinpath(*NEW)
+
+
+def make_old_station(repo):
+    d = repo / "workspace"
+    (d / "omnivoice" / "voices").mkdir(parents=True)
+    return d
 
 
 # ── thứ tự từng tầng ──────────────────────────────────────────────────────────────────
 
-def test_tier1_voice_station_beats_everything(repo, home, tmp_path, monkeypatch):
-    (repo / "workspace").mkdir()
-    make_home_station(home)
+def test_tier1_voice_station_beats_everything(repo, tmp_path, monkeypatch):
+    new_dir(repo).mkdir(parents=True)
+    make_old_station(repo)
     monkeypatch.setenv("OMNIVOICE_DIR", str(tmp_path / "old" / "omnivoice"))
     monkeypatch.setenv("VOICE_STATION", str(tmp_path / "st"))
     st, src = _env.resolve_station()
@@ -60,31 +68,57 @@ def test_tier2_legacy_engine_dir_gives_its_parent(repo, tmp_path, monkeypatch):
 
 
 def test_tier3_local_config_station_path(repo, tmp_path):
-    (repo / "workspace").mkdir()                       # có cả workspace/: lựa chọn đã ghi vẫn thắng
+    new_dir(repo).mkdir(parents=True)                     # có cả workspaces: lựa chọn đã ghi vẫn thắng
     (repo / "studio.local.json").write_text(
         json.dumps({"mode": "separate", "station_path": str(tmp_path / "chon")}), encoding="utf-8")
     st, src = _env.resolve_station()
     assert same(st, tmp_path / "chon") and src == "studio.local.json"
 
 
-def test_tier4_existing_workspace_beats_old_home_station(repo, home):
+def test_tier3_local_config_relative_old_name_still_resolves(repo):
+    """studio.local.json do bản cũ ghi (`station_path: workspace`) vẫn trỏ đúng trạm cũ."""
+    make_old_station(repo)
+    (repo / "studio.local.json").write_text(
+        json.dumps({"mode": "embedded", "station_path": "workspace"}), encoding="utf-8")
+    st, src = _env.resolve_station()
+    assert same(st, repo / "workspace") and src == "studio.local.json"
+
+
+def test_tier4_existing_workspaces_is_the_embedded_station(repo):
+    new_dir(repo).mkdir(parents=True)
+    st, src = _env.resolve_station()
+    assert same(st, new_dir(repo)) and src == "workspaces"
+
+
+def test_tier4_old_singular_station_is_adopted_when_the_new_one_is_missing(repo, capsys):
+    old = make_old_station(repo)
+    st, src = _env.resolve_station()
+    assert same(st, old) and src == "workspace"
+    _out, err = capsys.readouterr()
+    assert "workspaces" in err and str(old) in err        # một dòng khuyến nghị đổi tên
+    _env.resolve_station()                                # lần sau trong cùng tiến trình: không nhắc lại
+    assert capsys.readouterr().err == ""
+
+
+def test_tier4_both_layouts_prefer_the_new_one_and_say_so(repo, capsys):
+    make_old_station(repo)
+    new_dir(repo).mkdir(parents=True)
+    st, src = _env.resolve_station()
+    assert same(st, new_dir(repo)) and src == "workspaces"
+    _out, err = capsys.readouterr()
+    assert "workspace" in err and "workspaces" in err
+
+
+def test_tier4_old_singular_dir_without_marker_is_not_a_station(repo):
     (repo / "workspace").mkdir()
-    make_home_station(home)
     st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
+    assert same(st, new_dir(repo)) and src == "workspaces"
 
 
-def test_home_station_marker_is_never_used(repo, home, tmp_path, monkeypatch):
-    # ~/.voice mang dấu trạm KHÔNG còn là nguồn phân giải.
-    make_home_station(home)
-    assert _env.has_marker(str(home / ".voice"))
-    st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-    # có OPCOS_WORKSPACES (kể cả trỏ trạm mang dấu) cũng không đổi gì ở resolver.
+def test_resolve_station_ignores_opcos_workspaces(repo, tmp_path, monkeypatch):
     monkeypatch.setenv("OPCOS_WORKSPACES", str(make_opcos_station(tmp_path)))
     st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-    assert not hasattr(_env, "HOME_STATION")
+    assert same(st, new_dir(repo)) and src == "workspaces"
 
 
 def make_opcos_station(tmp_path, name="ocws"):
@@ -97,18 +131,6 @@ def make_opcos_station(tmp_path, name="ocws"):
 def test_sandbox_home_hides_real_home(sandbox_home, tmp_path):
     assert os.path.expanduser("~").startswith(str(tmp_path))
     assert "OPCOS_WORKSPACES" not in os.environ and "VOICE_STATION" not in os.environ
-    assert _env.has_marker(_env.legacy_station())            # trạm mồi có thật trong HOME giả
-    assert str(tmp_path) in _env.legacy_station()
-
-
-def test_sandbox_home_voice_source_is_workspace_before_and_after_init(repo, sandbox_home):
-    # Có trạm mồi ~/.voice, chưa có workspace/ → workspace; đã có workspace/ → vẫn workspace.
-    st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-    assert not (repo / "workspace").exists()
-    (repo / "workspace").mkdir()
-    st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
 
 
 def test_opcos_station_found_when_marked(tmp_path, monkeypatch):
@@ -138,23 +160,10 @@ def test_opcos_station_blank_file_or_tilde(tmp_path, monkeypatch, sandbox_home):
     assert same(_env.opcos_station(), sandbox_home / "ws" / "voice")
 
 
-def test_resolve_station_ignores_opcos_workspaces(repo, tmp_path, monkeypatch):
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(make_opcos_station(tmp_path)))
+def test_tier6_default_is_repo_workspaces_even_before_init(repo, home):
     st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-
-
-def test_empty_home_dir_is_not_a_station(repo, home):
-    (home / ".voice").mkdir()                          # thư mục rỗng: không phải trạm
-    st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-
-
-def test_tier6_default_is_repo_workspace_even_before_init(repo, home):
-    st, src = _env.resolve_station()
-    assert same(st, repo / "workspace") and src == "workspace"
-    assert not (repo / "workspace").exists()            # phân giải KHÔNG tạo thư mục
-    assert not (home / ".voice").exists()
+    assert same(st, new_dir(repo)) and src == "workspaces"
+    assert not (repo / "workspaces").exists() and not (repo / "workspace").exists()   # phân giải KHÔNG tạo gì
 
 
 def test_tier7_wheel_install_without_anything_is_unset(home):
@@ -164,7 +173,6 @@ def test_tier7_wheel_install_without_anything_is_unset(home):
     with pytest.raises(StationMissing) as e:
         _env.station_dir()
     assert "VOICE_STATION" in str(e.value)
-    assert not (home / ".voice").exists()
 
 
 # ── hệ quả ở CLI ──────────────────────────────────────────────────────────────────────
@@ -175,15 +183,14 @@ def test_cli_on_unset_station_exits_3_with_hint(capsys, home):
     assert rc == 3
     res = last_json(out)
     assert res["ok"] is False and res["code"] == 3 and "VOICE_STATION" in res["error"]
-    assert not (home / ".voice").exists()
 
 
-def test_init_yes_in_clone_builds_repo_workspace(repo, home, capsys):
+def test_init_yes_in_clone_builds_repo_workspaces(repo, home, capsys):
     rc = cli.main(["init", "--yes", "--json"])
     res = last_json(capsys.readouterr().out)
     assert rc == 0 and res["mode"] == "embedded"
-    assert same(res["station"], repo / "workspace")
-    assert (repo / "workspace" / "station.json").is_file()
-    assert not (home / ".voice").exists()
+    assert same(res["station"], new_dir(repo))
+    assert (new_dir(repo) / "station.json").is_file()
+    assert not (repo / "workspace").exists()
     st, src = _env.resolve_station()
-    assert same(st, repo / "workspace")
+    assert same(st, new_dir(repo))

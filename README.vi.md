@@ -81,14 +81,14 @@ không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windo
 [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
-`<repo>/workspace/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
+`<repo>/workspaces/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
 không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,
 hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) thì `init`
 in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài phải đưa bảng cho người
 dùng xem, không tự chọn im lặng.
 
 Chế độ `embedded` là "clone là chạy": `init` dựng sẵn cây trạm và chép `.env.example` thành
-`<repo>/.env` cho anh điền. Cả `workspace/` lẫn `.env` đều bị `.gitignore` chặn và hook
+`<repo>/.env` cho anh điền. Cả `workspaces/` lẫn `.env` đều bị `.gitignore` chặn và hook
 `pre-commit` chặn lần nữa. `.env` giữ **đường dẫn và cấu hình**, không bao giờ giữ token.
 
 Trạm giọng là nơi chứa venv, giọng, nhạc nền, output của anh — từng thư mục giải thích ở
