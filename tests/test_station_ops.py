@@ -492,6 +492,41 @@ def test_migrate_failure_leaves_the_users_empty_target_directory_in_place(embedd
     assert (embedded_repo / "workspace" / "station.json").is_file()
 
 
+def test_migrate_station_pointing_at_a_file_is_code_2(embedded_repo, tmp_path, capsys):
+    f = tmp_path / "la-mot-file"
+    f.write_text("x", encoding="utf-8")
+    rc = cli.main(["migrate", "--to", "separate", "--station", str(f), "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["ok"] is False and "thư mục" in err
+    assert "Traceback" not in err and f.read_text(encoding="utf-8") == "x"
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
+def test_migrate_typed_file_answer_is_a_contract_error(embedded_repo, tmp_path):
+    f = tmp_path / "la-mot-file"
+    f.write_text("x", encoding="utf-8")
+    prompts = []
+    with pytest.raises(station.ContractError, match="thư mục"):
+        station.do_migrate(ask=lambda p: prompts.append(p) or str(f))
+    assert len(prompts) == 1                                     # chưa tới câu xác nhận
+
+
+@pytest.mark.parametrize("exc", [OSError("đĩa đầy (giả)"), shutil.Error("chép hỏng (giả)"),
+                                 station.ContractError("không dời được (giả)")])
+def test_migrate_any_move_failure_restores_the_empty_target_and_reraises(exc, embedded_repo, tmp_path,
+                                                                         monkeypatch):
+    dest = tmp_path / "dich-rong"
+    dest.mkdir()
+
+    def fail(src, dst):
+        raise exc
+    monkeypatch.setattr(station, "_move_tree", fail)
+    with pytest.raises(type(exc)) as got:
+        station.migrate_to_separate(str(dest))
+    assert got.value is exc                                      # lỗi gốc không bị nuốt
+    assert dest.is_dir() and not os.listdir(dest)
+
+
 def test_migrate_eof_is_a_contract_error(embedded_repo, tmp_path, monkeypatch):
     _opcos_var(tmp_path, monkeypatch)
 

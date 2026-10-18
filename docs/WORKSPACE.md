@@ -24,7 +24,7 @@ có đường mặc định. Không hỏi (hoặc chỉ hỏi xác nhận) trong
   **không bao giờ** tạo `workspace/` (hai trạm cho một repo = hai nguồn sự thật).
 - `--mode embedded` hoặc `--yes` (= nhận khuyến nghị `embedded`; không bao giờ hỏi).
 - `--mode separate` khi `OPCOS_WORKSPACES` đang đặt: đích là `<biến>/voice` (tuyệt đối, kể cả khi
-  thư mục đó chưa là trạm). Có người ngồi đó thì `init` hỏi xác nhận hoặc đổi; không có người thì
+  thư mục đó chưa là trạm). Đã mang dấu trạm thì dùng thẳng, không hỏi; chưa thì có người ngồi đó `init` hỏi xác nhận hoặc đổi; không có người thì
   dùng luôn và in một dòng nêu đường. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2
   (cần `--station DIR`).
 

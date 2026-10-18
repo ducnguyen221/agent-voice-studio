@@ -930,6 +930,9 @@ def _migrate_plan(target, count=False):
     if _is_inside(target, ws):
         raise ContractError(f"đích nằm trong chính trạm đang dời ({ws}): {target} — không thể dời một "
                             "thư mục vào bên trong nó. Chọn nơi ngoài trạm (--station). Chưa dời gì.")
+    if os.path.exists(target) and not os.path.isdir(target):
+        raise ContractError(f"đích trỏ vào một FILE, không phải thư mục: {target} — chọn thư mục "
+                            "khác (--station). Chưa dời gì.")
     if os.path.exists(target) and os.listdir(target):
         raise ContractError(f"thư mục đích không rỗng: {target} — chọn chỗ khác (--station)")
     env_file = os.path.join(repo, ".env")
@@ -996,10 +999,10 @@ def migrate_to_separate(target=None):
     os.makedirs(os.path.dirname(target), exist_ok=True)
     try:
         _move_tree(ws, target)
-    except ContractError:
+    except BaseException:                        # mọi lỗi dời/chép (OSError, shutil.Error, ContractError…)
         if had_empty_dir and not os.path.exists(target):
             os.makedirs(target)                  # trả lại thư mục rỗng của người dùng
-        raise
+        raise                                    # rồi ném lại đúng lỗi gốc
     if moved_env:
         os.makedirs(sec, exist_ok=True)
         _move_file(env_file, moved_env)

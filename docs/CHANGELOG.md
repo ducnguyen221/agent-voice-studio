@@ -17,7 +17,8 @@ không còn.
   chế độ. Ai quen `--mode separate` để nhận trạm cũ nay dùng `--station <đường>` hoặc trả lời [2] ở
   bảng hỏi.
 - `separate` không còn đường mặc định ở home. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
-  `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — có người thì hỏi xác nhận/đổi, không có người
+  `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — nếu thư mục đó đã mang dấu trạm thì dùng thẳng,
+  không hỏi; nếu chưa, có người thì hỏi xác nhận/đổi, không có người
   thì (kể cả `--yes`) dùng luôn và in một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng
   mã 2. `--station` trỏ vào một file giờ thoát mã 2 thay vì lỗi hệ điều hành.
 - `migrate --to separate` thiếu `--station` thì **hỏi nơi dời** (gợi ý `<OPCOS_WORKSPACES>/voice` nếu
