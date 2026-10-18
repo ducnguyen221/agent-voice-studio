@@ -4,6 +4,23 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+## Chưa phát hành
+
+**Đổi hành vi (hỏi thay vì đoán):** bản 0.4.0 còn để `init` tự nhận `~/.voice` nếu nó đã là trạm; nay
+không còn.
+
+- `init` gặp một thư mục trạm cũ dưới home thì **hỏi** ba đường: dùng trạm mới (bảng nêu đúng đường
+  sẽ dùng — `<repo>/workspace/`, hoặc trạm OpcOS nếu có) · nhận trạm cũ · dời sang trạm mới (dừng, bạn
+  dời tay rồi chạy lại). Không có người trả lời (`--yes`, `--non-interactive`, không terminal) thì dùng
+  trạm mới và in một dòng nêu trạm cũ cùng cách nhận nó (`--station <đường>`).
+- `separate` không còn đường mặc định ở home. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
+  `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — có người thì hỏi xác nhận/đổi, không có người
+  thì dùng luôn và in một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2.
+- `migrate --to separate` thiếu `--station` thì **hỏi nơi dời** (gợi ý `<OPCOS_WORKSPACES>/voice` nếu
+  có), hiện đường tuyệt đối cùng số file và dung lượng (KB/MB) rồi xin xác nhận y/N; không có người trả
+  lời (hoặc `--non-interactive`) thì dừng mã 2. Từ chối đích nằm trong chính `workspace/`; đường dán
+  kèm ngoặc kép ('Copy as path') được bóc ở mọi chỗ nhập đường.
+
 ## 0.4.0 — 2026-10-18
 
 **Đổi hành vi (bỏ tầng `home`):** các lệnh không còn tự nhận `~/.voice` chỉ vì nó đã có
