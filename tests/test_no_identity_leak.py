@@ -59,10 +59,19 @@ ALLOW = {
     (".claude-plugin/marketplace.json", "tac-gia"): 4,
     (".claude-plugin/plugin.json", "tac-gia"): 3,
     (".codex-plugin/plugin.json", "tac-gia"): 3,
-    ("LICENSE", "tac-gia"): 1,
+    # Tên đầy đủ, email, website tác giả: chủ dự án chủ động công khai (18/10) ở khối author/owner
+    # của manifest, chủ bản quyền LICENSE/NOTICE và mục Author/Tác giả của README. Đếm chính xác
+    # từng file: tên/email ở file khác, hay thêm một lần ở đây, vẫn đỏ.
+    (".claude-plugin/marketplace.json", "ten-nguoi"): 2,
+    (".claude-plugin/plugin.json", "ten-nguoi"): 1,
+    (".codex-plugin/plugin.json", "ten-nguoi"): 1,
+    ("LICENSE", "ten-nguoi"): 1,
+    ("NOTICE", "ten-nguoi"): 2,
+    ("README.md", "ten-nguoi"): 1,
+    ("README.vi.md", "ten-nguoi"): 1,
     ("NOTICE", "tac-gia"): 1,
-    ("README.md", "tac-gia"): 6,        # +2: URL repo trong prompt cài
-    ("README.vi.md", "tac-gia"): 5,     # +2: URL repo trong prompt cài
+    ("README.md", "tac-gia"): 10,       # +2: URL repo trong prompt cài; +4: mục Author
+    ("README.vi.md", "tac-gia"): 9,     # +2: URL repo trong prompt cài; +4: mục Tác giả
     ("docs/INSTALL.md", "tac-gia"): 1,
     # INSTALL.md cho agent: địa chỉ repo công khai là NGUỒN DUY NHẤT mà prompt và luật an toàn trỏ tới.
     ("INSTALL.md", "tac-gia"): 7,

@@ -208,6 +208,12 @@ This project orchestrates engines you install yourself; it bundles none of their
 variants are non-commercial. Check the licence of every checkpoint you download before using
 its output commercially.
 
+## Author
+
+**Nguyễn Quang Đức** (Tobi) — founder and CEO of KPIM and co-founder of COMPA Class; Data/AI practitioner and instructor in Vietnam.
+
+Website: https://ducnguyen.vn · GitHub: [@ducnguyen221](https://github.com/ducnguyen221) · Contact: ducnguyen.ams@gmail.com
+
 ## Licence
 
 MIT — see [LICENSE](LICENSE).

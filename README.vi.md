@@ -190,6 +190,12 @@ Repo này điều phối các engine mà anh tự cài; nó không đóng gói d
 tách giọng là **non-commercial**. Kiểm license từng checkpoint mình tải trước khi dùng sản
 phẩm vào mục đích thương mại.
 
+## Tác giả
+
+**Nguyễn Quang Đức** (Tobi) — nhà sáng lập, CEO KPIM và đồng sáng lập COMPA Class; chuyên gia Data/AI và giảng viên công nghệ tại Việt Nam.
+
+Website: https://ducnguyen.vn · GitHub: [@ducnguyen221](https://github.com/ducnguyen221) · Liên hệ: ducnguyen.ams@gmail.com
+
 ## Giấy phép
 
 MIT — xem [LICENSE](LICENSE).

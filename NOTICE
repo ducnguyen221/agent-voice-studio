@@ -1,5 +1,6 @@
 agent-voice-studio
-Copyright (c) 2026 Duc Nguyen — phát hành theo giấy phép MIT (xem LICENSE).
+Copyright (c) 2026 Nguyễn Quang Đức — phát hành theo giấy phép MIT (xem LICENSE).
+Author: Nguyễn Quang Đức (Tobi) — https://ducnguyen.vn
 
 Repo này KHÔNG phát hành lại code, model weights hay audio của bên thứ ba. Mã trong repo được
 viết mới / chưng cất từ lớp bọc của chính tác giả. Các thành phần dưới đây được GỌI TỚI lúc chạy
