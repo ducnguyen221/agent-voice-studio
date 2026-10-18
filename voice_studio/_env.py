@@ -285,7 +285,13 @@ def resolve_station():
         return os.path.dirname(_expand(eng)), "OMNIVOICE_DIR"
     repo = repo_root()
     if repo:
-        sp = (local_config(repo).get("station_path") or "").strip()
+        cfg = local_config(repo)
+        sp = (cfg.get("station_path") or "").strip()
+        if sp and cfg.get("mode") != "separate" and not os.path.isabs(os.path.expanduser(sp)) \
+                and sp.replace("\\", "/").strip("/") in (WORKSPACE, LEGACY_WORKSPACE):
+            # Giá trị `init` embedded (bản cũ ghi `workspace`, bản mới `workspaces`) KHÔNG được tin theo
+            # chữ: đổi tên thư mục theo gợi ý không được làm mất trạm, và có cả hai thì phải theo luật chung.
+            return embedded_station(repo)
         if sp:
             sp = os.path.expanduser(sp)
             return (sp if os.path.isabs(sp) else os.path.abspath(os.path.join(repo, sp))), LOCAL_CONFIG

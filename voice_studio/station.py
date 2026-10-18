@@ -487,8 +487,8 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
         local = _env.read_json(local_path)[0]
         local.update({
             "mode": mode,
-            "station_path": (os.path.relpath(st, repo).replace(os.sep, "/")
-                             if mode == "embedded" else st),
+            # embedded: luôn ghi tên mới; bộ phân giải không tin chuỗi này (đi qua embedded_station)
+            "station_path": _env.WORKSPACE if mode == "embedded" else st,
             "secrets": _env.ENV_FILE if mode == "embedded" else SECRET_STORE,
         })
         _write_json(local_path, local)

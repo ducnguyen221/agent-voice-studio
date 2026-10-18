@@ -75,13 +75,90 @@ def test_tier3_local_config_station_path(repo, tmp_path):
     assert same(st, tmp_path / "chon") and src == "studio.local.json"
 
 
-def test_tier3_local_config_relative_old_name_still_resolves(repo):
-    """studio.local.json do bản cũ ghi (`station_path: workspace`) vẫn trỏ đúng trạm cũ."""
+CONFIGS = {
+    "config-cu-ghi-workspace": {"mode": "embedded", "station_path": "workspace"},
+    "config-moi-ghi-workspaces": {"mode": "embedded", "station_path": "workspaces"},
+    "khong-config": None,
+}
+
+
+def build_layout(repo, layout):
+    if layout in ("A-chi-co-cu", "C-co-ca-hai"):
+        make_old_station(repo)
+    if layout in ("B-chi-co-moi", "C-co-ca-hai"):
+        new_dir(repo).mkdir(parents=True)
+
+
+@pytest.mark.parametrize("cfg", sorted(CONFIGS))
+@pytest.mark.parametrize("layout", ["A-chi-co-cu", "B-chi-co-moi", "C-co-ca-hai"])
+def test_embedded_config_never_trusts_the_station_path_string(layout, cfg, repo, capsys):
+    """`station_path` do `init` embedded ghi (`workspace` cũ / `workspaces` mới) KHÔNG được tin theo chữ:
+    luôn đi qua bộ phân giải trạm nhúng chung (workspaces trước; tên cũ chỉ khi nó là trạm và workspaces
+    chưa có; dùng tên cũ hoặc có cả hai thì in một dòng nhắc)."""
+    build_layout(repo, layout)
+    if CONFIGS[cfg] is not None:
+        (repo / "studio.local.json").write_text(json.dumps(CONFIGS[cfg]), encoding="utf-8")
+    st, src = _env.resolve_station()
+    err = capsys.readouterr().err
+    if layout == "A-chi-co-cu":                        # (A) chỉ có tên cũ: nhận đúng + nhắc đổi tên
+        assert same(st, repo / "workspace") and src == "workspace"
+        assert "workspaces" in err and str(repo / "workspace") in err
+    elif layout == "B-chi-co-moi":                     # (B) đã đổi tên theo gợi ý: KHÔNG mất trạm
+        assert same(st, new_dir(repo)) and src == "workspaces"
+        assert err == ""
+    else:                                              # (C) có cả hai: workspaces thắng + nhắc
+        assert same(st, new_dir(repo)) and src == "workspaces"
+        assert "workspaces" in err and str(repo / "workspace") in err
+
+
+@pytest.mark.parametrize("cfg", ["config-cu-ghi-workspace", "config-moi-ghi-workspaces"])
+def test_migrate_moves_the_resolved_embedded_station_when_both_exist(cfg, repo, tmp_path):
+    from voice_studio import station
+    build_layout(repo, "C-co-ca-hai")
+    (new_dir(repo) / "station.json").write_text("{}", encoding="utf-8")
+    (repo / "studio.local.json").write_text(json.dumps(CONFIGS[cfg]), encoding="utf-8")
+    dest = tmp_path / "ngoai"
+    station.migrate_to_separate(str(dest))
+    assert (dest / "station.json").is_file() and not new_dir(repo).exists()
+    assert (repo / "workspace").is_dir()                  # tên cũ không bị đụng
+
+
+def test_init_embedded_writes_the_new_name_in_station_path(repo):
+    from voice_studio import station
+    make_old_station(repo)
+    res = station.do_init(yes=True)
+    assert same(res["station"], repo / "workspace")       # trạm cũ vẫn được dùng, không dựng trạm thứ hai
+    sp = json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))["station_path"]
+    assert sp == "workspaces"                              # nhưng khoá ghi theo tên mới
+
+
+def test_separate_or_other_relative_station_path_is_kept_literally(repo, tmp_path):
     make_old_station(repo)
     (repo / "studio.local.json").write_text(
-        json.dumps({"mode": "embedded", "station_path": "workspace"}), encoding="utf-8")
+        json.dumps({"mode": "separate", "station_path": "workspace"}), encoding="utf-8")
     st, src = _env.resolve_station()
     assert same(st, repo / "workspace") and src == "studio.local.json"
+    (repo / "studio.local.json").write_text(
+        json.dumps({"mode": "embedded", "station_path": "rieng/tram"}), encoding="utf-8")
+    st, src = _env.resolve_station()
+    assert same(st, repo / "rieng" / "tram") and src == "studio.local.json"
+
+
+def test_hidden_home_directory_station_is_never_used(repo, home):
+    """Trạm giả đặt dưới HOME giả ở tên thư mục ẩn (chuỗi GHÉP: file test không chứa nguyên chuỗi):
+    resolver, init và doctor KHÔNG được dùng, nhắc hay đụng vào nó."""
+    from voice_studio import doctor, station
+    hidden = home / ("." + "voice")
+    (hidden / "omnivoice" / "voices").mkdir(parents=True)
+    (hidden / "station.json").write_text("{}", encoding="utf-8")
+    before = sorted(str(p) for p in hidden.rglob("*"))
+    st, src = _env.resolve_station()
+    assert same(st, new_dir(repo)) and src == "workspaces"
+    res = station.do_init(yes=True)
+    assert same(res["station"], new_dir(repo)) and res["mode"] == "embedded"
+    text = json.dumps(doctor.run_checks(), ensure_ascii=False, default=str)
+    assert str(hidden) not in text and ("." + "voice") not in text.replace("voice_studio", "")
+    assert sorted(str(p) for p in hidden.rglob("*")) == before
 
 
 def test_tier4_existing_workspaces_is_the_embedded_station(repo):

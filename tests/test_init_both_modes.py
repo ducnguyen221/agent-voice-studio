@@ -73,7 +73,7 @@ def test_enter_means_embedded(repo, home):
     assert not list(ws.rglob("*.wav"))
     # từ giờ mọi script phân giải ra đúng trạm này
     st, src = _env.resolve_station()
-    assert os.path.normcase(st) == os.path.normcase(str(ws)) and src == "studio.local.json"
+    assert os.path.normcase(st) == os.path.normcase(str(ws)) and src == "workspaces"
 
 
 def test_the_choice_table_says_where_the_secrets_live(repo):
@@ -240,7 +240,7 @@ def test_a_dotenv_can_never_move_the_repo_or_the_station(var, repo):
     assert os.path.normcase(_env.repo_root()) == os.path.normcase(str(repo))
     st, src = _env.resolve_station()
     assert os.path.normcase(st) == os.path.normcase(str(repo / "workspaces"))
-    assert src == "studio.local.json"
+    assert src == "workspaces"
 
 
 @pytest.mark.parametrize("argv", [["init", "--non-interactive", "--json"],
@@ -364,7 +364,9 @@ def test_no_home_directory_station_is_mentioned_anywhere():
     root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     import re
     # tên thư mục ẩn dưới home (ghép chuỗi để file này không tự bắt mình); `x.voices_dir` / `self.voice` không tính
-    needle = re.compile(r"(?<![A-Za-z0-9_)\]])\." + "voice" + r"(?![A-Za-z0-9_])")
+    # Dạng `~/.x`, `/.x/`, biến-home + `.x` của MỌI trạm anh em (giọng, video, marketing).
+    needle = re.compile(r"(?<![A-Za-z0-9_)\]])\.(" + "|".join(("voi" + "ce", "vid" + "eo", "market" + "ing"))
+                        + r")(?![A-Za-z0-9_])")
     allowed_changelog_prefix = "## 0.4.0"
     hits = []
     for sub in ("voice_studio", "studio", "tests", "docs", "skills", "templates", "hosts", "samples",

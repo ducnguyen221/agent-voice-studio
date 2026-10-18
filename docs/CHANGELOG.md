@@ -14,6 +14,10 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
   một trạm mà `workspaces/` chưa có thì được nhận kèm một dòng nhắc đổi tên (không tự dời); có cả hai
   thì `workspaces/` thắng và có dòng nhắc. `init` mới không bao giờ tạo tên số ít; `doctor` có dòng
   `legacy-workspace` nhắc.
+- `studio.local.json` do `init` embedded ghi (`station_path: workspace` hoặc `workspaces`) không còn được
+  tin theo chữ: trạm nhúng luôn được phân giải bằng một luật chung (đổi tên thư mục theo gợi ý không làm mất
+  trạm; có cả hai thì `workspaces` thắng và có nhắc). `init` embedded ghi lại `station_path: workspaces`.
+  Cây mẫu của repo cũng đổi từ `templates/workspace/` sang `templates/workspaces/`.
 - Thư mục trạm cũ ẩn trong thư mục cá nhân không còn được tự nhận; trỏ vào bằng `--station <đường>`.
 - **Cảnh báo:** có `OPCOS_WORKSPACES` thì Enter/xác nhận ở câu hỏi của `init` ra `<biến>/voice`, còn
   `--yes` ra `<repo>/workspaces/` (`--yes` không bao giờ hỏi và không tự đặt vào thư mục dùng chung).
