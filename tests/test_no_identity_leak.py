@@ -45,6 +45,18 @@ PATTERNS = {
     "kho-tri-thuc": "(?-i:" + r"\b" + re.escape(s(66, 114, 97, 105, 110)) + r"\b)",   # viết hoa
 }
 
+# Email: cấm mọi địa chỉ ở mọi file, trừ ĐÚNG địa chỉ liên hệ của tác giả (chủ dự án chủ động
+# công khai) với số lần chính xác từng file. Dựng bằng ghép chuỗi để file này không tự chứa nó.
+MAU_EMAIL = re.compile(r"[\w.+-]+@(?:gmail|outlook|hotmail|yahoo|icloud)\.com", re.I)
+EMAIL_TG = "ducng" + "uyen.ams" + "@" + "gmail" + ".com"
+EMAIL_ALLOW = {
+    ".claude-plugin/marketplace.json": 2,
+    ".claude-plugin/plugin.json": 1,
+    ".codex-plugin/plugin.json": 1,
+    "README.md": 1,
+    "README.vi.md": 1,
+}
+
 # (file, khoá) → số lần tối đa được phép. Lý do bên cạnh.
 ALLOW = {
     # Bảng tương thích tên biến BGM cũ (đọc được một phiên bản, kèm DeprecationWarning) + test của nó.
@@ -52,7 +64,7 @@ ALLOW = {
     ("voice_studio/av.py", "tien-to-pipeline"): 3,
     ("voice_studio/doctor.py", "tien-to-pipeline"): 3,
     ("tests/conftest.py", "tien-to-pipeline"): 4,
-    ("tests/test_av_mux.py", "tien-to-pipeline"): 8,
+    ("tests/test_av_mux.py", "tien-to-pipeline"): 6,
     ("tests/test_bgm_pick.py", "tien-to-pipeline"): 1,
     ("docs/troubleshooting.md", "tien-to-pipeline"): 1,        # dạy đổi tên biến cũ sang VOICE_BGM*
     # Ghi công tác giả + địa chỉ repo công khai: đúng chỗ, là điều kiện của license.
@@ -134,6 +146,54 @@ def test_allowlist_is_not_stale():
     hits = count_hits()
     stale = [k for k in ALLOW if k not in hits and (ROOT / k[0]).exists()]
     assert stale == [], f"mục ALLOW không còn khớp gì, gỡ đi: {stale}"
+
+
+def test_allowlist_is_exact():
+    """Miễn trừ phải BẰNG số thật: mục dư (cửa mở sẵn) cũng đỏ như mục thiếu."""
+    hits = count_hits()
+    loose = {k: (n, hits.get(k, 0)) for k, n in ALLOW.items()
+             if (ROOT / k[0]).exists() and hits.get(k, 0) != n}
+    assert loose == {}, f"ALLOW lệch số thật (cho phép, thật): {loose}"
+
+
+def email_violations(rel, text):
+    """Email lạ: cấm ở mọi file. Email của tác giả: phải đúng số lần ghi cho file đó
+    (thừa lẫn thiếu đều đỏ)."""
+    found = [m.lower() for m in MAU_EMAIL.findall(text)]
+    mine = found.count(EMAIL_TG)
+    other = len(found) - mine
+    out = []
+    if other:
+        out.append(f"{rel}: {other} địa chỉ email không phải của tác giả")
+    want = EMAIL_ALLOW.get(rel, 0)
+    if mine != want:
+        out.append(f"{rel}: email tác giả x{mine}, kỳ vọng x{want}")
+    return out
+
+
+def test_no_foreign_email():
+    bad = []
+    seen = set()
+    for rel, p in repo_files():
+        seen.add(rel)
+        try:
+            bad += email_violations(rel, p.read_text(encoding="utf-8"))
+        except UnicodeDecodeError:
+            continue
+    bad += [f"{rel}: file miễn trừ email không còn" for rel in EMAIL_ALLOW if rel not in seen]
+    assert bad == [], "email trong repo public: " + "; ".join(bad)
+
+
+@pytest.mark.parametrize("rel", sorted(EMAIL_ALLOW))
+def test_email_gate_mutations(rel):
+    """Đột biến: đổi email tác giả thành email lạ, hoặc thêm lần thứ hai, thì cổng phải ĐỎ."""
+    text = (ROOT / rel).read_text(encoding="utf-8")
+    stranger = "stran" + "ger" + "@" + "gmail" + ".com"
+    assert email_violations(rel, text) == [], "bản thật phải xanh"
+    assert email_violations(rel, text.replace(EMAIL_TG, stranger)), "đổi sang email lạ mà cổng vẫn xanh"
+    assert email_violations(rel, text + "\n" + EMAIL_TG), "thêm lần thứ hai mà cổng vẫn xanh"
+    assert email_violations(rel, text + "\n" + stranger), "thêm email lạ cạnh email thật mà cổng vẫn xanh"
+    assert email_violations("docs/other.md", EMAIL_TG), "email tác giả ở file không được miễn phải đỏ"
 
 
 def test_patterns_catch_their_target(tmp_path):
