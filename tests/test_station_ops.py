@@ -546,3 +546,67 @@ def test_doctor_warns_long_engine_venv_path_on_windows(venv, level):
 
 def test_win_path_check_is_silent_elsewhere():
     assert doctor.win_path_check("/" + "x" * 300, windows=False) is None
+
+
+# ── doctor: trạm OpcOS + bỏ tầng home ─────────────────────────────────────────
+
+@pytest.fixture
+def bare_repo(tmp_path, monkeypatch, sandbox_home):
+    r = tmp_path / "bare-repo"
+    (r / "voice_studio").mkdir(parents=True)
+    (r / "pyproject.toml").write_text("", encoding="utf-8")
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
+    return r
+
+
+def opcos_ws(tmp_path, monkeypatch, marked=True):
+    ws = tmp_path / "opcos-ws"
+    (ws / "voice").mkdir(parents=True)
+    if marked:
+        (ws / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    return ws
+
+
+def test_doctor_hints_init_when_opcos_station_unused(bare_repo, tmp_path, monkeypatch):
+    ws = opcos_ws(tmp_path, monkeypatch)
+    c = by_name(doctor.run_checks())["opcos-station"]
+    assert c["level"] == "warn" and not c["ok"]
+    assert "init --mode separate --station" in c["hint"] and str(ws / "voice") in c["hint"]
+
+
+def test_doctor_silent_without_opcos_var(bare_repo):
+    assert "opcos-station" not in by_name(doctor.run_checks())
+
+
+def test_doctor_silent_when_station_env_set(bare_repo, tmp_path, monkeypatch):
+    opcos_ws(tmp_path, monkeypatch)
+    monkeypatch.setenv("VOICE_STATION", str(tmp_path / "chon"))
+    assert "opcos-station" not in by_name(doctor.run_checks())
+
+
+def test_doctor_silent_when_local_config_chose(bare_repo, tmp_path, monkeypatch):
+    opcos_ws(tmp_path, monkeypatch)
+    (bare_repo / "studio.local.json").write_text(
+        json.dumps({"mode": "separate", "station_path": str(tmp_path / "chon")}), encoding="utf-8")
+    assert "opcos-station" not in by_name(doctor.run_checks())
+
+
+def test_doctor_notes_opcos_dir_without_marker(bare_repo, tmp_path, monkeypatch):
+    ws = opcos_ws(tmp_path, monkeypatch, marked=False)
+    c = by_name(doctor.run_checks())["opcos-station"]
+    assert c["level"] == "warn" and str(ws) in c["detail"] + c["hint"]
+    assert "chưa là trạm" in c["detail"] + c["hint"]
+
+
+def test_doctor_has_no_home_station_warning(bare_repo, sandbox_home):
+    assert _env.has_marker(_env.default_station())           # trạm mồi ~/.voice có thật
+    names = by_name(doctor.run_checks())
+    assert "station-source" not in names
+    assert not any("được nhận vì nó đã có sẵn" in c["hint"] for c in names.values())
+
+
+def test_doctor_two_sources_ignores_home_station(embedded_repo, sandbox_home):
+    assert _env.has_marker(_env.default_station())
+    c = by_name(doctor.run_checks())
+    assert "two-sources" not in c or c["two-sources"]["ok"]

@@ -74,10 +74,74 @@ def test_tier4_existing_workspace_beats_old_home_station(repo, home):
     assert same(st, repo / "workspace") and src == "workspace"
 
 
-def test_tier5_home_station_only_when_it_already_is_one(repo, home):
+def test_home_station_marker_is_never_used(repo, home, tmp_path, monkeypatch):
+    # ~/.voice mang dấu trạm KHÔNG còn là nguồn phân giải.
     make_home_station(home)
+    assert _env.has_marker(str(home / ".voice"))
     st, src = _env.resolve_station()
-    assert same(st, home / ".voice") and src == _env.HOME_STATION
+    assert same(st, repo / "workspace") and src == "workspace"
+    # có OPCOS_WORKSPACES (kể cả trỏ trạm mang dấu) cũng không đổi gì ở resolver.
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(make_opcos_station(tmp_path)))
+    st, src = _env.resolve_station()
+    assert same(st, repo / "workspace") and src == "workspace"
+    assert not hasattr(_env, "HOME_STATION")
+
+
+def make_opcos_station(tmp_path, name="ocws"):
+    ws = tmp_path / name
+    (ws / "voice").mkdir(parents=True)
+    (ws / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    return ws
+
+
+def test_sandbox_home_hides_real_home(sandbox_home, tmp_path):
+    assert os.path.expanduser("~").startswith(str(tmp_path))
+    assert "OPCOS_WORKSPACES" not in os.environ and "VOICE_STATION" not in os.environ
+    assert _env.has_marker(_env.default_station())           # trạm mồi có thật trong HOME giả
+    assert str(tmp_path) in _env.default_station()
+
+
+def test_sandbox_home_voice_source_is_workspace_before_and_after_init(repo, sandbox_home):
+    # Có trạm mồi ~/.voice, chưa có workspace/ → workspace; đã có workspace/ → vẫn workspace.
+    st, src = _env.resolve_station()
+    assert same(st, repo / "workspace") and src == "workspace"
+    assert not (repo / "workspace").exists()
+    (repo / "workspace").mkdir()
+    st, src = _env.resolve_station()
+    assert same(st, repo / "workspace") and src == "workspace"
+
+
+def test_opcos_station_found_when_marked(tmp_path, monkeypatch):
+    ws = make_opcos_station(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    assert _env.opcos_station() == str(ws / "voice")
+
+
+def test_opcos_station_none_without_marker(tmp_path, monkeypatch):
+    (tmp_path / "ocws" / "voice").mkdir(parents=True)        # thư mục có, không dấu trạm
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "ocws"))
+    assert _env.opcos_station() is None
+    monkeypatch.delenv("OPCOS_WORKSPACES")
+    assert _env.opcos_station() is None
+
+
+def test_opcos_station_blank_file_or_tilde(tmp_path, monkeypatch, sandbox_home):
+    for blank in ("", "  "):
+        monkeypatch.setenv("OPCOS_WORKSPACES", blank)
+        assert _env.opcos_station() is None
+    f = tmp_path / "file.txt"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    assert _env.opcos_station() is None
+    make_opcos_station(sandbox_home, "ws")
+    monkeypatch.setenv("OPCOS_WORKSPACES", "~/ws")
+    assert same(_env.opcos_station(), sandbox_home / "ws" / "voice")
+
+
+def test_resolve_station_ignores_opcos_workspaces(repo, tmp_path, monkeypatch):
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(make_opcos_station(tmp_path)))
+    st, src = _env.resolve_station()
+    assert same(st, repo / "workspace") and src == "workspace"
 
 
 def test_empty_home_dir_is_not_a_station(repo, home):

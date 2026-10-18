@@ -56,7 +56,7 @@ Chọn chỗ đặt TRẠM GIỌNG (nơi chứa venv engine, giọng của bạn
               `voice-studio update`; và nhớ `voice-studio backup`.
       Chọn khi: một máy, muốn dùng được ngay, không rành kỹ thuật.
 
-  [2] separate — trạm ngoài repo (mặc định ~/.voice)
+  [2] separate — trạm ngoài repo (mặc định ~/.voice, hoặc trạm OpcOS nếu OPCOS_WORKSPACES có trạm)
       Là gì : trạm ở thư mục riêng; bí mật ở kho secret của máy ({kho}).
       Lợi   : repo luôn sạch (an toàn khi repo là bản public của chính bạn); nhiều máy /
               nhiều repo dùng chung một trạm; cập nhật repo không đụng dữ liệu.
@@ -218,6 +218,7 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
     trạm sai chỗ, và người dùng chỉ phát hiện ra sau khi đã dựng vài giọng.
     """
     repo = _env.repo_root()
+    from_prev = False                    # chế độ lấy từ studio.local.json — không đề xuất trạm OpcOS
     if station:
         return "separate", _env._expand(station), "--station"
     ext = detect_external()
@@ -235,6 +236,7 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
             return "separate", st, "studio.local.json (lần chọn trước)"
         if prev in MODES:
             mode, why = prev, "studio.local.json (lần chọn trước)"
+            from_prev = True
         elif yes:
             mode, why = "embedded", "--yes (nhận khuyến nghị)"
         else:
@@ -245,8 +247,13 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
                         "cần người dùng chọn chế độ cài. Agent: trình bảng trên cho người dùng, "
                         "rồi chạy lại với --mode embedded|separate (hoặc --yes = embedded).")
                 ask = _ask_console
+            table = CHOICE_TABLE
+            oc = _env.opcos_station()
+            if oc:
+                table += (f"\nTrạm OpcOS đã có sẵn (OPCOS_WORKSPACES): {oc}\n"
+                          "→ chọn [2] sẽ dùng đúng trạm đó (ghi vào studio.local.json), không tạo trạm mới.\n")
             try:
-                ans = (ask(CHOICE_TABLE) or "").strip().lower()
+                ans = (ask(table) or "").strip().lower()
             except EOFError:
                 # Windows: stdin là NUL vẫn báo isatty() = True — hết dữ liệu nghĩa là không có người.
                 raise ContractError(
@@ -267,6 +274,9 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
                                 "hoặc bản sao kèm biến VOICE_STUDIO_REPO=<repo> (docs/INSTALL.md "
                                 "mục 3); không thì chỉ dùng được separate (--station DIR).")
         return "embedded", os.path.join(repo, _env.WORKSPACE), why
+    oc = None if from_prev else _env.opcos_station()
+    if oc:
+        return "separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm"
     return "separate", _env.default_station(), why
 
 

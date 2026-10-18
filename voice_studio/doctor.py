@@ -145,8 +145,6 @@ def station_checks(st):
             others.append("OMNIVOICE_DIR")
         if local.get("mode") == "separate":
             others.append("studio.local.json=separate")
-        if _env.has_marker(_env.default_station()):
-            others.append("~/.voice")
         out.append(_check("two-sources", not others,
                           f"{ws} + {', '.join(others)}" if others else ws,
                           hint="hai nguồn sự thật cho một repo: giữ MỘT trạm — gộp dữ liệu rồi xoá "
@@ -170,6 +168,31 @@ def station_checks(st):
         out.append(_check("env-perm", not (mode & 0o077), oct(mode), level="warn",
                           hint="chmod 600 .env"))
     return out
+
+
+def opcos_check(src):
+    """Ghi chú về trạm OpcOS (`OPCOS_WORKSPACES`): chỉ nhắc, không bao giờ đổi trạm đang dùng.
+
+    Biến vắng ⇒ None. Có và `<biến>/voice` mang dấu trạm mà nguồn hiện tại là
+    `workspace`/`unset` ⇒ gợi ý lệnh `init`. Có mà chưa là trạm ⇒ ghi đường đã thử.
+    Nguồn đã là biến trạm / `studio.local.json` ⇒ im lặng.
+    """
+    base = (os.environ.get("OPCOS_WORKSPACES") or "").strip()
+    if not base:
+        return None
+    oc = _env.opcos_station()
+    if oc:
+        if src in (_env.WORKSPACE, _env.UNSET):
+            return _check("opcos-station", False, f"{oc} (trạm OpcOS chưa được dùng)", level="warn",
+                          hint=f"có trạm OpcOS: `voice-studio init --mode separate --station \"{oc}\"` "
+                               "để dùng chung trạm đó")
+        return None
+    tried = os.path.join(os.path.expanduser(base), "voice")
+    if src in (_env.WORKSPACE, _env.UNSET):
+        return _check("opcos-station", False, f"OPCOS_WORKSPACES={base}: {tried} chưa là trạm",
+                      level="warn", hint="thư mục đó chưa có station.json hoặc omnivoice/voices/ — bỏ qua nếu "
+                                         "không định dùng trạm OpcOS")
+    return None
 
 
 def _git_tracked(repo):
@@ -196,10 +219,9 @@ def run_checks():
         checks.append(_check("station", os.path.isdir(st), f"{st} (nguồn: {st_src})",
                              hint="chưa có trạm giọng — chạy `voice-studio init` hoặc đặt VOICE_STATION"))
         checks += station_checks(st)
-    if st_src == _env.HOME_STATION:
-        checks.append(_check("station-source", False, st, level="warn",
-                             hint="trạm ~/.voice được nhận vì nó đã có sẵn; đặt VOICE_STATION trỏ vào "
-                                  "đó để lịch chạy và máy khác thấy cùng một trạm"))
+    oc = opcos_check(st_src)
+    if oc:
+        checks.append(oc)
     if _env.env("OMNIVOICE_DIR") and not _env.env("VOICE_STATION"):
         checks.append(_check("env-name", False, "OMNIVOICE_DIR", level="warn",
                              hint="tên biến cũ — đặt VOICE_STATION=<gốc trạm> (OMNIVOICE_DIR vẫn đọc được)"))

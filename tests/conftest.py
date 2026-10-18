@@ -24,6 +24,7 @@ CONTRACT_VARS = (
     "NEWS_BGM", "NEWS_BGM_VOL", "NEWS_BGM_DIR",
     "FFMPEG_DIR", "VOICE_STUDIO_WORK", "VOICE_CLEAN_DIR", "HF_HOME", "HF_HUB_CACHE",
     "STUDIO_PORT", "VOICE_STUDIO_REPO",
+    "OPCOS_WORKSPACES", "OPCOS_ROOT",
 )
 
 
@@ -42,6 +43,29 @@ def _clean_contract_env(monkeypatch, tmp_path):
     from voice_studio import _env
     _env.reset_deprecation_warnings()
     yield
+
+
+@pytest.fixture
+def sandbox_home(tmp_path, monkeypatch):
+    """HOME giả không junction, có trạm mồi `~/.voice/station.json`. Biến trạm và `OPCOS_*` đã bị
+    `_clean_contract_env` (autouse) xoá — fixture này KHÔNG tự xoá lại.
+
+    Đặt đủ bốn biến home (`expanduser` trên Windows đọc USERPROFILE, PowerShell con tính lại từ
+    HOMEDRIVE/HOMEPATH) để không có đường nào dẫn về home thật của máy chạy test.
+    """
+    home = tmp_path / "home"
+    home.mkdir(exist_ok=True)
+    # Biến trạm và OPCOS_* đã bị `_clean_contract_env` (autouse) xoá; KHÔNG xoá lại ở đây vì
+    # VOICE_STUDIO_REPO do fixture `repo` của từng file đặt có thể đã chạy trước.
+    drive, tail = os.path.splitdrive(str(home))
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("USERPROFILE", str(home))
+    monkeypatch.setenv("HOMEDRIVE", drive)
+    monkeypatch.setenv("HOMEPATH", tail)
+    bait = home / ".voice"
+    bait.mkdir(exist_ok=True)
+    (bait / "station.json").write_text("{}", encoding="utf-8")
+    return home
 
 
 # ── Engine GIẢ dùng chung cho test CLI / MCP / make-profile ─────────────────────────────

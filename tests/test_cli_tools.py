@@ -120,7 +120,8 @@ def test_venv_python_per_os(tmp_path):
 def test_clean_dir_resolution_order(tmp_path, monkeypatch):
     assert clean_voice.resolve_clean_dir() is None           # máy trần: không tự chọn ~/.voice
     (tmp_path / "home" / ".voice" / "omnivoice" / "voices").mkdir(parents=True)
-    assert clean_voice.resolve_clean_dir() == (tmp_path / "home" / ".voice" / "voice-clean").resolve()
+    # ~/.voice mang dấu trạm KHÔNG còn được tự nhận — resolver bỏ tầng `home`.
+    assert clean_voice.resolve_clean_dir() is None
     monkeypatch.setenv("OMNIVOICE_DIR", str(tmp_path / "old" / "omnivoice"))
     assert clean_voice.resolve_clean_dir() == (tmp_path / "old" / "voice-clean").resolve()
     monkeypatch.setenv("VOICE_STATION", str(tmp_path / "st"))

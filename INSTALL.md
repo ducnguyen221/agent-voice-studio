@@ -204,7 +204,7 @@ Mỗi dòng: `[TRẠNG THÁI] khu vực chi tiết`, có thể kèm một dòng 
 | `[WARN] ffmpeg` | thiếu ffmpeg | cài ffmpeg (mục 3) khi cần mp3 hay ghép video |
 | `[WARN] bgm-library` | chưa có thư viện nhạc nền, hoặc style khai trong `bgm-library.json` chưa có `<style>.mp3` | bình thường với máy mới; trước khi chạy pipeline có nhạc nền: thêm mp3 (nhạc có quyền dùng) hoặc sinh theo [docs/bgm-generation.md](docs/bgm-generation.md) |
 | `[WARN] win-path` | đường venv engine dài, cài torch có thể gãy trên Windows | trước phần B: clone lại vào đường ngắn, hoặc chọn `separate` với thư mục ngắn |
-| `[WARN] env-name` / `station-source` | tên biến cũ / trạm cũ được nhận ngầm | làm theo gợi ý nếu người dùng đồng ý |
+| `[WARN] env-name` / `opcos-station` | tên biến cũ / máy có trạm giọng của OpcOS (`OPCOS_WORKSPACES`) mà chưa dùng | làm theo gợi ý nếu người dùng đồng ý |
 | `[NOT_CHECKED] weights` / `synthesis` | doctor không kiểm được lúc này | **không phải lỗi**; phần B mới kiểm được |
 | `[WARN] weights` | engine đã cài, weights chưa tải | bình thường tới lần tổng hợp đầu (mục 9) |
 

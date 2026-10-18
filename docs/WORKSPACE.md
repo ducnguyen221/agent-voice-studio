@@ -57,14 +57,16 @@ git mà đường dẫn trong `.env` trỏ tới (ở `separate`: `~/.secret/voi
 
 ```
 --station  →  VOICE_STATION  →  OMNIVOICE_DIR (tên cũ, trỏ thư mục engine)  →
-<repo>/studio.local.json  →  <repo>/workspace/ nếu có  →  ~/.voice nếu ĐÃ là một trạm  →
-<repo>/workspace/ (mặc định, `init` tạo)  →  chưa xác định (mã 3)
+<repo>/studio.local.json  →  <repo>/workspace/ (có hay chưa; `init` tạo)  →  chưa xác định (mã 3)
 ```
 
 **Không đặt gì thì trạm là thư mục trong repo** (`<repo>/workspace/`, bị git bỏ qua) — không
-bao giờ là một thư mục ẩn mới dưới home. `~/.voice` chỉ được dùng khi bạn đã chọn nó (biến,
-`--station`, chế độ `separate`) hoặc nó đã là một trạm từ trước (doctor nhắc đặt
-`VOICE_STATION` cho tường minh).
+bao giờ là một thư mục ẩn dưới home. `~/.voice` chỉ được dùng khi bạn đã chọn nó (biến,
+`--station`, hoặc `init` chế độ `separate` ghi vào `studio.local.json`); dù nó đã là một trạm thật,
+các lệnh **không** tự nhận nữa. Máy còn `~/.voice` cũ mà chưa cấu hình: đặt `VOICE_STATION` hoặc chạy
+`voice-studio init` (`init` phát hiện `~/.voice` đã là trạm thì tự nhận làm trạm separate, không hỏi — kể cả `--yes`). Nếu máy có biến `OPCOS_WORKSPACES` trỏ thư mục
+chứa trạm `voice/`, `init` đề xuất trạm đó (không tự nhận khi `--yes`) và `doctor` nhắc — resolver
+không đọc biến này.
 
 `<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO` — cách bản sao của máy
 chạy lịch tìm về bản clone, xem [`INSTALL.md`](INSTALL.md) mục 3). Cài dạng wheel không đặt biến thì

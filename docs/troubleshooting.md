@@ -18,7 +18,7 @@ chưa đủ. `[NOT_CHECKED]` **không phải lỗi**: doctor nói thẳng điề
 | `[FAIL] station <đường>` | trạm chưa dựng | `voice-studio init` |
 | `[FAIL] voices` | trạm có nhưng thiếu `omnivoice/voices/` | `voice-studio init` (chạy lại an toàn, không đè gì) |
 | `[FAIL] torch` / `omnivoice` | đang chạy bằng python không có engine | gọi bằng python của **venv engine** (`<trạm>/omnivoice/.venv`), hoặc cài engine theo [install-omnivoice.md](../skills/voice-routing/references/install-omnivoice.md) |
-| `[FAIL] two-sources` | vừa có `<repo>/workspace/` vừa có trạm ngoài (biến hoặc `~/.voice`) | giữ **một** trạm: gộp dữ liệu, rồi xoá `workspace/` hoặc gỡ biến; hoặc `voice-studio migrate --to separate` |
+| `[FAIL] two-sources` | vừa có `<repo>/workspace/` vừa có trạm ngoài (biến hoặc `studio.local.json: separate`) | giữ **một** trạm: gộp dữ liệu, rồi xoá `workspace/` hoặc gỡ biến; hoặc `voice-studio migrate --to separate` |
 
 Trạm nằm ở đâu khi không đặt gì: `<repo>/workspace/`. Thứ tự tìm đầy đủ ở
 [WORKSPACE.md](WORKSPACE.md#thứ-tự-tìm-trạm-mọi-lệnh-dùng-chung-một-hàm).
@@ -27,8 +27,9 @@ Trạm nằm ở đâu khi không đặt gì: `<repo>/workspace/`. Thứ tự t�
 
 `OMNIVOICE_DIR` là tên cũ, trỏ **thư mục engine** (`<trạm>/omnivoice`), không phải gốc trạm. Vẫn
 đọc được, nhưng đặt `VOICE_STATION=<gốc trạm>` rồi gỡ biến cũ. `NEWS_BGM*` tương tự → `VOICE_BGM*`.
-`[WARN] station-source`: trạm `~/.voice` được nhận vì nó đã có sẵn — đặt `VOICE_STATION` trỏ vào
-đó để lịch chạy và máy khác thấy cùng một trạm.
+Trạm `~/.voice` có sẵn **không còn được tự nhận** (bỏ dòng `station-source`): đặt `VOICE_STATION`
+trỏ vào đó, hoặc `voice-studio init` để ghi vào `studio.local.json`. `[WARN] opcos-station` chỉ nhắc
+khi `OPCOS_WORKSPACES` có trạm mà bạn chưa dùng — chạy lệnh `init --mode separate --station …` nó in.
 
 ## Weights — offline theo mặc định
 

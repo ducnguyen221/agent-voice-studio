@@ -4,6 +4,15 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+## Chưa phát hành
+
+**Đổi hành vi (bỏ tầng `home`):** các lệnh không còn tự nhận `~/.voice` chỉ vì nó đã có
+`station.json` / `omnivoice/voices/`. Thứ tự tìm trạm: `--station` → `VOICE_STATION` →
+`OMNIVOICE_DIR` → `studio.local.json` → `<repo>/workspace/`. Máy còn `~/.voice` thật mà chưa cấu
+hình phải đặt `VOICE_STATION` hoặc chạy `voice-studio init` (`init` phát hiện `~/.voice` đã là trạm thì tự nhận làm trạm separate, không hỏi — kể cả `--yes`).
+`doctor` bỏ dòng `station-source`. Thêm: `init` đề xuất và `doctor` nhắc trạm `voice/` trong
+`OPCOS_WORKSPACES` (tuỳ chọn; `init --yes` không tự nhận, resolver không đọc biến này).
+
 ## 0.3.3 — 2026-10-01
 
 **Extra `[clone]` ghim faster-whisper + PyAV theo cặp đã đo.** Engine, profile, trạm, CLI và mã thoát

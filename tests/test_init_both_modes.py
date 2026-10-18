@@ -406,6 +406,129 @@ def test_host_venv_classifies_prefixes(tmp_path):
         assert got["weights_cached"] is False               # HOME giả: cache rỗng
 
 
+# ── trạm OpcOS: OPCOS_WORKSPACES chỉ được đọc ở init/doctor ───────────────────
+
+@pytest.fixture
+def opcos(tmp_path, monkeypatch, sandbox_home):
+    """OPCOS_WORKSPACES trỏ thư mục có `voice/station.json`; trả đường trạm OpcOS."""
+    ws = tmp_path / "opcos-ws"
+    (ws / "voice").mkdir(parents=True)
+    (ws / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    return ws / "voice"
+
+
+def read_local(repo):
+    return json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))
+
+
+def test_init_mode_separate_defaults_to_opcos_station_and_writes_absolute_path(repo, opcos, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()      # chỉ còn trạm OpcOS, không ext ở home
+    before = set(os.listdir(opcos.parent))
+    res = station.do_init(mode="separate", ask=never_ask)
+    assert res["mode"] == "separate"
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
+    local = read_local(repo)
+    assert local["mode"] == "separate" and local["station_path"] == os.path.abspath(str(opcos))
+    assert set(os.listdir(opcos.parent)) == before           # không tạo trạm/thư mục anh em
+    assert not (repo / "workspace").exists()
+    assert not (sandbox_home / ".voice" / "omnivoice").exists()
+
+
+def test_init_separate_relative_opcos_workspaces_writes_absolute_path(repo, tmp_path, monkeypatch, sandbox_home):
+    """OPCOS_WORKSPACES tương đối + cwd ≠ repo: station_path vẫn tuyệt đối và resolve_station() đúng."""
+    (sandbox_home / ".voice" / "station.json").unlink()
+    cwd = tmp_path / "elsewhere"
+    (cwd / "ws" / "voice").mkdir(parents=True)
+    (cwd / "ws" / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.chdir(cwd)
+    monkeypatch.setenv("OPCOS_WORKSPACES", "ws")
+    res = station.do_init(mode="separate", ask=never_ask)
+    want = os.path.abspath(str(cwd / "ws" / "voice"))
+    assert os.path.normcase(res["station"]) == os.path.normcase(want)
+    sp = read_local(repo)["station_path"]
+    assert os.path.isabs(sp) and os.path.normcase(sp) == os.path.normcase(want)
+    monkeypatch.chdir(tmp_path)                              # đổi cwd: con trỏ vẫn đúng
+    got, _src = _env.resolve_station()
+    assert os.path.normcase(got) == os.path.normcase(want)
+
+
+def test_init_interactive_proposes_opcos_station(repo, opcos, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    prompts = []
+    res = station.do_init(ask=lambda p: prompts.append(p) or "2")
+    assert str(opcos) in prompts[0]                          # bảng nêu đường trạm OpcOS
+    assert res["mode"] == "separate"
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
+    assert read_local(repo)["station_path"] == os.path.abspath(str(opcos))
+    # trả lời nhận embedded → embedded
+    (repo / "studio.local.json").unlink()
+    res = station.do_init(ask=lambda p: "1")
+    assert res["mode"] == "embedded"
+    assert read_local(repo)["station_path"] == "workspace"
+
+
+def test_init_yes_with_opcos_var_stays_embedded(repo, opcos, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    res = station.do_init(yes=True, ask=never_ask)
+    assert res["mode"] == "embedded"
+    assert read_local(repo)["station_path"] == "workspace"
+    assert str(opcos) not in json.dumps(read_local(repo))
+
+
+def test_init_mode_embedded_allowed_with_opcos_var(repo, opcos, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    res = station.do_init(mode="embedded", ask=never_ask)    # không ContractError
+    assert res["mode"] == "embedded" and (repo / "workspace" / "station.json").is_file()
+
+
+def test_init_again_on_embedded_clone_is_not_flipped(repo, opcos, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    (repo / "studio.local.json").write_text(json.dumps({"mode": "embedded"}), encoding="utf-8")
+    res = station.do_init(ask=never_ask)
+    assert res["mode"] == "embedded"
+    assert read_local(repo)["station_path"] == "workspace"
+
+
+def test_init_yes_ignores_opcos_dir_without_marker(repo, tmp_path, monkeypatch, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    (tmp_path / "bare-ws" / "voice").mkdir(parents=True)     # thư mục có, không dấu trạm
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
+    res = station.do_init(yes=True, ask=never_ask)
+    assert res["mode"] == "embedded" and "station_path" in read_local(repo)
+    assert read_local(repo)["station_path"] == "workspace"
+
+
+def test_init_prev_separate_without_station_path_ignores_opcos(repo, opcos, sandbox_home):
+    # Lựa chọn đã ghi (`mode: separate`, chưa có station_path) thắng — KHÔNG đề xuất trạm OpcOS.
+    (sandbox_home / ".voice" / "station.json").unlink()
+    (repo / "studio.local.json").write_text(json.dumps({"mode": "separate"}), encoding="utf-8")
+    res = station.do_init(ask=never_ask, dry_run=True)
+    assert res["mode"] == "separate"
+    assert os.path.normcase(res["station"]) == os.path.normcase(_env.default_station())
+    assert os.path.normcase(res["station"]) != os.path.normcase(str(opcos))
+
+
+def test_init_mode_separate_opcos_dir_without_marker_uses_default(repo, tmp_path, monkeypatch, sandbox_home):
+    (sandbox_home / ".voice" / "station.json").unlink()
+    (tmp_path / "bare-ws" / "voice").mkdir(parents=True)     # thư mục có, không dấu trạm
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
+    res = station.do_init(mode="separate", ask=never_ask, dry_run=True)
+    assert os.path.normcase(res["station"]) == os.path.normcase(_env.default_station())
+
+
+def test_init_without_opcos_var_unchanged(repo, sandbox_home):
+    # biến vắng + ~/.voice mang dấu (trạm mồi) → vẫn nhận diện, không hỏi (như test hiện có)
+    res = station.do_init(ask=never_ask)
+    assert res["mode"] == "separate" and "~/.voice" in res["reason"]
+
+
+def test_init_opcos_var_does_not_override_detected_external(repo, opcos, tmp_path, monkeypatch):
+    monkeypatch.setenv("VOICE_STATION", str(tmp_path / "chon"))
+    res = station.do_init(ask=never_ask)
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(tmp_path / "chon"))
+
+
 def test_venv_commands_weights_size_is_measured_value(tmp_path):
     cmds = "\n".join(station.venv_commands(str(tmp_path / "st"), windows=False))
     assert "3,3 GB" in cmds and "4 GB" not in cmds

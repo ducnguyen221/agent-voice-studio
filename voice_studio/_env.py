@@ -22,8 +22,8 @@ MỘT phiên bản, kèm DeprecationWarning, rồi sẽ bị bỏ.
 Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — `resolve_station()`:
 
     --station (lệnh đặt VOICE_STATION trong tiến trình) → VOICE_STATION → OMNIVOICE_DIR (cha)
-    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ nếu có
-    → ~/.voice nếu ĐÃ là một trạm → <repo>/workspace/ (mặc định, `init` tạo) → chưa xác định
+    → <repo>/studio.local.json ("station_path") → <repo>/workspace/ (có hay chưa; `init` tạo)
+    → chưa xác định (không repo)
 
 `<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
 `VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ không có tầng repo,
@@ -210,8 +210,21 @@ def has_marker(path):
                            os.path.isdir(os.path.join(path, "omnivoice", "voices")))
 
 
+def opcos_station(station="voice"):
+    """Trạm OpcOS `<OPCOS_WORKSPACES>/<station>` nếu biến đặt, khác rỗng và thư mục đó MANG DẤU
+    trạm; không thì None. Chỉ `init`/`doctor` gọi — `resolve_station()` không bao giờ đọc nó.
+
+    Đọc `os.environ` thật (không qua `env()`/`.env` của repo): đây là con trỏ cấp máy. Không tạo,
+    không ghi, không cảnh báo; `~` được mở rộng; biến trỏ file thì không có thư mục con → None.
+    """
+    base = (os.environ.get("OPCOS_WORKSPACES") or "").strip()
+    if not base:
+        return None
+    path = os.path.abspath(os.path.join(os.path.expanduser(base), station))
+    return path if has_marker(path) else None
+
+
 UNSET = "unset"
-HOME_STATION = "home"
 UNSET_HINT = ("chưa xác định được trạm giọng: bản cài này không nằm trong một bản clone repo "
               "và chưa đặt VOICE_STATION. Đặt VOICE_STATION=<thư mục trạm> (hoặc truyền "
               "--station), rồi chạy `voice-studio init --station <thư mục trạm>`.")
@@ -221,12 +234,12 @@ def resolve_station():
     """-> (gốc trạm | None, nguồn). Đọc lại mỗi lần gọi. Thứ tự:
 
         VOICE_STATION → OMNIVOICE_DIR (cha) → <repo>/studio.local.json → <repo>/workspace/ nếu có
-        → ~/.voice nếu ĐÃ là một trạm (`home`, tương thích máy cũ) → <repo>/workspace/ (chưa có;
-        `init` sẽ tạo) → (None, `unset`)
+        → <repo>/workspace/ (chưa có; `init` sẽ tạo) → (None, `unset`)
 
     Không đặt gì thì trạm là THƯ MỤC TRONG REPO (bị git bỏ qua), không bao giờ là một thư mục
-    ẩn mới dưới home: `~/.voice` chỉ được dùng khi người dùng đã chọn nó (biến, `--station`,
-    `init` chế độ separate) hoặc nó đã là một trạm từ trước. Cài dạng wheel (không có repo) mà
+    ẩn dưới home: `~/.voice` chỉ được dùng khi người dùng đã chọn nó (biến, `--station`,
+    `init` chế độ separate ghi vào `studio.local.json`) — dù nó đã là một trạm thật, resolver
+    KHÔNG tự nhận (tầng `home` đã bỏ; `init` phát hiện nó thì tự nhận làm trạm separate, không hỏi). Cài dạng wheel (không có repo) mà
     chưa đặt gì ⇒ `unset` — `station_dir()` báo mã 3 kèm cách đặt, thay vì tự đẻ thư mục.
     """
     st = env("VOICE_STATION")
@@ -244,9 +257,6 @@ def resolve_station():
             return (sp if os.path.isabs(sp) else os.path.abspath(os.path.join(repo, sp))), LOCAL_CONFIG
         if os.path.isdir(ws):
             return ws, WORKSPACE
-    home = default_station()
-    if has_marker(home):
-        return home, HOME_STATION
     if repo and os.path.isdir(repo):
         return ws, WORKSPACE
     return None, UNSET
