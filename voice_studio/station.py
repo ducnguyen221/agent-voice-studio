@@ -270,10 +270,10 @@ def _ask_legacy(ext, ask, default_ask):
     """Có trạm cũ dưới home mà chưa ai chọn: HỎI ba đường. -> ("embedded", lý do) khi dùng
     trạm mới trong repo; ("separate", đường, lý do) khi nhận trạm cũ hoặc trạm OpcOS."""
     path, why = ext[0], ext[1]
-    oc = _env.opcos_station()
+    oc = _env.opcos_dir()      # `<OPCOS_WORKSPACES>/voice` nếu biến đặt — dù thư mục chưa là trạm
     repo = _env.repo_root()
     new = oc or os.path.join(repo or "<repo>", _env.WORKSPACE)     # ĐƯỜNG THẬT mà [1] sẽ dùng
-    where = ("Trạm OpcOS đã có sẵn (OPCOS_WORKSPACES) — dùng luôn trạm đó" if oc
+    where = ("Trạm dùng chung theo OPCOS_WORKSPACES (chưa có thì init dựng ở đó)" if oc
              else "Trạm mới nằm trong repo (embedded)")
     table = LEGACY_TABLE.format(path=path, why=why, where=where, new=new)
     try:
@@ -285,7 +285,7 @@ def _ask_legacy(ext, ask, default_ask):
             "--yes / --mode embedded (trạm mới trong repo).")
     if ans in ("", "1"):
         if oc:
-            return "separate", oc, f"người dùng chọn trạm mới — trạm OpcOS: {oc}"
+            return "separate", oc, f"người dùng chọn trạm mới — OPCOS_WORKSPACES/voice: {oc}"
         return "embedded", f"người dùng chọn trạm mới {new} (trạm cũ giữ nguyên)"
     if ans == "2":
         return "separate", path, f"người dùng chọn nhận trạm cũ — {why}"
@@ -308,7 +308,8 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
     repo = _env.repo_root()
     from_prev = False                    # chế độ lấy từ studio.local.json — không đề xuất trạm OpcOS
     default_ask = ask is None
-    interactive = ask is not None or (not non_interactive and _stdin_is_tty())
+    # `--yes` là "đừng hỏi gì cả" (có terminal hay không): không đường nào dưới đây được gọi input().
+    interactive = not yes and (ask is not None or (not non_interactive and _stdin_is_tty()))
     if station:
         return "separate", _path(station), "--station"
     ext = detect_external()
@@ -517,6 +518,8 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
     repo = _env.repo_root()
     res = {"mode": mode, "station": st, "reason": why, "dry_run": bool(dry_run),
            "repo": repo, "created": [], "hook": None}
+    if os.path.exists(st) and not os.path.isdir(st):
+        raise ContractError(f"đường trạm trỏ vào một FILE, không phải thư mục: {st}")
     if existing and not os.path.isdir(st):
         raise ContractError(f"--existing nhưng không có thư mục trạm: {st}")
     voices = os.path.join(st, "omnivoice", "voices")
@@ -987,10 +990,16 @@ def migrate_to_separate(target=None):
     plan = _migrate_plan(target)                 # không đếm file: đã có đích rõ thì khỏi đi cả cây
     repo, ws, target = plan["repo"], plan["ws"], plan["target"]
     env_file, sec, moved_env = plan["env_file"], plan["sec"], plan["moved_env"]
-    if os.path.isdir(target):
+    had_empty_dir = os.path.isdir(target)
+    if had_empty_dir:
         os.rmdir(target)
     os.makedirs(os.path.dirname(target), exist_ok=True)
-    _move_tree(ws, target)
+    try:
+        _move_tree(ws, target)
+    except ContractError:
+        if had_empty_dir and not os.path.exists(target):
+            os.makedirs(target)                  # trả lại thư mục rỗng của người dùng
+        raise
     if moved_env:
         os.makedirs(sec, exist_ok=True)
         _move_file(env_file, moved_env)

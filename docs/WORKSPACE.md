@@ -22,19 +22,22 @@ có đường mặc định. Không hỏi (hoặc chỉ hỏi xác nhận) trong
 - `--station DIR` — bạn chỉ thẳng trạm ⇒ `separate`.
 - Máy **đã đặt trạm ngoài**: biến `VOICE_STATION` (hoặc tên cũ `OMNIVOICE_DIR`) ⇒ tự `separate`,
   **không bao giờ** tạo `workspace/` (hai trạm cho một repo = hai nguồn sự thật).
-- `--mode embedded` hoặc `--yes` (= nhận khuyến nghị `embedded`).
+- `--mode embedded` hoặc `--yes` (= nhận khuyến nghị `embedded`; không bao giờ hỏi).
 - `--mode separate` khi `OPCOS_WORKSPACES` đang đặt: đích là `<biến>/voice` (tuyệt đối, kể cả khi
   thư mục đó chưa là trạm). Có người ngồi đó thì `init` hỏi xác nhận hoặc đổi; không có người thì
   dùng luôn và in một dòng nêu đường. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2
   (cần `--station DIR`).
 
 Còn một thư mục trạm **cũ** dưới home (`~/.voice` có `station.json` / `omnivoice/voices/`) thì
-`init` **hỏi**, không tự nhận: [1] dùng trạm mới (khuyến nghị, Enter; bảng nêu đúng đường: `<repo>/workspace/`, hoặc trạm OpcOS nếu
-có) · [2] nhận trạm cũ làm trạm hiện có · [3] dời dữ liệu sang trạm mới (dừng, bạn dời tay rồi chạy lại). Không
-có người trả lời (`--yes`, `--non-interactive`, không có terminal) thì dùng trạm mới và in một dòng
-nêu trạm cũ cùng cách nhận nó (`--station <đường>`).
+`init` **hỏi**, không tự nhận: [1] dùng trạm mới (khuyến nghị, Enter; bảng nêu đúng đường:
+`<OPCOS_WORKSPACES>/voice` nếu biến đặt, không thì `<repo>/workspace/`) · [2] nhận trạm cũ làm trạm
+hiện có · [3] dời dữ liệu sang trạm mới (dừng, bạn dời tay rồi chạy lại). `--yes` không bao giờ
+hỏi (có hay không có terminal): dùng trạm mới `<repo>/workspace/` và in một dòng nêu trạm cũ cùng cách
+nhận nó (`--station <đường>`).
 
-Chạy không có terminal (agent, script) mà chưa chọn ⇒ `init` in bảng lựa chọn rồi thoát mã 2.
+Chạy không có người trả lời (`--non-interactive`, hoặc không có terminal) mà thiếu cả `--yes` lẫn
+`--mode` ⇒ `init` in bảng lựa chọn rồi thoát mã 2 (không đoán chế độ). Hành vi theo từng cách gọi nằm
+trong bảng quyết định `tests/test_init_decision_table.py`.
 **Agent cài phải trình bảng đó cho người dùng và chờ họ chọn** — không tự chọn im lặng. Tự
 khai `--non-interactive` cũng vậy: nó nói "không có ai ngồi đây", KHÔNG nói "đoán hộ tôi", nên
 thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2.

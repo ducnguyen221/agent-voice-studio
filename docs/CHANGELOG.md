@@ -10,12 +10,16 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
 không còn.
 
 - `init` gặp một thư mục trạm cũ dưới home thì **hỏi** ba đường: dùng trạm mới (bảng nêu đúng đường
-  sẽ dùng — `<repo>/workspace/`, hoặc trạm OpcOS nếu có) · nhận trạm cũ · dời sang trạm mới (dừng, bạn
-  dời tay rồi chạy lại). Không có người trả lời (`--yes`, `--non-interactive`, không terminal) thì dùng
-  trạm mới và in một dòng nêu trạm cũ cùng cách nhận nó (`--station <đường>`).
+  sẽ dùng — `<OPCOS_WORKSPACES>/voice` nếu biến đặt, không thì `<repo>/workspace/`; Enter = đường này)
+  · nhận trạm cũ · dời sang trạm mới (dừng, bạn dời tay rồi chạy lại). `--yes` (có hay không có
+  terminal) không bao giờ hỏi: dùng trạm mới `<repo>/workspace/` và in một dòng nêu trạm cũ cùng cách nhận
+  nó (`--station <đường>`). `--non-interactive` thiếu cả `--yes` lẫn `--mode` thì thoát mã 2, không đoán
+  chế độ. Ai quen `--mode separate` để nhận trạm cũ nay dùng `--station <đường>` hoặc trả lời [2] ở
+  bảng hỏi.
 - `separate` không còn đường mặc định ở home. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
   `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — có người thì hỏi xác nhận/đổi, không có người
-  thì dùng luôn và in một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng mã 2.
+  thì (kể cả `--yes`) dùng luôn và in một dòng. Không đặt biến: có người thì hỏi đường, không thì dừng
+  mã 2. `--station` trỏ vào một file giờ thoát mã 2 thay vì lỗi hệ điều hành.
 - `migrate --to separate` thiếu `--station` thì **hỏi nơi dời** (gợi ý `<OPCOS_WORKSPACES>/voice` nếu
   có), hiện đường tuyệt đối cùng số file và dung lượng (KB/MB) rồi xin xác nhận y/N; không có người trả
   lời (hoặc `--non-interactive`) thì dừng mã 2. Từ chối đích nằm trong chính `workspace/`; đường dán

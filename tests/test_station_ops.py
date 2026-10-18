@@ -478,6 +478,20 @@ def test_migrate_does_not_walk_the_tree_when_station_is_given(embedded_repo, tmp
     assert (tmp_path / "d" / "station.json").is_file() and res["mode"] == "separate"
 
 
+def test_migrate_failure_leaves_the_users_empty_target_directory_in_place(embedded_repo, tmp_path, monkeypatch):
+    """Đích là thư mục RỖNG có sẵn của người dùng; dời hỏng ("chưa đụng gì") thì nó phải còn nguyên."""
+    dest = tmp_path / "dich-rong"
+    dest.mkdir()
+
+    def fail(src, dst):
+        raise station.ContractError("không dời được (giả)")
+    monkeypatch.setattr(station, "_move_tree", fail)
+    with pytest.raises(station.ContractError, match="giả"):
+        station.migrate_to_separate(str(dest))
+    assert dest.is_dir() and not os.listdir(dest)
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
 def test_migrate_eof_is_a_contract_error(embedded_repo, tmp_path, monkeypatch):
     _opcos_var(tmp_path, monkeypatch)
 

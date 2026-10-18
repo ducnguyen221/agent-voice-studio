@@ -148,6 +148,15 @@ def test_pasted_path_in_quotes_is_unwrapped(wrap, repo, tmp_path):
     tree_ok(dest)
 
 
+def test_station_pointing_at_a_file_is_a_contract_error(repo, tmp_path, capsys):
+    f = tmp_path / "la-mot-file"
+    f.write_text("x", encoding="utf-8")
+    rc = cli.main(["init", "--station", str(f), "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["ok"] is False and "thư mục" in err
+    assert f.read_text(encoding="utf-8") == "x"
+
+
 def test_station_flag_in_quotes_is_unwrapped(repo, tmp_path):
     dest = tmp_path / "co-ngoac"
     res = station.do_init(station=f'"{dest}"', ask=never_ask)
