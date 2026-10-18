@@ -4,7 +4,7 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
-## Chưa phát hành
+## 0.4.0 — 2026-10-18
 
 **Đổi hành vi (bỏ tầng `home`):** các lệnh không còn tự nhận `~/.voice` chỉ vì nó đã có
 `station.json` / `omnivoice/voices/`. Thứ tự tìm trạm: `--station` → `VOICE_STATION` →
