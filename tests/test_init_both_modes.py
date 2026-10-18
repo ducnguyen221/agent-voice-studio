@@ -369,6 +369,7 @@ def test_no_home_directory_station_is_mentioned_anywhere():
                         + r")(?![A-Za-z0-9_])")
     allowed_changelog_prefix = "## 0.4.0"
     hits = []
+    scanned = 0
     for sub in ("voice_studio", "studio", "tests", "docs", "skills", "templates", "hosts", "samples",
                 "extras", "README.md", "README.vi.md", "GUIDE.md", "GUIDE.vi.md", "INSTALL.md",
                 "START-HERE.md", "AGENTS.md", "ECOSYSTEM.md", ".env.example", ".gitignore", "pyproject.toml"):
@@ -381,12 +382,15 @@ def test_no_home_directory_station_is_mentioned_anywhere():
                   and "__pycache__" not in dp])
         for f in files:
             text = open(f, encoding="utf-8", errors="replace").read()
+            scanned += 1
             if os.path.basename(f) == "CHANGELOG.md":
                 head = text.split(allowed_changelog_prefix)[0]       # mục "Chưa phát hành" phải sạch
                 text = head
             for i, line in enumerate(text.splitlines(), 1):
                 if needle.search(line):
                     hits.append(f"{os.path.relpath(f, root)}:{i}")
+    # Quét rỗng (đổi tên thư mục, sai đường) cũng "không có hit" — bắt buộc đã quét đủ nhiều file.
+    assert scanned > 50, f"chỉ quét được {scanned} file: test canh chữ mất tác dụng"
     assert not hits, hits
     assert not hasattr(_env, "legacy_station") and not hasattr(_env, "default_station")
 

@@ -27,7 +27,7 @@ Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — 
 
 `<repo>` là bản clone đã `pip install -e` (có `pyproject.toml` cạnh package); đặt
 `VOICE_STUDIO_REPO` để trỏ tường minh. Cài dạng wheel thì không có repo ⇒ không có tầng repo,
-và thiếu cả biến lẫn trạm cũ thì `station_dir()` báo mã 3 (không tự tạo thư mục ẩn ở home).
+và thiếu cả biến lẫn cấu hình thì `station_dir()` báo mã 3 (không tự tạo thư mục nào ở thư mục cá nhân).
 `station.json` ở gốc trạm có thể khai `engine_dir`, `bgm_dir` (tương đối theo gốc trạm).
 
 Biến cấu hình đi theo thứ tự riêng: biến môi trường thật → `<repo>/.env` (**chỉ** khi
@@ -261,9 +261,12 @@ def embedded_station(repo):
 
 
 UNSET = "unset"
+# Câu chung cho mọi thông báo "chưa có trạm" và cho `doctor`: người còn giọng ở nơi khác đừng tưởng mất.
+# KHÔNG nêu tên thư mục nào — chỉ chỉ cách trỏ vào nơi họ đang giữ dữ liệu.
+OLD_DATA_HINT = "Có dữ liệu cũ ở nơi khác? Dùng `--station <đường>` để trỏ vào đó."
 UNSET_HINT = ("chưa xác định được trạm giọng: bản cài này không nằm trong một bản clone repo "
               "và chưa đặt VOICE_STATION. Đặt VOICE_STATION=<thư mục trạm> (hoặc truyền "
-              "--station), rồi chạy `voice-studio init --station <thư mục trạm>`.")
+              "--station), rồi chạy `voice-studio init --station <thư mục trạm>`. " + OLD_DATA_HINT)
 
 
 def resolve_station():

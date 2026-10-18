@@ -823,6 +823,43 @@ def test_doctor_hints_init_when_opcos_station_unused(bare_repo, tmp_path, monkey
     assert "init --mode separate --station" in c["hint"] and str(ws / "voice") in c["hint"]
 
 
+@pytest.mark.parametrize("marked", [True, False])
+def test_doctor_silent_when_embedded_was_chosen_on_purpose(marked, bare_repo, tmp_path, monkeypatch):
+    """Đã ghi lựa chọn embedded vào studio.local.json thì có `<biến>/voice` cũng không nhắc mỗi lần."""
+    opcos_ws(tmp_path, monkeypatch, marked=marked)
+    (bare_repo / "studio.local.json").write_text(
+        json.dumps({"mode": "embedded", "station_path": "workspaces"}), encoding="utf-8")
+    assert "opcos-station" not in by_name(doctor.run_checks())
+
+
+def test_doctor_still_hints_when_nothing_was_chosen(bare_repo, tmp_path, monkeypatch):
+    opcos_ws(tmp_path, monkeypatch)
+    (bare_repo / "studio.local.json").write_text(json.dumps({"mode": "separate"}), encoding="utf-8")
+    assert "opcos-station" in by_name(doctor.run_checks())
+
+
+OLD_DATA = "Có dữ liệu cũ ở nơi khác? Dùng `--station <đường>`"
+
+
+def test_old_data_sentence_is_in_doctor(bare_repo):
+    c = doctor.run_checks()
+    assert any(OLD_DATA in (x["detail"] + x["hint"]) for x in c)
+    assert "." + "voice" not in json.dumps(c, ensure_ascii=False)       # không nêu tên thư mục ẩn nào
+
+
+def test_old_data_sentence_is_in_the_code_3_messages(tmp_path, monkeypatch, capsys):
+    # trạm chưa xác định (bản cài không có repo)
+    rc = cli.main(["export", "--personal", "--out", str(tmp_path / "x.zip"), "--json"])
+    out = capsys.readouterr().out
+    assert rc == 3 and OLD_DATA in last_json(out)["error"]
+    # trạm đã trỏ nhưng thư mục chưa có
+    with pytest.raises(station.StationMissing, match="Có dữ liệu cũ"):
+        station.export_personal(str(tmp_path / "chua-co"), str(tmp_path / "y.zip"))
+    monkeypatch.setenv("VOICE_STATION", str(tmp_path / "chua-co"))
+    with pytest.raises(station.StationMissing, match="Có dữ liệu cũ"):
+        station.backup(str(tmp_path / "z.zip"))
+
+
 def test_doctor_silent_without_opcos_var(bare_repo):
     assert "opcos-station" not in by_name(doctor.run_checks())
 

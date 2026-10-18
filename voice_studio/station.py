@@ -611,7 +611,7 @@ def _zip(files, out, manifest):
 def export_personal(st, out):
     st = _env._expand(st)
     if not os.path.isdir(st):
-        raise StationMissing(f"không có trạm giọng: {st} (chạy `voice-studio init`)")
+        raise StationMissing(f"không có trạm giọng: {st} (chạy `voice-studio init`). {_env.OLD_DATA_HINT}")
     files = personal_files(st)
     bad = [rel for _, rel in files if _is_secret_name(rel)]
     if bad:
@@ -735,7 +735,7 @@ BACKUP_SKIP_TOP = {"out", "cache"}
 def backup(out, station=None, with_env=False):
     st = _env._expand(station) if station else _env.station_dir()
     if not os.path.isdir(st):
-        raise StationMissing(f"không có trạm giọng: {st}")
+        raise StationMissing(f"không có trạm giọng: {st}. {_env.OLD_DATA_HINT}")
     files = []
     for dp, dn, fn in os.walk(st):
         rel_dir = os.path.relpath(dp, st)

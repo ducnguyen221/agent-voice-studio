@@ -183,11 +183,15 @@ def opcos_check(src):
     """Ghi chú về trạm OpcOS (`OPCOS_WORKSPACES`): chỉ nhắc, không bao giờ đổi trạm đang dùng.
 
     Biến vắng ⇒ None. Có và `<biến>/voice` mang dấu trạm mà nguồn hiện tại là
-    `workspace`/`unset` ⇒ gợi ý lệnh `init`. Có mà chưa là trạm ⇒ ghi đường đã thử.
-    Nguồn đã là biến trạm / `studio.local.json` ⇒ im lặng.
+    `workspaces`/`workspace`/`unset` ⇒ gợi ý lệnh `init`. Có mà chưa là trạm ⇒ ghi đường đã thử.
+    Im lặng khi nguồn đã là biến trạm / `studio.local.json`, hoặc khi `studio.local.json` đã ghi
+    `mode: embedded` (người dùng đã chủ động chọn trạm nhúng — nguồn khi đó hiện là `workspaces`).
     """
     base = _env.opcos_base()
     if not base:
+        return None
+    repo = _env.repo_root()
+    if repo and _env.local_config(repo).get("mode") == "embedded":
         return None
     oc = _env.opcos_station()
     if oc:
@@ -231,6 +235,7 @@ def run_checks():
     oc = opcos_check(st_src)
     if oc:
         checks.append(oc)
+    checks.append(_check("old-data", True, _env.OLD_DATA_HINT))
     if _env.env("OMNIVOICE_DIR") and not _env.env("VOICE_STATION"):
         checks.append(_check("env-name", False, "OMNIVOICE_DIR", level="warn",
                              hint="tên biến cũ — đặt VOICE_STATION=<gốc trạm> (OMNIVOICE_DIR vẫn đọc được)"))

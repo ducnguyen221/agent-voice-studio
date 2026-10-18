@@ -26,7 +26,7 @@ import argparse
 import os
 import time
 
-from . import API_VERSION, __version__, contract, engine, profiles
+from . import API_VERSION, __version__, _env, contract, engine, profiles
 from .contract import ContractError, StationMissing, log
 
 DEFAULT_SEED = 42
@@ -80,7 +80,7 @@ def resolve_profile(name, instruct=None):
     if not os.path.isdir(d):
         raise StationMissing(
             f"chưa có kho giọng {d}. Dựng trạm bằng `voice-studio init` (hoặc đặt VOICE_STATION), "
-            f"rồi tạo profile bằng `voice-studio make-profile`.")
+            f"rồi tạo profile bằng `voice-studio make-profile`. {_env.OLD_DATA_HINT}")
     try:
         return profiles.ensure_default(name=name)
     except profiles.ProfileError as e:
