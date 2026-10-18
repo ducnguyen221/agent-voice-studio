@@ -304,6 +304,190 @@ def test_migrate_refuses_non_empty_target(embedded_repo, tmp_path):
     assert (embedded_repo / "workspace" / "station.json").is_file()
 
 
+# ── migrate: hỏi rõ nơi dời; không bao giờ đoán một thư mục ẩn dưới home ──────────────────
+
+def _tree_snapshot(*roots):
+    out = {}
+    for root in roots:
+        for dp, dn, fn in os.walk(root):
+            for n in dn:
+                out[os.path.join(dp, n)] = None
+            for n in fn:
+                p = os.path.join(dp, n)
+                out[p] = Path(p).read_bytes()
+    return out
+
+
+def _opcos_var(tmp_path, monkeypatch, value=None):
+    ws = tmp_path / "opcos-ws"
+    ws.mkdir(exist_ok=True)
+    monkeypatch.setenv("OPCOS_WORKSPACES", value if value is not None else str(ws))
+    return ws
+
+
+def test_migrate_without_a_target_has_no_default(embedded_repo, tmp_path):
+    with pytest.raises(station.ContractError, match="--station"):
+        station.migrate_to_separate(None)
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+    assert not (tmp_path / "home" / ".voice").exists()
+
+
+@pytest.mark.parametrize("argv", [["migrate", "--to", "separate", "--non-interactive", "--json"],
+                                  ["migrate", "--to", "separate", "--json"]])
+def test_migrate_non_interactive_requires_station_code_2(argv, embedded_repo, tmp_path, capsys):
+    before = _tree_snapshot(embedded_repo, tmp_path / "home")
+    rc = cli.main(argv)
+    out, err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["ok"] is False
+    assert "--station" in err
+    assert _tree_snapshot(embedded_repo, tmp_path / "home") == before
+
+
+def test_migrate_cli_with_station_moves_without_asking(embedded_repo, tmp_path, capsys):
+    dest = tmp_path / "chon" / "tram"
+    rc = cli.main(["migrate", "--to", "separate", "--station", str(dest),
+                   "--non-interactive", "--json"])
+    out, _ = capsys.readouterr()
+    assert rc == 0 and last_json(out)["station"] == str(dest)
+    assert (dest / "omnivoice" / "voices" / "demo.wav").is_file()
+
+
+def test_migrate_asks_where_and_confirms_with_counts(embedded_repo, tmp_path, monkeypatch):
+    ws = _opcos_var(tmp_path, monkeypatch)
+    files = [os.path.join(dp, n) for dp, _d, fn in os.walk(embedded_repo / "workspace") for n in fn]
+    files.append(str(embedded_repo / ".env"))                   # .env đi theo trạm
+    n_files, size = len(files), sum(os.path.getsize(f) for f in files)
+    prompts = []
+    answers = iter(["", "y"])                                   # Enter = nơi gợi ý, rồi xác nhận
+    res = station.do_migrate(ask=lambda p: prompts.append(p) or next(answers))
+    want = os.path.abspath(str(ws / "voice"))
+    assert os.path.normcase(res["station"]) == os.path.normcase(want)
+    assert (ws / "voice" / "omnivoice" / "voices" / "demo.wav").is_file()
+    assert not (embedded_repo / "workspace").exists()
+    ask_where, confirm = prompts
+    assert want in ask_where                                    # gợi ý hiện đường tuyệt đối
+    assert want in confirm and "y/N" in confirm
+    assert f"{n_files} file" in confirm and f"{size} byte" in confirm
+
+
+@pytest.mark.parametrize("answer", ["", "n", "no", "khong", "x"])
+def test_migrate_declined_moves_nothing(answer, embedded_repo, tmp_path, monkeypatch):
+    _opcos_var(tmp_path, monkeypatch)
+    before = _tree_snapshot(embedded_repo, tmp_path / "opcos-ws", tmp_path / "home")
+    answers = iter(["", answer])
+    with pytest.raises(station.ContractError, match="huỷ"):
+        station.do_migrate(ask=lambda p: next(answers))
+    assert _tree_snapshot(embedded_repo, tmp_path / "opcos-ws", tmp_path / "home") == before
+
+
+def test_migrate_without_opcos_var_has_no_suggestion_and_enter_cancels(embedded_repo, tmp_path):
+    prompts = []
+    with pytest.raises(station.ContractError, match="huỷ"):
+        station.do_migrate(ask=lambda p: prompts.append(p) or "")
+    assert len(prompts) == 1 and ".voice" not in prompts[0]
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
+def test_migrate_typed_path_is_made_absolute_and_confirmed(embedded_repo, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    answers = iter(["dich-tuong-doi", "Y"])
+    res = station.do_migrate(ask=lambda p: next(answers))
+    want = os.path.abspath(str(tmp_path / "dich-tuong-doi"))
+    assert os.path.normcase(res["station"]) == os.path.normcase(want)
+    assert (tmp_path / "dich-tuong-doi" / "station.json").is_file()
+
+
+def test_migrate_relative_opcos_var_is_suggested_as_absolute(embedded_repo, tmp_path, monkeypatch):
+    (tmp_path / "rel").mkdir()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", "rel")
+    prompts = []
+    answers = iter(["", "y"])
+    res = station.do_migrate(ask=lambda p: prompts.append(p) or next(answers))
+    want = os.path.abspath(str(tmp_path / "rel" / "voice"))
+    assert os.path.isabs(res["station"]) and os.path.normcase(res["station"]) == os.path.normcase(want)
+    assert want in prompts[0]
+    local = json.loads((embedded_repo / "studio.local.json").read_text(encoding="utf-8"))
+    assert os.path.isabs(local["station_path"])
+
+
+def test_migrate_rejects_busy_target_before_confirming(embedded_repo, tmp_path, monkeypatch):
+    ws = _opcos_var(tmp_path, monkeypatch)
+    (ws / "voice").mkdir()
+    (ws / "voice" / "x").write_text("x", encoding="utf-8")
+    prompts = []
+    with pytest.raises(station.ContractError, match="không rỗng"):
+        station.do_migrate(ask=lambda p: prompts.append(p) or "")
+    assert len(prompts) == 1                                    # chưa tới câu xác nhận
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
+@pytest.mark.parametrize("sub", ["sub/x", "sub", ""])
+def test_migrate_target_inside_the_source_is_refused_cleanly(sub, embedded_repo):
+    ws = embedded_repo / "workspace"
+    target = ws / sub if sub else ws
+    before = _tree_snapshot(embedded_repo)
+    with pytest.raises(station.ContractError, match="nằm trong"):
+        station.migrate_to_separate(str(target))
+    assert _tree_snapshot(embedded_repo) == before                # không để lại thư mục rỗng nào
+
+
+def test_migrate_typed_target_inside_the_source_is_refused_before_confirming(embedded_repo):
+    prompts = []
+    inside = embedded_repo / "workspace" / "sub" / "x"
+    with pytest.raises(station.ContractError, match="nằm trong"):
+        station.do_migrate(ask=lambda p: prompts.append(p) or str(inside))
+    assert len(prompts) == 1 and not (embedded_repo / "workspace" / "sub").exists()
+
+
+def test_migrate_typed_path_with_quotes_is_unwrapped(embedded_repo, tmp_path):
+    dest = tmp_path / "dan-vao"
+    answers = iter([f'"{dest}"', "y"])
+    res = station.do_migrate(ask=lambda p: next(answers))
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(dest))
+    assert (dest / "station.json").is_file()
+
+
+def test_migrate_station_flag_with_quotes_is_unwrapped(embedded_repo, tmp_path, capsys):
+    dest = tmp_path / "co-ngoac"
+    rc = cli.main(["migrate", "--to", "separate", "--station", f'"{dest}"', "--json"])
+    out, _ = capsys.readouterr()
+    assert rc == 0 and os.path.normcase(last_json(out)["station"]) == os.path.normcase(str(dest))
+
+
+@pytest.mark.parametrize("n, text", [(0, "0 byte"), (1023, "1023 byte"), (1536, "1.5 KB"),
+                                     (5 * 1024 * 1024, "5.0 MB"), (3 * 1024 ** 3, "3.0 GB")])
+def test_migrate_sizes_are_human_readable(n, text):
+    assert station._human_size(n) == text
+
+
+def test_migrate_confirm_shows_human_size(embedded_repo, tmp_path, monkeypatch):
+    monkeypatch.setattr(station, "_tree_stats", lambda ws, env_file: (7, 2 * 1024 * 1024))
+    prompts = []
+    answers = iter([str(tmp_path / "d"), "n"])
+    with pytest.raises(station.ContractError):
+        station.do_migrate(ask=lambda p: prompts.append(p) or next(answers))
+    assert "7 file" in prompts[1] and "2.0 MB" in prompts[1] and "byte" not in prompts[1]
+
+
+def test_migrate_does_not_walk_the_tree_when_station_is_given(embedded_repo, tmp_path, monkeypatch):
+    def boom(*a, **k):
+        raise AssertionError("không cần đếm file khi đã có --station")
+    monkeypatch.setattr(station, "_tree_stats", boom)
+    res = station.migrate_to_separate(str(tmp_path / "d"))
+    assert (tmp_path / "d" / "station.json").is_file() and res["mode"] == "separate"
+
+
+def test_migrate_eof_is_a_contract_error(embedded_repo, tmp_path, monkeypatch):
+    _opcos_var(tmp_path, monkeypatch)
+
+    def eof(_p):
+        raise EOFError
+    with pytest.raises(station.ContractError, match="--station"):
+        station.do_migrate(ask=eof)
+    assert (embedded_repo / "workspace" / "station.json").is_file()
+
+
 # ── update = git pull --ff-only, không bao giờ xoá ────────────────────────────────────────
 
 @pytest.mark.skipif(not HAS_GIT, reason="cần git")

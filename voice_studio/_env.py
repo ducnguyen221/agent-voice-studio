@@ -252,8 +252,8 @@ def resolve_station():
 
     Không đặt gì thì trạm là THƯ MỤC TRONG REPO (bị git bỏ qua), không bao giờ là một thư mục
     ẩn dưới home: `~/.voice` chỉ được dùng khi người dùng đã chọn nó (biến, `--station`,
-    `init` chế độ separate ghi vào `studio.local.json`) — dù nó đã là một trạm thật, resolver
-    KHÔNG tự nhận (tầng `home` đã bỏ; `init` phát hiện nó thì tự nhận làm trạm separate, không hỏi). Cài dạng wheel (không có repo) mà
+    hoặc trả lời nhận nó khi `init` hỏi, ghi vào `studio.local.json`) — dù nó đã là một trạm
+    thật, resolver KHÔNG tự nhận và `init` cũng không tự nhận, chỉ hỏi. Cài dạng wheel (không có repo) mà
     chưa đặt gì ⇒ `unset` — `station_dir()` báo mã 3 kèm cách đặt, thay vì tự đẻ thư mục.
     """
     st = env("VOICE_STATION")

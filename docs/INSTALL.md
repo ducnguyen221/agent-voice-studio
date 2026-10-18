@@ -130,7 +130,7 @@ mã, nên bảng này không trôi được mà không ai thấy.
 ```
 voice-studio init                       # trình bảng hai lựa chọn rồi chờ bạn chọn
 voice-studio init --dry-run             # chỉ in ra sẽ làm gì
-voice-studio init --station ~/.voice    # chọn thẳng separate, không hỏi
+voice-studio init --station <đường trạm>   # chọn thẳng separate, không hỏi
 voice-studio init --station <trạm cũ> --existing   # nhận trạm đang chạy: chỉ ghi station.json
 ```
 

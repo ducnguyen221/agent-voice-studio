@@ -27,8 +27,9 @@ Trạm nằm ở đâu khi không đặt gì: `<repo>/workspace/`. Thứ tự t�
 
 `OMNIVOICE_DIR` là tên cũ, trỏ **thư mục engine** (`<trạm>/omnivoice`), không phải gốc trạm. Vẫn
 đọc được, nhưng đặt `VOICE_STATION=<gốc trạm>` rồi gỡ biến cũ. `NEWS_BGM*` tương tự → `VOICE_BGM*`.
-Trạm `~/.voice` có sẵn **không còn được tự nhận** (bỏ dòng `station-source`): đặt `VOICE_STATION`
-trỏ vào đó, hoặc `voice-studio init` để ghi vào `studio.local.json`. `[WARN] opcos-station` chỉ nhắc
+Trạm cũ `~/.voice` **không còn được tự nhận** (bỏ dòng `station-source`): đặt `VOICE_STATION`
+trỏ vào đó, hoặc chạy `voice-studio init` — nó HỎI bạn dùng trạm mới, nhận trạm cũ, hay
+dời sang trạm mới — rồi ghi lựa chọn vào `studio.local.json`. `[WARN] opcos-station` chỉ nhắc
 khi `OPCOS_WORKSPACES` có trạm mà bạn chưa dùng — chạy lệnh `init --mode separate --station …` nó in.
 
 ## Weights — offline theo mặc định

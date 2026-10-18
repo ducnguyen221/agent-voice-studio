@@ -6,13 +6,15 @@ repo chỉ chứa mã. Có HAI chế độ cài (F17):
 
     embedded   trạm = <repo>/workspace/ (gitignore), secret ở <repo>/.env — "mở một folder là
                thấy hết". MẶC ĐỊNH và là KHUYẾN NGHỊ cho người dùng mới.
-    separate   trạm ngoài repo (mặc định ~/.voice), secret ở kho secret riêng của máy — cho
-               người dùng nhiều máy, repo public của chính mình, nhiều repo chia sẻ trạm.
+    separate   trạm ngoài repo (đường do người dùng chỉ), secret ở kho secret riêng của máy —
+               cho người dùng nhiều máy, repo public của chính mình, nhiều repo chia sẻ trạm.
 
 Lựa chọn ghi vào <repo>/studio.local.json (gitignore); `voice_studio._env.resolve_station()`
-đọc lại nó cho MỌI lệnh. Máy đã có trạm ngoài (VOICE_STATION / OMNIVOICE_DIR đã đặt, hoặc
-~/.voice đã có station.json / omnivoice/voices/) ⇒ tự chọn `separate`, KHÔNG hỏi, KHÔNG BAO
-GIỜ tạo workspace/ — tránh hai nguồn sự thật.
+đọc lại nó cho MỌI lệnh. Máy đã đặt trạm ngoài (VOICE_STATION / OMNIVOICE_DIR) ⇒ tự chọn
+`separate`, KHÔNG hỏi, KHÔNG BAO GIỜ tạo workspace/ — tránh hai nguồn sự thật. Một thư mục
+trạm CŨ dưới home (`~/.voice` có station.json / omnivoice/voices/) thì KHÔNG tự nhận: đó là
+thứ cần người dùng quyết định, nên `init` HỎI; không có người thì dùng trạm mới và in một dòng
+nêu cách nhận trạm cũ (`--station <đường>`).
 
 `init` KHÔNG tạo venv, không cài torch, không tải model: nó in lệnh để người dùng tự chạy.
 Mọi thao tác không đè file đã có (chạy lại an toàn); `update` không bao giờ xoá gì.
@@ -56,7 +58,7 @@ Chọn chỗ đặt TRẠM GIỌNG (nơi chứa venv engine, giọng của bạn
               `voice-studio update`; và nhớ `voice-studio backup`.
       Chọn khi: một máy, muốn dùng được ngay, không rành kỹ thuật.
 
-  [2] separate — trạm ngoài repo (mặc định ~/.voice, hoặc trạm OpcOS nếu OPCOS_WORKSPACES có trạm)
+  [2] separate — trạm ngoài repo (bạn chỉ đường; hoặc trạm OpcOS nếu OPCOS_WORKSPACES có trạm)
       Là gì : trạm ở thư mục riêng; bí mật ở kho secret của máy ({kho}).
       Lợi   : repo luôn sạch (an toàn khi repo là bản public của chính bạn); nhiều máy /
               nhiều repo dùng chung một trạm; cập nhật repo không đụng dữ liệu.
@@ -65,6 +67,37 @@ Chọn chỗ đặt TRẠM GIỌNG (nơi chứa venv engine, giọng của bạn
 
 Sau này đổi ý được: `voice-studio migrate --to separate`.
 """.format(kho=SECRET_STORE)
+
+LEGACY_TABLE = """\
+Máy này còn một thư mục trạm giọng cũ: {path}
+({why}). Chưa ai chọn dùng nó cho bản clone này.
+
+  [1] dùng trạm mới ở {new} — KHUYẾN NGHỊ (bấm Enter)
+      {where}. Trạm cũ giữ nguyên, không bị đụng vào.
+  [2] nhận {path} làm trạm hiện có (separate)
+      Giọng cũ dùng được ngay; mọi lệnh sau này ghi vào đó.
+  [3] dời dữ liệu từ {path} sang trạm mới ({new})
+      `init` dừng lại; dời tay thư mục (đóng chương trình đang mở file), rồi chạy lại.
+"""
+
+STATION_ASK_PATH = ("Nơi đặt trạm separate (đường dẫn; thư mục chưa có hoặc đang trống; "
+                    "Enter để thôi): ")
+STATION_CONFIRM = ("Trạm separate sẽ đặt ở {path} (OPCOS_WORKSPACES/voice). "
+                   "Enter để nhận, hoặc gõ đường khác: ")
+NEED_STATION = ("chế độ separate cần chỉ rõ nơi đặt trạm: chạy lại với --station DIR (hoặc đặt "
+                "OPCOS_WORKSPACES để dùng <biến>/voice). Không có đường mặc định ở home.")
+
+
+def _unquote(text):
+    """Bỏ khoảng trắng và MỘT cặp ngoặc kép/đơn bọc quanh đường dán (Windows 'Copy as path')."""
+    s = (text or "").strip()
+    if len(s) >= 2 and s[0] == s[-1] and s[0] in "\"'":
+        s = s[1:-1].strip()
+    return s
+
+
+def _path(text):
+    return _env._expand(_unquote(text))
 
 
 # ── tiện ích ───────────────────────────────────────────────────────────────────────────
@@ -184,15 +217,20 @@ def host_venv(st, repo=None, prefix=None, base_prefix=None, engine_ok=None):
 # ── nhận diện + chọn chế độ ────────────────────────────────────────────────────────────
 
 def detect_external():
-    """Máy đã có trạm ngoài? -> (đường trạm, lý do) hoặc None. Không ghi gì."""
+    """Máy đã có trạm ngoài? -> (đường trạm, lý do, đã_chọn) hoặc None. Không ghi gì.
+
+    `đã_chọn` = True khi trạm được CHỌN tường minh (biến VOICE_STATION / OMNIVOICE_DIR — máy chạy
+    lịch đặt biến là đã chọn). False khi chỉ là thư mục trạm cũ dưới home tình cờ mang dấu trạm:
+    đó là một PHÁT HIỆN, không phải một lựa chọn, và `init` không được tự nhận nó.
+    """
     if _env.env("VOICE_STATION"):
-        return _env._expand(_env.env("VOICE_STATION")), "biến VOICE_STATION đã đặt"
+        return _env._expand(_env.env("VOICE_STATION")), "biến VOICE_STATION đã đặt", True
     if _env.env("OMNIVOICE_DIR"):
         return (os.path.dirname(_env._expand(_env.env("OMNIVOICE_DIR"))),
-                "biến OMNIVOICE_DIR (tên cũ) đã đặt")
-    home = _env.legacy_station()
-    if _env.has_marker(home):
-        return home, "~/.voice đã là một trạm (có station.json hoặc omnivoice/voices/)"
+                "biến OMNIVOICE_DIR (tên cũ) đã đặt", True)
+    legacy = _env.legacy_station()
+    if _env.has_marker(legacy):
+        return legacy, "~/.voice là một trạm cũ (có station.json hoặc omnivoice/voices/)", False
     return None
 
 
@@ -210,6 +248,56 @@ def _ask_console(prompt):
     return input()
 
 
+def _ask_path_console(prompt):
+    sys.stderr.write(prompt)
+    sys.stderr.flush()
+    return input()
+
+
+def _ask_legacy_console(prompt):
+    contract.log(prompt)
+    sys.stderr.write("Chọn [1/2/3] (Enter = 1, trạm mới): ")
+    sys.stderr.flush()
+    return input()
+
+
+def _legacy_notice(path):
+    contract.log(f"[init] lưu ý: máy còn một trạm cũ ở {path}; init KHÔNG tự nhận nó. "
+                 f"Muốn dùng nó: voice-studio init --station {path}")
+
+
+def _ask_legacy(ext, ask, default_ask):
+    """Có trạm cũ dưới home mà chưa ai chọn: HỎI ba đường. -> ("embedded", lý do) khi dùng
+    trạm mới trong repo; ("separate", đường, lý do) khi nhận trạm cũ hoặc trạm OpcOS."""
+    path, why = ext[0], ext[1]
+    oc = _env.opcos_station()
+    repo = _env.repo_root()
+    new = oc or os.path.join(repo or "<repo>", _env.WORKSPACE)     # ĐƯỜNG THẬT mà [1] sẽ dùng
+    where = ("Trạm OpcOS đã có sẵn (OPCOS_WORKSPACES) — dùng luôn trạm đó" if oc
+             else "Trạm mới nằm trong repo (embedded)")
+    table = LEGACY_TABLE.format(path=path, why=why, where=where, new=new)
+    try:
+        ans = ((_ask_legacy_console if default_ask else ask)(table) or "").strip().lower()
+    except EOFError:
+        raise ContractError(
+            f"không đọc được lựa chọn (stdin không có người); trạm cũ ở {path} KHÔNG được tự nhận. "
+            f"Agent: hỏi người dùng, rồi chạy lại với --station {path} (nhận trạm cũ) hoặc "
+            "--yes / --mode embedded (trạm mới trong repo).")
+    if ans in ("", "1"):
+        if oc:
+            return "separate", oc, f"người dùng chọn trạm mới — trạm OpcOS: {oc}"
+        return "embedded", f"người dùng chọn trạm mới {new} (trạm cũ giữ nguyên)"
+    if ans == "2":
+        return "separate", path, f"người dùng chọn nhận trạm cũ — {why}"
+    if ans == "3":
+        raise ContractError(
+            f"đã dừng theo lựa chọn [3]: dời tay thư mục {path} sang {new} (đóng chương "
+            "trình đang mở file trong đó) rồi chạy lại `voice-studio init`; hoặc nhận nó tại chỗ "
+            f"bằng `voice-studio init --station {path}`. Chưa ghi gì.")
+    raise ContractError(f"lựa chọn không hợp lệ: {ans!r} (1 = trạm mới, 2 = nhận trạm cũ, "
+                        "3 = dời sang trạm mới)")
+
+
 def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=False):
     """-> (chế độ, gốc trạm, lý do). Ném ContractError khi cần người chọn mà không hỏi được.
 
@@ -219,15 +307,20 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
     """
     repo = _env.repo_root()
     from_prev = False                    # chế độ lấy từ studio.local.json — không đề xuất trạm OpcOS
+    default_ask = ask is None
+    interactive = ask is not None or (not non_interactive and _stdin_is_tty())
     if station:
-        return "separate", _env._expand(station), "--station"
+        return "separate", _path(station), "--station"
     ext = detect_external()
-    if ext:
+    legacy = None                        # trạm cũ dưới home: được PHÁT HIỆN, chưa được CHỌN
+    if ext and ext[2]:
         if mode == "embedded":
             raise ContractError(
                 f"máy đã có trạm giọng ngoài ({ext[1]}: {ext[0]}); tạo thêm workspace/ sẽ thành "
                 "hai nguồn sự thật. Dùng trạm đó (bỏ --mode) hoặc gỡ biến/trạm cũ trước.")
         return "separate", ext[0], f"nhận diện trạm có sẵn — {ext[1]}"
+    if ext:
+        legacy = ext
     if not mode:
         local = _env.local_config(repo) if repo else {}
         prev = local.get("mode")
@@ -237,9 +330,18 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
         if prev in MODES:
             mode, why = prev, "studio.local.json (lần chọn trước)"
             from_prev = True
-        elif yes:
-            mode, why = "embedded", "--yes (nhận khuyến nghị)"
         else:
+            if legacy:
+                if yes or not interactive:
+                    _legacy_notice(legacy[0])          # không có người: dùng trạm mới, nói rõ
+                else:
+                    picked = _ask_legacy(legacy, ask, default_ask)
+                    if picked[0] == "separate":
+                        return picked
+                    mode, why = "embedded", picked[1]
+        if not mode and yes:
+            mode, why = "embedded", "--yes (nhận khuyến nghị)"
+        elif not mode:
             if ask is None:
                 if non_interactive or not _stdin_is_tty():
                     contract.log(CHOICE_TABLE)
@@ -268,16 +370,41 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
             why = "người dùng chọn"
     else:
         why = "--mode"
+        if legacy:
+            _legacy_notice(legacy[0])
     if mode == "embedded":
         if not repo:
             raise ContractError("chế độ embedded cần biết bản clone repo: cài `pip install -e <repo>`, "
                                 "hoặc bản sao kèm biến VOICE_STUDIO_REPO=<repo> (docs/INSTALL.md "
                                 "mục 3); không thì chỉ dùng được separate (--station DIR).")
         return "embedded", os.path.join(repo, _env.WORKSPACE), why
-    oc = None if from_prev else _env.opcos_station()
+    if from_prev:
+        raise ContractError(NEED_STATION)
+    oc = _env.opcos_station()
     if oc:
         return "separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm"
-    return "separate", _env.legacy_station(), why
+    ask_path = _ask_path_console if default_ask else ask
+    suggest = _env.opcos_dir()           # `<OPCOS_WORKSPACES>/voice` tuyệt đối, dù chưa mang dấu trạm
+    if suggest:
+        typed = ""
+        if interactive:
+            try:
+                typed = _unquote(ask_path(STATION_CONFIRM.format(path=suggest)))
+            except EOFError:
+                typed = ""
+        if typed:
+            return "separate", _env._expand(typed), "người dùng chỉ đường trạm"
+        contract.log(f"[init] separate: dùng {suggest} (OPCOS_WORKSPACES/voice). "
+                     "Muốn nơi khác: --station <đường>.")
+        return "separate", suggest, f"OPCOS_WORKSPACES đã đặt: {suggest}"
+    if interactive:
+        try:
+            typed = _unquote(ask_path(STATION_ASK_PATH))
+        except EOFError:
+            typed = ""
+        if typed:
+            return "separate", _env._expand(typed), "người dùng chỉ đường trạm"
+    raise ContractError(NEED_STATION)
 
 
 # ── init ───────────────────────────────────────────────────────────────────────────────
@@ -743,14 +870,63 @@ def _move_file(src, dst):
         os.remove(src)
 
 
-def migrate_to_separate(target=None):
+MIGRATE_ASK_WHERE = """\
+Dời trạm giọng từ {ws} ra ngoài repo. Chọn nơi dời (đường tuyệt đối; thư mục chưa có hoặc đang trống).
+{hint}
+Đích: """
+
+MIGRATE_NEED_STATION = ("migrate cần biết nơi dời: chạy lại với --station DIR (đường tuyệt đối, thư "
+                        "mục chưa có hoặc đang trống). Không còn đích mặc định, và không hỏi được "
+                        "khi không có người trả lời. Chưa dời gì.")
+
+
+def _migrate_source():
     repo = _env.repo_root()
     if not repo:
         raise ContractError("không xác định được repo (cài -e từ bản clone, hoặc đặt VOICE_STUDIO_REPO)")
     ws = os.path.join(repo, _env.WORKSPACE)
     if not os.path.isdir(ws):
         raise ContractError(f"không có {ws} — máy này không ở chế độ embedded")
-    target = _env._expand(target) if target else _env.legacy_station()
+    return repo, ws
+
+
+def _human_size(n):
+    if n < 1024:
+        return f"{n} byte"
+    for unit, div in (("KB", 1024), ("MB", 1024 ** 2), ("GB", 1024 ** 3)):
+        if n < div * 1024 or unit == "GB":
+            return f"{n / div:.1f} {unit}"
+
+
+def _tree_stats(ws, env_file=None):
+    """-> (số file, tổng byte) của cây `ws` (+ `env_file` nếu có). Đi cả cây: chỉ gọi khi cần HIỂN THỊ."""
+    files = [os.path.join(dp, n) for dp, _d, fn in os.walk(ws) for n in fn]
+    if env_file:
+        files.append(env_file)
+    size = 0
+    for f in files:
+        try:
+            size += os.path.getsize(f)
+        except OSError:
+            pass
+    return len(files), size
+
+
+def _is_inside(path, root):
+    p, r = (os.path.normcase(os.path.realpath(x)) for x in (path, root))
+    return p == r or p.startswith(r.rstrip(os.sep) + os.sep)
+
+
+def _migrate_plan(target, count=False):
+    """Kiểm MỌI điều kiện trước khi dời byte nào (không tạo gì). `count` ⇒ thêm số file/byte sẽ dời
+    (đi cả cây — chỉ bật khi cần hiển thị)."""
+    repo, ws = _migrate_source()
+    if not target:
+        raise ContractError(MIGRATE_NEED_STATION)
+    target = _path(target)
+    if _is_inside(target, ws):
+        raise ContractError(f"đích nằm trong chính trạm đang dời ({ws}): {target} — không thể dời một "
+                            "thư mục vào bên trong nó. Chọn nơi ngoài trạm (--station). Chưa dời gì.")
     if os.path.exists(target) and os.listdir(target):
         raise ContractError(f"thư mục đích không rỗng: {target} — chọn chỗ khác (--station)")
     env_file = os.path.join(repo, ".env")
@@ -758,6 +934,59 @@ def migrate_to_separate(target=None):
     moved_env = os.path.join(sec, ".env") if os.path.isfile(env_file) else None
     if moved_env and os.path.exists(moved_env):          # kiểm TRƯỚC khi dời gì
         raise ContractError(f"{moved_env} đã có — gộp tay rồi xoá {env_file}, sau đó chạy lại")
+    plan = {"repo": repo, "ws": ws, "target": target, "env_file": env_file, "sec": sec,
+            "moved_env": moved_env}
+    if count:
+        plan["files"], plan["bytes"] = _tree_stats(ws, env_file if moved_env else None)
+    return plan
+
+
+def _ask_line(prompt):
+    sys.stderr.write(prompt)
+    sys.stderr.flush()
+    return input()
+
+
+def do_migrate(station=None, ask=None, non_interactive=False):
+    """`migrate --to separate`: có `--station` thì dời thẳng; không thì HỎI nơi dời (gợi ý trạm
+    OpcOS nếu có), hiện đường tuyệt đối + số file/dung lượng và xin xác nhận y/N. Không có người
+    trả lời ⇒ ContractError (mã 2): không bao giờ đoán nơi dời."""
+    if station:
+        return migrate_to_separate(station)
+    interactive = ask is not None or (not non_interactive and _stdin_is_tty())
+    if not interactive:
+        raise ContractError(MIGRATE_NEED_STATION)
+    ask = ask or _ask_line
+    _repo, ws = _migrate_source()
+    suggest = _env.opcos_dir()           # gợi ý duy nhất: `<OPCOS_WORKSPACES>/voice`; không có thì không gợi ý
+    hint = (f"Gợi ý (Enter để nhận): {suggest}" if suggest
+            else "Không có gợi ý sẵn (OPCOS_WORKSPACES chưa đặt). Enter để thôi.")
+    try:
+        ans = _unquote(ask(MIGRATE_ASK_WHERE.format(ws=ws, hint=hint)))
+    except EOFError:
+        raise ContractError(MIGRATE_NEED_STATION)
+    target = _path(ans) if ans else suggest
+    if not target:
+        raise ContractError("đã huỷ: chưa chọn nơi dời. Chưa dời gì.")
+    plan = _migrate_plan(target, count=True)
+    summary = (f"Sẽ dời {plan['ws']} → {plan['target']}\n"
+               f"  {plan['files']} file, {_human_size(plan['bytes'])}"
+               + (f" (gồm .env → {plan['moved_env']})" if plan["moved_env"] else "") + "\n"
+               "Sau khi dời, repo trỏ vào đích qua studio.local.json. Dời xong khó quay lại bằng một lệnh.\n"
+               "Dời? [y/N]: ")
+    try:
+        ok = (ask(summary) or "").strip().lower() in ("y", "yes")
+    except EOFError:
+        ok = False
+    if not ok:
+        raise ContractError("đã huỷ theo lựa chọn: chưa dời gì.")
+    return migrate_to_separate(target)
+
+
+def migrate_to_separate(target=None):
+    plan = _migrate_plan(target)                 # không đếm file: đã có đích rõ thì khỏi đi cả cây
+    repo, ws, target = plan["repo"], plan["ws"], plan["target"]
+    env_file, sec, moved_env = plan["env_file"], plan["sec"], plan["moved_env"]
     if os.path.isdir(target):
         os.rmdir(target)
     os.makedirs(os.path.dirname(target), exist_ok=True)
@@ -945,14 +1174,17 @@ def migrate_main(argv=None):
     ap = argparse.ArgumentParser(prog="voice-studio migrate",
                                  description="Chuyển trạm embedded (workspace/) ra ngoài repo.")
     ap.add_argument("--to", required=True, choices=["separate"])
-    ap.add_argument("--station", help="đích (mặc định ~/.voice)")
+    ap.add_argument("--station", help="nơi dời tới (đường tuyệt đối). Thiếu thì HỎI; không có người "
+                                      "trả lời thì dừng với mã 2 — không có đích mặc định")
+    ap.add_argument("--non-interactive", action="store_true",
+                    help="không có ai trả lời: không hỏi; thiếu --station thì dừng với mã 2")
     ap.add_argument("--json", action="store_true")
     args, code = contract.parse(ap, argv)
     if args is None:
         return code
 
     def fn(a):
-        res = migrate_to_separate(a.station)
+        res = do_migrate(station=a.station, non_interactive=a.non_interactive)
         contract.log(f"[migrate] trạm giờ ở {res['station']} — đặt VOICE_STATION trỏ vào đó")
         return res
     return contract.run(fn, args, args.json)
