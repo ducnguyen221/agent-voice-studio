@@ -36,6 +36,10 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
   nhãn in đúng đường) và `--non-interactive` thiếu cả `--yes` lẫn `--mode` vẫn thoát mã 2.
 - `OPCOS_WORKSPACES` (hay `<biến>/voice`) trỏ vào một file giờ thoát mã 2 nêu tên biến, trước mọi thao tác
   ghi (trước đây mã 1 kèm traceback).
+- `OPCOS_WORKSPACES` có dấu nháy dính vào giá trị (kiểu `setx` kèm nháy), có ký tự không hợp lệ trong đường
+  dẫn (Windows), hoặc trỏ vào chính một trạm (thay vì thư mục CHA chứa các trạm) giờ thoát mã 2 nêu tên biến,
+  chưa ghi gì — không còn mã 1 kèm traceback hay trạm lồng trong trạm. Gốc workspaces thông thường (không có
+  `station.json`/`omnivoice/voices/`) không bị chặn.
 - Ctrl+C ở bất kỳ lệnh `voice-studio` nào giờ thoát **mã 2** với đúng một dòng `đã huỷ (Ctrl+C)` (kèm dòng
   JSON lỗi khi có `--json`), không còn traceback.
 - `separate` không còn đường mặc định ở thư mục cá nhân. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là

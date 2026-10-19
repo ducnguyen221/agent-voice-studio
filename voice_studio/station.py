@@ -273,6 +273,15 @@ def _opcos_target():
     base = _env.opcos_base()
     if not base:
         return None
+    bad = '"' if '"' in base else (next((c for c in '<>|?*' if c in base[2:]), None) if os.name == "nt" else None)
+    if bad:
+        raise ContractError(
+            f"OPCOS_WORKSPACES có ký tự không hợp lệ trong đường dẫn ({bad!r}): {base}. Đặt lại biến là một đường "
+            "thư mục thuần, không kèm dấu nháy, hoặc chạy lại với --station DIR. Chưa ghi gì.")
+    if _env.has_marker(base):
+        raise ContractError(
+            f"OPCOS_WORKSPACES trỏ vào chính một trạm ({base}); biến phải là thư mục CHA chứa các trạm. Đặt lại "
+            f"biến, hoặc dùng --station {base}. Chưa ghi gì.")
     probe = base
     while not os.path.exists(probe) and os.path.dirname(probe) != probe:
         probe = os.path.dirname(probe)
@@ -585,7 +594,14 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
         for sub in ("omnivoice/voices", "assets/bgm", "out", "cache"):
             d = os.path.join(st, *sub.split("/"))
             if not os.path.isdir(d):
-                os.makedirs(d)
+                try:
+                    os.makedirs(d)
+                except OSError as e:           # đường không dựng được (ổ không có, tên sai…) là lỗi cấu hình, không phải lỗi máy
+                    base = _env.opcos_base()
+                    from_var = bool(base) and os.path.normcase(st).startswith(os.path.normcase(base))
+                    raise ContractError(
+                        f"không tạo được thư mục trạm {st}: {e}." +
+                        (" Kiểm giá trị OPCOS_WORKSPACES." if from_var else " Kiểm đường dẫn trạm."))
                 created.append(sub + "/")
         bgm.init_library(os.path.join(st, "assets", "bgm"))
         _copy_template(st, created)

@@ -1100,3 +1100,52 @@ def test_init_old_station_with_opcos_workspaces_pointing_at_a_file_cli_is_code_2
     out, err = capsys.readouterr()
     assert rc == 2 and "Traceback" not in err
     assert "OPCOS_WORKSPACES" in last_json(out)["error"]
+
+
+# ── a junction into the source station must be refused by real path (before any question, nothing moved) ──────
+
+def _junction(link, target):
+    if os.name != "nt":
+        pytest.skip("junctions are a Windows feature")
+    r = subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(target)], capture_output=True, text=True)
+    if r.returncode != 0:
+        pytest.skip("mklink /J is not available here: " + (r.stderr or r.stdout).strip())
+
+
+def test_migrate_refuses_a_target_that_reaches_the_source_through_a_junction(embedded_repo, tmp_path):
+    jn = tmp_path / "jn"
+    _junction(jn, embedded_repo / "workspaces")
+    before = _hashes(embedded_repo)
+    with pytest.raises(station.ContractError, match="nằm trong"):
+        station.migrate_to_separate(str(jn / "x"))
+    assert _hashes(embedded_repo) == before
+    assert not (embedded_repo / "workspaces" / "x").exists()
+
+
+def test_init_move_into_a_junction_that_reaches_the_source_is_code_2_before_the_y_n_question(
+        old_data_repo, tmp_path, monkeypatch):
+    sub = old_data_repo / "workspaces" / "sub"
+    sub.mkdir()
+    jn = tmp_path / "jn"
+    _junction(jn, sub)
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(jn))
+    before = _hashes(old_data_repo / "workspaces")
+    ask = _scripted("chuyen")
+    with pytest.raises(station.ContractError, match="nằm trong"):
+        station.do_init(ask=ask)
+    assert len(ask.prompts) == 1                                  # no y/N question
+    assert _kept(before, _hashes(old_data_repo / "workspaces"))
+
+
+# ── studio.local.json must not point at the target before the move has finished ─────────────────────────────
+
+def test_a_failed_move_leaves_the_recorded_choice_untouched(embedded_repo, tmp_path, monkeypatch):
+    def fail(src, dst):
+        raise station.ContractError("không dời được (giả)")
+    monkeypatch.setattr(station, "_move_tree", fail)
+    local = embedded_repo / "studio.local.json"
+    before = local.read_bytes()
+    with pytest.raises(station.ContractError, match="giả"):
+        station.migrate_to_separate(str(tmp_path / "dich"))
+    assert local.read_bytes() == before and json.loads(before)["mode"] == "embedded"
+    assert (embedded_repo / "workspaces" / "station.json").is_file()

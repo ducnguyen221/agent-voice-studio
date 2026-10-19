@@ -388,37 +388,6 @@ def test_relative_opcos_workspaces_gives_an_absolute_station_with_yes(world, tmp
     assert os.path.normcase(st) == os.path.normcase(str(tmp_path / "relws" / "voice"))
 
 
-def test_opcos_workspaces_inside_the_repo_is_built_as_asked(world, tmp_path, monkeypatch):
-    """Pinned as current behaviour, not a contract: whether this should be refused is still open."""
-    world("none", "unset")
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "repo" / "ws"))
-    mode, st, _ = station.choose_mode(yes=True)
-    assert mode == "separate" and os.path.normcase(st) == os.path.normcase(str(tmp_path / "repo" / "ws" / "voice"))
-
-
-def test_opcos_workspaces_that_is_itself_a_station_is_nested_as_asked(world, tmp_path, monkeypatch):
-    """Pinned as current behaviour, not a contract."""
-    world("none", "unset")
-    ws = tmp_path / "ws"
-    ws.mkdir()
-    (ws / "station.json").write_text("{}", encoding="utf-8")
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
-    mode, st, _ = station.choose_mode(yes=True)
-    assert mode == "separate" and os.path.normcase(st) == os.path.normcase(str(ws / "voice"))
-
-
-def test_opcos_voice_dir_not_empty_without_marker_is_used_as_asked(world, tmp_path, monkeypatch):
-    """Pinned as current behaviour, not a contract: the directory is used as is, nothing is deleted."""
-    world("none", "unset")
-    ws = tmp_path / "ws"
-    (ws / "voice").mkdir(parents=True)
-    (ws / "voice" / "la.txt").write_text("x", encoding="utf-8")
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
-    mode, st, _ = station.choose_mode(yes=True)
-    assert mode == "separate" and os.path.normcase(st) == os.path.normcase(str(ws / "voice"))
-    assert (ws / "voice" / "la.txt").read_text(encoding="utf-8") == "x"
-
-
 # ── dòng in khi dựng trạm OpcOS mới ────────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("call", ["--yes", "--non-interactive", "khong-tty khong co"])
@@ -489,3 +458,111 @@ def test_station_flag_beats_everything_and_is_made_absolute(layout, var, world, 
     mode, got, why = station.choose_mode(station="tram-tuong-doi", yes=True)
     assert (mode, why) == ("separate", "--station")
     assert os.path.normcase(got) == os.path.normcase(str(tmp_path / "tram-tuong-doi"))
+
+
+# ── a malformed OPCOS_WORKSPACES value is the caller's error: exit code 2 naming it, nothing written ──────
+
+BAD_VALUES = {
+    "quoted": lambda tmp: '"' + str(tmp / "ws") + '"',          # `setx` style: the quotes stick to the value
+    "illegal-char": lambda tmp: str(tmp / "a<b"),
+}
+
+
+@pytest.mark.parametrize("call", ["yes", "non-interactive", "mode-separate-yes"])
+@pytest.mark.parametrize("kind", sorted(BAD_VALUES))
+def test_malformed_opcos_workspaces_is_code_2_naming_the_variable(kind, call, world, tmp_path, monkeypatch, capsys):
+    if kind == "illegal-char" and os.name != "nt":
+        pytest.skip("`<` is a legal file-name character outside Windows")
+    world("none", "unset")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", BAD_VALUES[kind](tmp_path))
+    argv = {"yes": ["--yes"], "non-interactive": ["--non-interactive"],
+            "mode-separate-yes": ["--mode", "separate", "--yes"]}[call]
+    before = sorted(os.listdir(tmp_path))
+    rc = cli.main(["init", "--json", *argv])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"], err
+    assert "Traceback" not in err and "[init] separate: dùng" not in err
+    assert sorted(os.listdir(tmp_path)) == before and not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+def test_malformed_opcos_workspaces_at_end_of_input_is_code_2(world, tmp_path, monkeypatch):
+    world("none", "unset")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", '"' + str(tmp_path / "ws") + '"')
+
+    def eof(_prompt):
+        raise EOFError
+    with pytest.raises(ContractError, match="OPCOS_WORKSPACES"):
+        station.do_init(ask=eof)
+    assert not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+# ── layout `both` + a variable that is a file: the broken variable still wins (exit code 2) ───────────────
+
+@pytest.mark.parametrize("person", [False, True])
+def test_both_layout_with_opcos_workspaces_pointing_at_a_file_is_code_2(person, world, tmp_path, monkeypatch):
+    world("both", "unset")
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    seen = []
+    with pytest.raises(ContractError, match="OPCOS_WORKSPACES"):
+        if person:
+            station.choose_mode(ask=_answers(seen, ""))
+        else:
+            station.choose_mode(yes=True)
+    assert seen == []
+
+
+# ── OPCOS_WORKSPACES that is itself a station: refused (the variable must be the PARENT of the stations) ────
+
+@pytest.mark.parametrize("flags", [["--yes"], ["--non-interactive"], ["--mode", "separate", "--yes"]])
+def test_opcos_workspaces_that_is_itself_a_station_is_code_2_and_nothing_is_nested(flags, world, tmp_path,
+                                                                                    monkeypatch, capsys):
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    rc = cli.main(["init", "--json", *flags])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and "OPCOS_WORKSPACES" in last["error"] and "Traceback" not in err
+    assert not (ws / "voice").exists() and not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+def test_the_real_workspaces_root_layout_is_not_mistaken_for_a_station(world, tmp_path, monkeypatch):
+    """A workspaces root holds stations and other folders but has no marker of its own."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    for d in ("data", "marketing", "video", "writing"):
+        (ws / d).mkdir(parents=True)
+    (ws / "README.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    mode, st, _ = station.choose_mode(yes=True)
+    assert mode == "separate" and os.path.normcase(st) == os.path.normcase(str(ws / "voice"))
+
+
+# ── the two cases that stay as they are, now pinned through the whole `init` (not just choose_mode) ─────────
+
+def test_opcos_workspaces_inside_the_repo_is_built_through_init(world, tmp_path, monkeypatch, capsys):
+    """Pinned as current behaviour, not a contract: whether this should be refused is still open."""
+    world("none", "unset")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "repo" / "ws"))
+    rc = cli.main(["init", "--yes", "--json"])
+    assert rc == 0, capsys.readouterr().err
+    assert (tmp_path / "repo" / "ws" / "voice" / "station.json").is_file()
+
+
+def test_opcos_voice_dir_not_empty_without_marker_is_used_through_init(world, tmp_path, monkeypatch, capsys):
+    """Pinned as current behaviour, not a contract: the directory is used as is, nothing is deleted."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    (ws / "voice").mkdir(parents=True)
+    (ws / "voice" / "la.txt").write_bytes(b"x")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    rc = cli.main(["init", "--yes", "--json"])
+    assert rc == 0, capsys.readouterr().err
+    assert (ws / "voice" / "la.txt").read_bytes() == b"x" and (ws / "voice" / "station.json").is_file()
