@@ -765,3 +765,15 @@ def test_init_typed_path_that_is_a_file_is_code_2_and_writes_nothing(repo, opcos
     with pytest.raises(station.ContractError, match="FILE"):
         station.do_init(ask=lambda p: str(f))
     assert not (repo / "studio.local.json").exists() and not (repo / "workspaces").exists()
+
+
+@pytest.mark.parametrize("how", ["eof-at-the-table", "nobody-to-answer"])
+def test_no_answer_and_no_variable_message_names_mode_station_and_yes(how, repo, home):
+    """Exit code 2 with no variable set: the message tells an agent every way forward."""
+    def eof(_prompt):
+        raise EOFError
+    with pytest.raises(station.ContractError) as e:
+        station.do_init(ask=eof) if how == "eof-at-the-table" else station.do_init(non_interactive=True)
+    msg = str(e.value)
+    assert "--mode" in msg and "--station <đường>" in msg and "--yes" in msg
+    assert not (repo / "studio.local.json").exists()

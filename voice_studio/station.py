@@ -375,8 +375,8 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
                     contract.log(CHOICE_TABLE)
                     raise ContractError(
                         "cần người dùng chọn chế độ cài. Agent: trình bảng trên cho người dùng, "
-                        "rồi chạy lại với --mode embedded|separate (hoặc --yes để nhận trạm nhúng "
-                        "khi máy không đặt OPCOS_WORKSPACES).")
+                        "rồi chạy lại với --mode embedded|separate, hoặc --station <đường> (trạm ngoài repo), "
+                        "hoặc --yes (nhận trạm nhúng khi máy không đặt OPCOS_WORKSPACES).")
                 mode, why = "separate", "không có người trả lời + OPCOS_WORKSPACES"
             else:
                 ask = ask or _ask_console
@@ -407,8 +407,8 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
                     # Windows: stdin là NUL vẫn báo isatty() = True — hết dữ liệu nghĩa là không có người.
                     raise ContractError(
                         "không đọc được lựa chọn (stdin không có người). Agent: trình bảng lựa chọn cho "
-                        "người dùng, rồi chạy lại với --mode embedded|separate (hoặc --yes để nhận trạm "
-                        "nhúng khi máy không đặt OPCOS_WORKSPACES).")
+                        "người dùng, rồi chạy lại với --mode embedded|separate, hoặc --station <đường> (trạm "
+                        "ngoài repo), hoặc --yes (nhận trạm nhúng khi máy không đặt OPCOS_WORKSPACES).")
                 if ans in ("", "1", "embedded"):
                     mode = "embedded"
                 elif ans in ("2", "separate"):
