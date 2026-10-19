@@ -267,13 +267,19 @@ def _reject_bare_choice(typed):
             "chạy lại với --mode embedded. Chưa ghi gì.")
 
 
+def _after_drive(path):
+    """Phần đường dẫn SAU ổ đĩa/tiền tố (ổ `C:`, tiền tố mở rộng của Windows kèm ổ, hoặc đường mạng UNC): chỗ
+    kiểm ký tự cấm. `?` của tiền tố mở rộng và dấu `:` của ổ đĩa không phải ký tự cấm (`splitdrive` đã tách chúng)."""
+    return os.path.splitdrive(path)[1]
+
+
 def _opcos_target():
     """`<OPCOS_WORKSPACES>/voice` tuyệt đối, hoặc None khi biến vắng. Biến (hay một thư mục cha của nó) hoặc
     `<biến>/voice` là một FILE ⇒ ContractError nêu TÊN BIẾN, trước mọi `makedirs` (lỗi hợp đồng của người gọi)."""
     base = _env.opcos_base()
     if not base:
         return None
-    bad = '"' if '"' in base else (next((c for c in '<>|?*' if c in base[2:]), None) if os.name == "nt" else None)
+    bad = '"' if '"' in base else (next((c for c in '<>|?*' if c in _after_drive(base)), None) if os.name == "nt" else None)
     if bad:
         raise ContractError(
             f"OPCOS_WORKSPACES có ký tự không hợp lệ trong đường dẫn ({bad!r}): {base}. Đặt lại biến là một đường "

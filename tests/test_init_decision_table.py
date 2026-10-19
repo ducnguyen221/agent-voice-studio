@@ -566,3 +566,48 @@ def test_opcos_voice_dir_not_empty_without_marker_is_used_through_init(world, tm
     rc = cli.main(["init", "--yes", "--json"])
     assert rc == 0, capsys.readouterr().err
     assert (ws / "voice" / "la.txt").read_bytes() == b"x" and (ws / "voice" / "station.json").is_file()
+
+
+def test_extended_length_prefix_is_a_valid_value_not_an_illegal_character(world, tmp_path, monkeypatch, capsys):
+    """`\\\\?\\C:\\...` is a legal Windows path form; its `?` must not trip the illegal-character check."""
+    if os.name != "nt":
+        pytest.skip("extended-length prefixes are a Windows feature")
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("OPCOS_WORKSPACES", "\\\\?\\" + str(ws))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 0, err
+    assert (ws / "voice" / "station.json").is_file()
+
+
+def test_an_illegal_character_after_the_extended_length_prefix_is_still_refused(world, tmp_path, monkeypatch, capsys):
+    if os.name != "nt":
+        pytest.skip("Windows path rules")
+    world("none", "unset")
+    monkeypatch.setenv("OPCOS_WORKSPACES", "\\\\?\\" + str(tmp_path / "a<b"))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, _err = capsys.readouterr()
+    assert rc == 2 and "OPCOS_WORKSPACES" in json.loads(out.strip().splitlines()[-1])["error"]
+
+
+def test_an_unreachable_variable_is_code_2_naming_the_variable_and_writes_nothing(world, tmp_path, monkeypatch, capsys):
+    """A path that cannot be created (network name not found…) is a configuration error, not exit code 1 + traceback."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    real = os.makedirs
+
+    def flaky(path, *a, **kw):
+        if str(ws) in str(path):
+            raise OSError(67, "Không tìm thấy tên mạng")
+        return real(path, *a, **kw)
+    monkeypatch.setattr(os, "makedirs", flaky)
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and "Traceback" not in err
+    assert "OPCOS_WORKSPACES" in last["error"] and str(ws) in last["error"]
+    assert not (tmp_path / "repo" / "studio.local.json").exists()
