@@ -1062,3 +1062,14 @@ def test_init_old_station_yes_keeps_it_and_the_second_run_is_silent_and_never_as
     res2 = station.do_init(ask=_scripted())
     assert res2["mode"] == "embedded"
     assert "migrate --to separate" not in capsys.readouterr().err
+
+
+def test_init_old_station_dry_run_with_yes_prints_the_keep_plan_and_writes_nothing(old_data_repo, capsys):
+    """Ô CL59: `--dry-run --yes` trên trạm nhúng cũ có dữ liệu ⇒ kế hoạch 'giữ', 0 byte, không ghi studio.local.json."""
+    snap = _hashes(old_data_repo)
+    res = station.do_init(yes=True, dry_run=True, ask=_scripted())
+    station._print_init(res)
+    assert res["mode"] == "embedded" and res["dry_run"] is True
+    assert not (old_data_repo / "studio.local.json").exists()
+    assert _hashes(old_data_repo) == snap
+    assert "migrate --to separate" in capsys.readouterr().err

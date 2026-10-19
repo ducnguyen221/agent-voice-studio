@@ -756,3 +756,12 @@ def test_init_bare_choice_at_the_path_question_is_code_2_and_creates_nothing(typ
     with pytest.raises(station.ContractError, match="--mode embedded"):
         station.do_init(ask=lambda p: typed)
     assert not (tmp_path / typed).exists() and not (repo / "studio.local.json").exists()
+
+
+def test_init_typed_path_that_is_a_file_is_code_2_and_writes_nothing(repo, opcos, tmp_path):
+    """Ô CL34: gõ một đường mà đường đó là FILE ở câu nhận đường ⇒ mã 2, chưa ghi gì."""
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    with pytest.raises(station.ContractError, match="FILE"):
+        station.do_init(ask=lambda p: str(f))
+    assert not (repo / "studio.local.json").exists() and not (repo / "workspaces").exists()
