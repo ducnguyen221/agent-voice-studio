@@ -921,7 +921,7 @@ def test_doctor_tracked_check_covers_the_singular_name(embedded_repo):
     assert by_name(doctor.run_checks())["git-tracked"]["level"] == "error"
 
 
-# ── init: trạm nhúng cũ có dữ liệu, chưa ghi lựa chọn, máy có OPCOS_WORKSPACES (FR1.6.2) ────────────────
+# ── init: trạm nhúng cũ có dữ liệu, chưa ghi lựa chọn, máy có OPCOS_WORKSPACES ────────────────
 
 @pytest.fixture
 def old_data_repo(tmp_path, monkeypatch, live):
@@ -978,7 +978,7 @@ def _local(repo):
 
 
 def test_init_old_station_chuyen_then_yes_moves_it_with_two_questions(old_data_repo, tmp_path):
-    """Ô CL55: gõ `chuyen` rồi `y` ⇒ ghi embedded, rồi dời qua đúng đường `migrate`; 2 câu; hash khớp (SC5)."""
+    """`chuyen` then `y` ⇒ embedded is written, then the move goes through the `migrate` path; 2 questions; hashes match."""
     before = _hashes(old_data_repo / "workspaces")
     ask = _scripted("chuyen", "y")
     res = station.do_init(ask=ask)
@@ -998,7 +998,7 @@ def test_init_old_station_chuyen_then_yes_moves_it_with_two_questions(old_data_r
 
 @pytest.mark.parametrize("answer", ["n", "", "khong", EOFError])
 def test_init_old_station_chuyen_then_decline_keeps_it_with_exit_0(answer, old_data_repo, tmp_path, capsys):
-    """Ô CL56: `n`/Enter/EOF ở y/N ⇒ giữ (đã ghi embedded), 0 byte dời, không lỗi, một dòng chỉ lệnh `migrate`."""
+    """`n`/Enter/EOF ở y/N ⇒ giữ (đã ghi embedded), 0 byte dời, không lỗi, một dòng chỉ lệnh `migrate`."""
     before = _hashes(old_data_repo / "workspaces")
     ask = _scripted("chuyen", answer)
     res = station.do_init(ask=ask)
@@ -1013,7 +1013,7 @@ def test_init_old_station_chuyen_then_decline_keeps_it_with_exit_0(answer, old_d
 
 
 def test_init_old_station_chuyen_into_a_non_empty_target_is_code_2_before_the_y_n_question(old_data_repo, tmp_path):
-    """Ô CL57 (CQ9 b): đích không rỗng ⇒ mã 2 TRƯỚC câu y/N; trạm cũ đã ghi embedded vẫn dùng được."""
+    """Target không rỗng ⇒ mã 2 TRƯỚC câu y/N; trạm cũ đã ghi embedded vẫn dùng được."""
     oc = tmp_path / "opcos-ws" / "voice"
     oc.mkdir()
     (oc / "co-san.txt").write_text("x", encoding="utf-8")
@@ -1029,7 +1029,7 @@ def test_init_old_station_chuyen_into_a_non_empty_target_is_code_2_before_the_y_
 
 
 def test_init_old_station_dry_run_with_chuyen_prints_the_plan_and_writes_nothing(old_data_repo, tmp_path, capsys):
-    """Ô CL58: `--dry-run` + chuyển ⇒ in "sẽ dời", 0 byte dời, không ghi studio.local.json."""
+    """`--dry-run` + chuyển ⇒ in "sẽ dời", 0 byte dời, không ghi studio.local.json."""
     snap = _hashes(old_data_repo)
     ask = _scripted("chuyen")
     res = station.do_init(ask=ask, dry_run=True)
@@ -1043,7 +1043,7 @@ def test_init_old_station_dry_run_with_chuyen_prints_the_plan_and_writes_nothing
 
 
 def test_init_old_station_ctrl_c_at_the_y_n_question_propagates_and_moves_nothing(old_data_repo, tmp_path):
-    """FR1.6.4: Ctrl+C ở y/N ⇒ lan ra (contract.run đổi thành mã 2); embedded đã ghi, 0 byte dời."""
+    """Ctrl+C ở y/N ⇒ lan ra (contract.run đổi thành mã 2); embedded đã ghi, 0 byte dời."""
     before = _hashes(old_data_repo / "workspaces")
     with pytest.raises(KeyboardInterrupt):
         station.do_init(ask=_scripted("chuyen", KeyboardInterrupt))
@@ -1053,7 +1053,7 @@ def test_init_old_station_ctrl_c_at_the_y_n_question_propagates_and_moves_nothin
 
 
 def test_init_old_station_yes_keeps_it_and_the_second_run_is_silent_and_never_asks(old_data_repo, capsys):
-    """Ô CL51 + CL63: `--yes` giữ trạm cũ (ghi embedded); init lần hai: 0 câu, không dòng `migrate`."""
+    """`--yes` giữ trạm cũ (ghi embedded); init lần hai: 0 câu, không dòng `migrate`."""
     res = station.do_init(yes=True)
     err = capsys.readouterr().err
     assert res["mode"] == "embedded" and _local(old_data_repo)["mode"] == "embedded"
@@ -1065,7 +1065,7 @@ def test_init_old_station_yes_keeps_it_and_the_second_run_is_silent_and_never_as
 
 
 def test_init_old_station_dry_run_with_yes_prints_the_keep_plan_and_writes_nothing(old_data_repo, capsys):
-    """Ô CL59: `--dry-run --yes` trên trạm nhúng cũ có dữ liệu ⇒ kế hoạch 'giữ', 0 byte, không ghi studio.local.json."""
+    """`--dry-run --yes` trên trạm nhúng cũ có dữ liệu ⇒ kế hoạch 'giữ', 0 byte, không ghi studio.local.json."""
     snap = _hashes(old_data_repo)
     res = station.do_init(yes=True, dry_run=True, ask=_scripted())
     station._print_init(res)
@@ -1073,3 +1073,30 @@ def test_init_old_station_dry_run_with_yes_prints_the_keep_plan_and_writes_nothi
     assert not (old_data_repo / "studio.local.json").exists()
     assert _hashes(old_data_repo) == snap
     assert "migrate --to separate" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("how", ["yes", "chuyen-then-y"])
+def test_init_old_station_with_opcos_workspaces_pointing_at_a_file_is_code_2(how, old_data_repo, tmp_path, monkeypatch):
+    """The old station is kept data-wise, but a broken variable is still the caller's error: exit code 2 naming it,
+    before any question, nothing written (no hint to run a `migrate` that cannot work)."""
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    before = _hashes(old_data_repo)
+    ask = _scripted("chuyen", "y")
+    with pytest.raises(station.ContractError, match="OPCOS_WORKSPACES"):
+        station.do_init(yes=True, ask=ask) if how == "yes" else station.do_init(ask=ask)
+    assert ask.prompts == []                           # the error comes before any question
+    assert not (old_data_repo / "studio.local.json").exists()
+    assert _hashes(old_data_repo) == before
+
+
+def test_init_old_station_with_opcos_workspaces_pointing_at_a_file_cli_is_code_2_without_traceback(
+        old_data_repo, tmp_path, monkeypatch, capsys):
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 2 and "Traceback" not in err
+    assert "OPCOS_WORKSPACES" in last_json(out)["error"]

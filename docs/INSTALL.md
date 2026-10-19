@@ -135,7 +135,7 @@ voice-studio init --station <trạm cũ> --existing   # nhận trạm đang ch�
 ```
 
 **`embedded` là mặc định và là khuyến nghị**: trạm ở `<repo>/workspaces/`, biến cấu hình ở
-`<repo>/.env`, bấm Enter là xong, không phải đặt biến môi trường nào. Chọn **`separate`** khi bạn
+`<repo>/.env`; khi máy chưa đặt `OPCOS_WORKSPACES`, bấm Enter là xong, không phải đặt biến môi trường nào. Chọn **`separate`** khi bạn
 dùng nhiều máy, rành kỹ thuật, hoặc repo này là bản public của chính bạn — tức là trạm phải sống
 lâu hơn bản clone.
 

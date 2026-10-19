@@ -78,7 +78,7 @@ và bạn cũng không muốn nó (xem cảnh báo bộ chuẩn hoá trong `viet
 **5. Dựng trạm:**
 
 ```bash
-voice-studio init                 # hỏi embedded / separate (Enter = embedded)
+voice-studio init                 # hỏi embedded / separate (Enter = embedded); máy đã đặt OPCOS_WORKSPACES thì hỏi 1 câu nhận <biến>/voice
 voice-studio init --dry-run       # chỉ xem sẽ làm gì
 voice-studio init --station <đường trạm>      # separate, không hỏi
 voice-studio init --station <trạm cũ> --existing   # nhận trạm đang chạy: chỉ ghi station.json

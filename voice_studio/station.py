@@ -301,7 +301,7 @@ def _keep_old_station(repo, ask, default_ask, interactive):
     old_m = _env.has_marker(os.path.join(repo, _env.LEGACY_WORKSPACE))
     if not (new_m or old_m):
         return None
-    oc = _env.opcos_dir()
+    oc = _opcos_target()                 # biến trỏ vào file ⇒ mã 2 nêu tên biến, trước mọi câu hỏi
     path = _env.embedded_station(repo)[0]
     why = f"trạm nhúng trong repo đã có dữ liệu ({path}); máy có OPCOS_WORKSPACES"
     if not new_m and os.path.isdir(os.path.join(repo, _env.WORKSPACE)):
@@ -321,7 +321,7 @@ def _keep_old_station(repo, ask, default_ask, interactive):
 def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=False):
     """-> Choice (unpack được `(chế độ, gốc trạm, lý do)`). Ném ContractError khi cần người chọn mà không hỏi được.
 
-    Thứ tự (ba plugin cùng một hình; bảng đầy đủ ở docs của sprint):
+    Thứ tự ưu tiên:
 
         --station → biến trạm riêng → lựa chọn đã ghi → --mode (embedded: trạm nhúng; separate: đã dấu ? dùng :
         có người ? 1 câu : dựng + 1 dòng) → máy có OPCOS_WORKSPACES?
@@ -561,7 +561,7 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
             non_interactive=False):
     choice = choose_mode(station=station, mode=mode, yes=yes, ask=ask, non_interactive=non_interactive)
     mode, st, why = choice
-    then_migrate = choice.then_migrate           # cờ tường minh: người dùng chọn dời trạm nhúng cũ (FR1.6.2)
+    then_migrate = choice.then_migrate           # explicit flag: the user chose to move the old embedded station
     repo = _env.repo_root()
     res = {"mode": mode, "station": st, "reason": why, "dry_run": bool(dry_run),
            "repo": repo, "created": [], "hook": None}
@@ -617,7 +617,7 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
 
 
 def _migrate_after_init(res, target, ask):
-    """`init` chọn dời trạm nhúng cũ (FR1.6.2): trạm đã được dựng + ghi `embedded`. Kiểm đích TRƯỚC (không rỗng ⇒
+    """`init` chose to move the old embedded station: the station đã được dựng + ghi `embedded`. Kiểm đích TRƯỚC (không rỗng ⇒
     mã 2, trạm cũ vẫn dùng được), rồi đúng câu tóm tắt + y/N của `migrate`. `n`/Enter/EOF ⇒ giữ, mã 0."""
     plan = _migrate_plan(target, count=True)
     if not _confirm_move(plan, ask or _ask_line):
@@ -1034,7 +1034,7 @@ def do_migrate(station=None, ask=None, non_interactive=False):
         raise ContractError(MIGRATE_NEED_STATION)
     ask = ask or _ask_line
     _repo, ws = _migrate_source()
-    suggest = _env.opcos_dir()           # gợi ý duy nhất: `<OPCOS_WORKSPACES>/voice`; không có thì không gợi ý
+    suggest = _opcos_target()            # gợi ý duy nhất: `<OPCOS_WORKSPACES>/voice`; không có thì không gợi ý
     hint = (f"Gợi ý (Enter để nhận): {suggest}" if suggest
             else "Không có gợi ý sẵn (OPCOS_WORKSPACES chưa đặt). Enter để thôi.")
     try:

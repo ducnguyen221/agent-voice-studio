@@ -81,7 +81,7 @@ không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windo
 [`docs/INSTALL.md` mục 3](docs/INSTALL.md#3-cài-package---e-hay-bản-sao).
 
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
-`<repo>/workspaces/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
+`<repo>/workspaces/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — khi máy chưa đặt `OPCOS_WORKSPACES`, bấm Enter là xong,
 không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,
 hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) và máy chưa đặt
 `OPCOS_WORKSPACES` thì `init` in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài

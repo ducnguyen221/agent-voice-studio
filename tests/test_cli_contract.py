@@ -252,7 +252,7 @@ def test_process_speak_exit_3_without_station(tmp_path):
     assert json.loads(r.stdout.strip().splitlines()[-1])["code"] == 3
 
 
-# ── Ctrl+C = mã 2 ở biên CLI (FR1.8) ───────────────────────────────────────────────────────
+# ── Ctrl+C = exit code 2 at the CLI boundary ───────────────────────────────────────────────────────
 
 def _interrupt(_args):
     raise KeyboardInterrupt

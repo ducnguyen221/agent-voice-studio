@@ -95,7 +95,7 @@ def _answers(seen, *items):
 
 
 SKIP = "skip"
-KEEP_LAYOUTS = ("marked", "old", "both")      # trạm nhúng mang dấu, chưa ghi lựa chọn (FR1.6)
+KEEP_LAYOUTS = ("marked", "old", "both")      # embedded station already carries the marker, no recorded choice
 
 # kwargs cho choose_mode · cách dựng câu trả lời giả (typed_path -> list; phần tử là ngoại lệ thì ném) hoặc None
 # · mong đợi(var, layout) · SỐ CÂU HỎI mong đợi(var, layout) — test đếm bằng ĐÚNG số này (hỏi ít hơn cũng đỏ)
@@ -122,7 +122,7 @@ def _auto_or_exit2(var, layout):
 
 
 def _one_question(var, layout):
-    """Câu hỏi có người khi biến đặt: bố cục `both` không có câu nào (FR1.6.3); còn lại đúng một câu."""
+    """Câu hỏi có người khi biến đặt: bố cục `both` không có câu nào (the layout with an old marked `workspace` and an unmarked `workspaces`); otherwise exactly one."""
     return 0 if var != "unset" and layout == "both" else 1
 
 
@@ -179,7 +179,7 @@ SCENARIOS = {
     "da ghi separate thieu duong + --yes": sc(dict(yes=True), None, lambda var, layout: "exit2",
                                               recorded={"mode": "separate"}),
 }
-# gõ lựa chọn trần ở câu nhận đường (CQ1): mã 2; riêng bố cục mang dấu thì đó là câu giữ/chuyển, `1`… không phải từ khoá ⇒ giữ
+# a bare choice typed at the path question: exit code 2; riêng bố cục mang dấu thì đó là câu giữ/chuyển, `1`… không phải từ khoá ⇒ giữ
 for _word in ("1", "2", "embedded", "separate"):
     SCENARIOS[f"tuong-tac (biến đặt) go {_word}"] = sc(
         dict(), (lambda t, _w=_word: [_w]), _set_only(_bare_choice), _one_question)
@@ -204,7 +204,7 @@ def test_decision_table(name, layout, var, world, monkeypatch, capsys):
     ask = _answers(seen, *s.answers(table["typed_path"])) if s.answers else None
     want = None if key == "interrupt" else table[key]
     if key == "interrupt":
-        with pytest.raises(KeyboardInterrupt):        # hàm chọn chế độ KHÔNG bắt Ctrl+C (FR1.8)
+        with pytest.raises(KeyboardInterrupt):        # choose_mode must not catch Ctrl+C
             station.choose_mode(ask=ask, **s.kwargs)
     elif want is None:
         with pytest.raises(ContractError):
@@ -245,7 +245,7 @@ def test_label_names_the_real_path(var, world):
     assert (mode, os.path.normcase(st)) == (want[0], os.path.normcase(want[1]))
 
 
-# ── FR1.6: trạm nhúng cũ có dữ liệu thắng biến (chưa ghi lựa chọn) ─────────────────────────
+# ── an embedded station that already holds data wins over the variable (no recorded choice) ─────────────────────────
 
 def _tree_state(*roots):
     """Ảnh chụp cây (đường → nội dung) để chứng minh KHÔNG byte nào bị dời/ghi."""
@@ -276,7 +276,7 @@ KEEP_CALLS = {
 @pytest.mark.parametrize("var", ["unmarked", "marked"])
 @pytest.mark.parametrize("call", sorted(KEEP_CALLS))
 def test_old_station_with_data_is_kept_and_says_how_to_move(call, var, layout, world, monkeypatch, capsys):
-    """FR1.6.1 (ô CL51–CL54, CL60, CL65): giữ trạm nhúng cũ, 1 dòng chỉ cách dời; không bao giờ dựng trạm OpcOS rỗng."""
+    """Keep the old embedded station, 1 dòng chỉ cách dời; không bao giờ dựng trạm OpcOS rỗng."""
     kwargs, build, tty, n_asks = KEEP_CALLS[call]
     table = world(layout, var)
     monkeypatch.setattr(station, "_stdin_is_tty", lambda: tty)
@@ -292,7 +292,7 @@ def test_old_station_with_data_is_kept_and_says_how_to_move(call, var, layout, w
     err = capsys.readouterr().err
     if var == "unmarked":
         assert f"migrate --to separate --station {oc}" in err
-    else:                                          # cả <biến>/voice cũng đã là trạm (FR1.6.5)
+    else:                                          # <biến>/voice is a station too
         assert "hai trạm" in err and "migrate --to separate" not in err
         assert f"--station {oc}" in err
 
@@ -301,7 +301,7 @@ def test_old_station_with_data_is_kept_and_says_how_to_move(call, var, layout, w
 @pytest.mark.parametrize("layout", ["marked", "old"])
 @pytest.mark.parametrize("var", ["unmarked", "marked"])
 def test_old_station_choosing_to_move_returns_a_flag_and_moves_nothing(word, var, layout, world, monkeypatch, capsys):
-    """FR1.6.2 (ô CL55): hàm chọn chế độ KHÔNG dời gì — nó trả `then_migrate`; `do_init` mới dời sau cổng dry-run."""
+    """choose_mode never moves anything — nó trả `then_migrate`; `do_init` mới dời sau cổng dry-run."""
     table = world(layout, var)
     monkeypatch.setattr(station, "_stdin_is_tty", lambda: True)
     monkeypatch.setattr(builtins, "input", _boom)
@@ -322,7 +322,7 @@ def tmp_root(table):
 @pytest.mark.parametrize("call", ["yes", "non-interactive", "khong-tty", "Enter"])
 @pytest.mark.parametrize("var", ["unmarked", "marked"])
 def test_both_layout_keeps_without_any_question_or_migrate_line(call, var, world, monkeypatch, capsys):
-    """FR1.6.3 (ô CL62, phán quyết 4): `workspace` cũ mang dấu + `workspaces` mới chưa dấu ⇒ giữ, 0 câu ở mọi cách
+    """Layout `both`: the old `workspace` mang dấu + `workspaces` mới chưa dấu ⇒ giữ, 0 câu ở mọi cách
     gọi (kể cả có người), nhắc gộp có sẵn, KHÔNG gợi `migrate` (dời thư mục rỗng là vô nghĩa)."""
     kwargs, build, tty, _n = KEEP_CALLS[call]
     table = world("both", var)
@@ -338,11 +338,11 @@ def test_both_layout_keeps_without_any_question_or_migrate_line(call, var, world
     assert "tên cũ" in err and "migrate --to separate" not in err
 
 
-# ── FR1.7: giá trị OPCOS_WORKSPACES lệch ───────────────────────────────────────────────────
+# ── odd OPCOS_WORKSPACES values ───────────────────────────────────────────────────
 
 @pytest.mark.parametrize("flags", [["--yes"], ["--non-interactive"], ["--mode", "separate", "--yes"]])
 def test_opcos_workspaces_pointing_at_a_file_is_code_2_naming_the_variable(flags, world, tmp_path, monkeypatch, capsys):
-    """FR1.7 (ô CL47, phán quyết 2): lỗi hợp đồng của người gọi ⇒ mã 2 nêu TÊN BIẾN, không traceback (trước: mã 1)."""
+    """A caller error: ⇒ mã 2 nêu TÊN BIẾN, không traceback (trước: mã 1)."""
     world("none", "unset")
     f = tmp_path / "la-file"
     f.write_text("x", encoding="utf-8")
@@ -350,8 +350,9 @@ def test_opcos_workspaces_pointing_at_a_file_is_code_2_naming_the_variable(flags
     rc = cli.main(["init", "--json", *flags])
     out, err = capsys.readouterr()
     assert rc == 2, err
-    assert "OPCOS_WORKSPACES" in err and "FILE" in err and "Traceback" not in err
-    assert json.loads(out.strip().splitlines()[-1])["code"] == 2
+    last = json.loads(out.strip().splitlines()[-1])
+    assert last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"] and "FILE" in last["error"]
+    assert "Traceback" not in err
     assert not (tmp_path / "repo" / "studio.local.json").exists()
 
 
@@ -362,12 +363,15 @@ def test_opcos_workspaces_voice_entry_being_a_file_is_code_2_naming_the_variable
     (ws / "voice").write_text("x", encoding="utf-8")
     monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
     rc = cli.main(["init", "--yes", "--json"])
-    _out, err = capsys.readouterr()
-    assert rc == 2 and "OPCOS_WORKSPACES" in err and "FILE" in err and "Traceback" not in err
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    # the ERROR itself must name the variable (not just an earlier "[init] separate: dùng … OPCOS_WORKSPACES/voice" line)
+    assert rc == 2 and last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"] and "FILE" in last["error"]
+    assert "Traceback" not in err and "[init] separate: dùng" not in err
 
 
 def test_blank_opcos_workspaces_counts_as_unset(world, monkeypatch):
-    """FR1.7 (ô CL45): rỗng/khoảng trắng = vắng ⇒ `--yes` vẫn ra trạm nhúng."""
+    """Blank/khoảng trắng = vắng ⇒ `--yes` vẫn ra trạm nhúng."""
     table = world("none", "unset")
     monkeypatch.setenv("OPCOS_WORKSPACES", "   ")
     mode, st, _ = station.choose_mode(yes=True)
@@ -375,7 +379,7 @@ def test_blank_opcos_workspaces_counts_as_unset(world, monkeypatch):
 
 
 def test_relative_opcos_workspaces_gives_an_absolute_station_with_yes(world, tmp_path, monkeypatch, capsys):
-    """FR1.7 (ô CL46): biến tương đối ⇒ đường ra là tuyệt đối theo cwd lúc gọi."""
+    """A relative variable ⇒ đường ra là tuyệt đối theo cwd lúc gọi."""
     world("none", "unset")
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("OPCOS_WORKSPACES", "relws")
@@ -385,7 +389,7 @@ def test_relative_opcos_workspaces_gives_an_absolute_station_with_yes(world, tmp
 
 
 def test_opcos_workspaces_inside_the_repo_is_built_as_asked(world, tmp_path, monkeypatch):
-    """FR1.7 (ô CL48) — test ĐẶC TẢ hành vi hiện tại; TK8 (security hẹp) quyết có chặn không."""
+    """Pinned as current behaviour, not a contract: whether this should be refused is still open."""
     world("none", "unset")
     monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "repo" / "ws"))
     mode, st, _ = station.choose_mode(yes=True)
@@ -393,7 +397,7 @@ def test_opcos_workspaces_inside_the_repo_is_built_as_asked(world, tmp_path, mon
 
 
 def test_opcos_workspaces_that_is_itself_a_station_is_nested_as_asked(world, tmp_path, monkeypatch):
-    """FR1.7 (ô CL49) — test ĐẶC TẢ hành vi hiện tại; TK8 quyết."""
+    """Pinned as current behaviour, not a contract."""
     world("none", "unset")
     ws = tmp_path / "ws"
     ws.mkdir()
@@ -404,7 +408,7 @@ def test_opcos_workspaces_that_is_itself_a_station_is_nested_as_asked(world, tmp
 
 
 def test_opcos_voice_dir_not_empty_without_marker_is_used_as_asked(world, tmp_path, monkeypatch):
-    """FR1.7 (ô CL50) — test ĐẶC TẢ hành vi hiện tại (dùng thư mục đó, không xoá gì); TK8 quyết."""
+    """Pinned as current behaviour, not a contract: the directory is used as is, nothing is deleted."""
     world("none", "unset")
     ws = tmp_path / "ws"
     (ws / "voice").mkdir(parents=True)
@@ -435,7 +439,7 @@ def test_using_an_already_marked_opcos_station_prints_nothing(world, monkeypatch
     assert capsys.readouterr().err == ""
 
 
-# ── thứ tự ưu tiên: --station và biến trạm RIÊNG thắng OPCOS_WORKSPACES (ô CL16, CL18, CL42, CL43, CL44) ──────
+# ── thứ tự ưu tiên: --station và biến trạm RIÊNG thắng OPCOS_WORKSPACES ──────
 
 OWN_VARS = ("VOICE_STATION", "OMNIVOICE_DIR")
 OWN_CALLS = {
@@ -451,7 +455,7 @@ OWN_CALLS = {
 @pytest.mark.parametrize("own", OWN_VARS)
 def test_own_station_variable_beats_opcos_workspaces_and_is_never_asked_about(own, var, call, world, tmp_path,
                                                                               monkeypatch):
-    """CL18 + CL43: biến trạm riêng (VOICE_STATION · OMNIVOICE_DIR) ⇒ separate tại trạm đó, 0 câu, không tạo workspaces/."""
+    """A station-specific variable (VOICE_STATION · OMNIVOICE_DIR) ⇒ separate tại trạm đó, 0 câu, không tạo workspaces/."""
     world("marked", var)
     st = tmp_path / "tram-rieng"
     monkeypatch.setenv(own, str(st / "omnivoice") if own == "OMNIVOICE_DIR" else str(st))
@@ -468,7 +472,7 @@ def test_own_station_variable_beats_opcos_workspaces_and_is_never_asked_about(ow
 @pytest.mark.parametrize("own", OWN_VARS)
 @pytest.mark.parametrize("var", ["unset", "unmarked"])
 def test_explicit_embedded_with_an_own_station_variable_is_code_2(own, var, world, tmp_path, monkeypatch):
-    """CL44: `--mode embedded` + biến trạm riêng ⇒ mã 2 ('hai nguồn sự thật')."""
+    """`--mode embedded` + biến trạm riêng ⇒ mã 2 ('hai nguồn sự thật')."""
     world("none", var)
     monkeypatch.setenv(own, str(tmp_path / "tram-rieng"))
     with pytest.raises(ContractError, match="hai nguồn sự thật"):
@@ -478,7 +482,7 @@ def test_explicit_embedded_with_an_own_station_variable_is_code_2(own, var, worl
 @pytest.mark.parametrize("var", ["unset", "unmarked", "marked"])
 @pytest.mark.parametrize("layout", ["none", "marked", "old", "both"])
 def test_station_flag_beats_everything_and_is_made_absolute(layout, var, world, tmp_path, monkeypatch):
-    """CL16 + CL42: `--station` ⇒ separate tại đường đó (tuyệt đối theo cwd), 0 câu, bất kể biến/bố cục."""
+    """`--station` ⇒ separate tại đường đó (tuyệt đối theo cwd), 0 câu, bất kể biến/bố cục."""
     world(layout, var)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(builtins, "input", _boom)

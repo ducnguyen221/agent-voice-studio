@@ -711,7 +711,7 @@ def test_venv_commands_weights_size_is_measured_value(tmp_path):
 # ── thay ba test khoá hành vi cũ (`--yes`/không người có biến ra trạm OpcOS) ───────────────────────────
 
 def test_init_yes_with_opcos_var_builds_the_opcos_station(repo, opcos, sandbox_home, capsys):
-    """Ô CL22 (thay `test_init_yes_with_opcos_var_stays_embedded`): `--yes` + biến ⇒ `<biến>/voice`, không hỏi."""
+    """`--yes` + OPCOS_WORKSPACES ⇒ `<biến>/voice`, no question."""
     res = station.do_init(yes=True, ask=never_ask)
     assert res["mode"] == "separate"
     assert os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
@@ -721,7 +721,7 @@ def test_init_yes_with_opcos_var_builds_the_opcos_station(repo, opcos, sandbox_h
 
 
 def test_init_yes_builds_the_opcos_station_even_when_the_dir_has_no_marker(repo, tmp_path, monkeypatch, sandbox_home, capsys):
-    """Ô CL22 (thay `test_init_yes_ignores_opcos_dir_without_marker`): thư mục chưa dấu ⇒ dựng ở đó + 1 dòng."""
+    """`--yes` with an unmarked `<biến>/voice` directory ⇒ the station is built there, plus one line."""
     (tmp_path / "bare-ws" / "voice").mkdir(parents=True)
     monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
     res = station.do_init(yes=True, ask=never_ask)
@@ -733,7 +733,7 @@ def test_init_yes_builds_the_opcos_station_even_when_the_dir_has_no_marker(repo,
 
 
 def test_init_opcos_without_anyone_to_ask_builds_the_opcos_station(repo, opcos, capsys):
-    """Ô CL25 (thay `..._non_interactive_without_yes_or_mode_is_code_2`): không người, có biến ⇒ trạm OpcOS, mã 0."""
+    """Nobody to answer and the variable set ⇒ the OpcOS station, exit code 0."""
     rc = cli.main(["init", "--non-interactive", "--json"])
     out, _err = capsys.readouterr()
     assert rc == 0 and last_json(out)["ok"] is True
@@ -742,7 +742,7 @@ def test_init_opcos_without_anyone_to_ask_builds_the_opcos_station(repo, opcos, 
 
 
 def test_init_stdin_at_eof_with_opcos_var_uses_the_opcos_station(repo, opcos, monkeypatch, capsys):
-    """Ô CL26 (FR2.3, CQ6): hết dữ liệu ở câu đường khi có biến = không có người ⇒ trạm OpcOS, mã 0."""
+    """End of input at the path question with the variable set = nobody there ⇒ the OpcOS station, exit code 0."""
     def eof(_prompt):
         raise EOFError
     res = station.do_init(ask=eof)
@@ -751,7 +751,7 @@ def test_init_stdin_at_eof_with_opcos_var_uses_the_opcos_station(repo, opcos, mo
 
 @pytest.mark.parametrize("typed", ["1", "2", "embedded", "separate", "Embedded"])
 def test_init_bare_choice_at_the_path_question_is_code_2_and_creates_nothing(typed, repo, opcos, tmp_path, monkeypatch):
-    """Ô CL29–CL32 (CQ1, FR2.4): `1`/`2`/`embedded`/`separate` ở câu nhận đường ⇒ mã 2; không tạo `<cwd>/1`."""
+    """`1`/`2`/`embedded`/`separate` at the path question ⇒ exit code 2; no `<cwd>/1` is created."""
     monkeypatch.chdir(tmp_path)
     with pytest.raises(station.ContractError, match="--mode embedded"):
         station.do_init(ask=lambda p: typed)
@@ -759,7 +759,7 @@ def test_init_bare_choice_at_the_path_question_is_code_2_and_creates_nothing(typ
 
 
 def test_init_typed_path_that_is_a_file_is_code_2_and_writes_nothing(repo, opcos, tmp_path):
-    """Ô CL34: gõ một đường mà đường đó là FILE ở câu nhận đường ⇒ mã 2, chưa ghi gì."""
+    """A typed path that is a file ⇒ exit code 2, nothing written."""
     f = tmp_path / "la-file"
     f.write_text("x", encoding="utf-8")
     with pytest.raises(station.ContractError, match="FILE"):
