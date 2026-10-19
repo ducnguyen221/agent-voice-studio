@@ -83,9 +83,10 @@ không làm đổi lượt đang chạy — luật duy nhất, kèm lệnh Windo
 `init` **trình bảng hai lựa chọn rồi mới làm**, chứ không hỏi trống: `embedded` (trạm ở
 `<repo>/workspaces/`, biến cấu hình ở `<repo>/.env`) là **khuyến nghị** — bấm Enter là xong,
 không phải đặt biến môi trường nào. Chọn `separate` khi anh dùng nhiều máy, rành kỹ thuật,
-hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) thì `init`
-in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài phải đưa bảng cho người
-dùng xem, không tự chọn im lặng.
+hoặc repo này là bản public của chính anh. Không có ai trả lời (CI, lịch chạy) và máy chưa đặt
+`OPCOS_WORKSPACES` thì `init` in bảng đó ra rồi **thoát mã 2 mà chưa ghi byte nào** — agent cài
+phải đưa bảng cho người dùng xem, không tự chọn im lặng. Máy đã đặt `OPCOS_WORKSPACES` thì chỗ đặt
+đã biết: `--yes` hay chạy không người dựng trạm `<biến>/voice`.
 
 Chế độ `embedded` là "clone là chạy": `init` dựng sẵn cây trạm và chép `.env.example` thành
 `<repo>/.env` cho anh điền. Cả `workspaces/` lẫn `.env` đều bị `.gitignore` chặn và hook

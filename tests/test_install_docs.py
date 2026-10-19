@@ -199,3 +199,18 @@ def test_no_second_copy_of_the_editable_rule():
     # Đoạn "ngoại lệ có chủ đích" cũ từng sống ở 3 nơi với 3 lời khác nhau.
     for rel in POINTS_TO_CANONICAL + [CANONICAL_INSTALL, "docs/WORKSPACE.md"]:
         assert "Ngoại lệ có chủ đích" not in read(rel), rel
+
+
+def test_docs_and_help_do_not_say_yes_means_embedded_unconditionally(capsys):
+    """FR5.2: máy có OPCOS_WORKSPACES thì `--yes` ra `<biến>/voice`; câu "`--yes` = embedded" vô điều kiện là sai."""
+    from voice_studio import station
+    unconditional = re.compile(r"--yes'?\s*=\s*(trạm )?(embedded|nhúng)|embedded:\s*'?`?voice-studio init --yes'?`?\s*$",
+                               re.IGNORECASE | re.MULTILINE)
+    for rel in ("AGENTS.md", "INSTALL.md", "docs/WORKSPACE.md"):
+        assert not unconditional.search(read(rel)), rel
+    assert "--mode embedded --yes" in read("INSTALL.md") and "--mode embedded --yes" in read("AGENTS.md")
+    assert station.init_main(["--help"]) == 0
+    help_text = capsys.readouterr().out
+    assert "OPCOS_WORKSPACES" in help_text and "(embedded) không hỏi" not in help_text
+    for msg in ("--yes = embedded", "--yes = trạm nhúng"):
+        assert msg not in (ROOT / "voice_studio" / "station.py").read_text(encoding="utf-8")

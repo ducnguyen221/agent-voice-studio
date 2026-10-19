@@ -139,9 +139,10 @@ voice-studio init --station <trạm cũ> --existing   # nhận trạm đang ch�
 dùng nhiều máy, rành kỹ thuật, hoặc repo này là bản public của chính bạn — tức là trạm phải sống
 lâu hơn bản clone.
 
-Không có ai trả lời (CI, scheduled task) mà chưa chọn ⇒ `init` in bảng lựa chọn rồi thoát
-**mã 2, chưa ghi byte nào**. Agent cài phải đưa bảng đó cho người dùng xem, **không tự chọn im
-lặng**.
+Không có ai trả lời (CI, scheduled task) mà chưa chọn và máy chưa đặt `OPCOS_WORKSPACES` ⇒ `init`
+in bảng lựa chọn rồi thoát **mã 2, chưa ghi byte nào**. Agent cài phải đưa bảng đó cho người dùng
+xem, **không tự chọn im lặng**. Máy đã đặt `OPCOS_WORKSPACES` thì chỗ đặt đã biết: `--yes` (hay
+chạy không người) dựng trạm `<biến>/voice`.
 
 `init` dựng `station.json` và cây trạm (`omnivoice/voices/`, `assets/bgm/`, `out/`, `cache/`). Nó
 **không** tạo venv và **không** tải model — chỉ in lệnh. Từng thư mục giải thích ở

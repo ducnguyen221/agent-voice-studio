@@ -919,3 +919,146 @@ def test_doctor_tracked_check_covers_the_singular_name(embedded_repo):
     (embedded_repo / "workspace" / "station.json").write_text("{}", encoding="utf-8")
     git(embedded_repo, "add", "-f", "workspace/station.json")
     assert by_name(doctor.run_checks())["git-tracked"]["level"] == "error"
+
+
+# ── init: trạm nhúng cũ có dữ liệu, chưa ghi lựa chọn, máy có OPCOS_WORKSPACES (FR1.6.2) ────────────────
+
+@pytest.fixture
+def old_data_repo(tmp_path, monkeypatch, live):
+    """Repo có trạm nhúng `workspaces/` ĐÃ mang dấu + `.env`, CHƯA có studio.local.json; máy đặt OPCOS_WORKSPACES."""
+    r = tmp_path / "repo"
+    (r / "voice_studio").mkdir(parents=True)
+    (r / "pyproject.toml").write_text("", encoding="utf-8")
+    shutil.move(str(live), str(r / "workspaces"))
+    (r / ".env").write_text("HF_TOKEN=gia\n", encoding="utf-8")
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(r))
+    ws = tmp_path / "opcos-ws"
+    ws.mkdir()
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    monkeypatch.chdir(tmp_path)               # một lỗi (đường gõ tương đối) không được ghi vào cây repo đang test
+    return r
+
+
+def _scripted(*items):
+    """Hàm hỏi giả: ghi lại câu hỏi; phần tử là ngoại lệ thì ném, hết câu trả lời thì nổ."""
+    it = iter(items)
+    prompts = []
+
+    def ask(prompt):
+        prompts.append(prompt)
+        try:
+            val = next(it)
+        except StopIteration:
+            raise AssertionError("hỏi nhiều hơn dự kiến: " + prompt)
+        if isinstance(val, type) and issubclass(val, BaseException):
+            raise val
+        return val
+    ask.prompts = prompts
+    return ask
+
+
+def _hashes(root):
+    import hashlib
+    out = {}
+    for dp, _d, fn in os.walk(root):
+        for n in fn:
+            p = os.path.join(dp, n)
+            out[os.path.relpath(p, root).replace(os.sep, "/")] = hashlib.sha256(Path(p).read_bytes()).hexdigest()
+    return out
+
+
+def _kept(before, after):
+    """Mọi file có sẵn còn nguyên nội dung (`init` được thêm file mẫu thiếu, không được đổi/xoá file có sẵn;
+    `station.json` được cập nhật nên bỏ qua)."""
+    return all(after.get(k) == v for k, v in before.items() if k != "station.json")
+
+
+def _local(repo):
+    return json.loads((repo / "studio.local.json").read_text(encoding="utf-8"))
+
+
+def test_init_old_station_chuyen_then_yes_moves_it_with_two_questions(old_data_repo, tmp_path):
+    """Ô CL55: gõ `chuyen` rồi `y` ⇒ ghi embedded, rồi dời qua đúng đường `migrate`; 2 câu; hash khớp (SC5)."""
+    before = _hashes(old_data_repo / "workspaces")
+    ask = _scripted("chuyen", "y")
+    res = station.do_init(ask=ask)
+    oc = tmp_path / "opcos-ws" / "voice"
+    assert len(ask.prompts) == 2 and "y/N" in ask.prompts[1] and str(oc) in ask.prompts[1]
+    assert res["mode"] == "separate" and os.path.normcase(res["station"]) == os.path.normcase(str(oc))
+    assert not (old_data_repo / "workspaces").exists()
+    after = _hashes(oc)
+    for rel, digest in before.items():
+        if rel != "station.json":                      # station.json đổi `mode` (so như JSON ở dưới)
+            assert after[rel] == digest, rel
+    assert json.loads((oc / "station.json").read_text(encoding="utf-8"))["mode"] == "separate"
+    assert _local(old_data_repo)["mode"] == "separate"
+    assert os.path.normcase(_local(old_data_repo)["station_path"]) == os.path.normcase(str(oc))
+    assert (tmp_path / "home" / ".secret" / "voice-studio" / ".env").read_text(encoding="utf-8") == "HF_TOKEN=gia\n"
+
+
+@pytest.mark.parametrize("answer", ["n", "", "khong", EOFError])
+def test_init_old_station_chuyen_then_decline_keeps_it_with_exit_0(answer, old_data_repo, tmp_path, capsys):
+    """Ô CL56: `n`/Enter/EOF ở y/N ⇒ giữ (đã ghi embedded), 0 byte dời, không lỗi, một dòng chỉ lệnh `migrate`."""
+    before = _hashes(old_data_repo / "workspaces")
+    ask = _scripted("chuyen", answer)
+    res = station.do_init(ask=ask)
+    assert len(ask.prompts) == 2
+    assert res["mode"] == "embedded"
+    assert _local(old_data_repo)["mode"] == "embedded"
+    after = _hashes(old_data_repo / "workspaces")
+    assert _kept(before, after)
+    assert not (tmp_path / "opcos-ws" / "voice").exists()
+    assert (old_data_repo / ".env").is_file()
+    assert "migrate --to separate" in capsys.readouterr().err
+
+
+def test_init_old_station_chuyen_into_a_non_empty_target_is_code_2_before_the_y_n_question(old_data_repo, tmp_path):
+    """Ô CL57 (CQ9 b): đích không rỗng ⇒ mã 2 TRƯỚC câu y/N; trạm cũ đã ghi embedded vẫn dùng được."""
+    oc = tmp_path / "opcos-ws" / "voice"
+    oc.mkdir()
+    (oc / "co-san.txt").write_text("x", encoding="utf-8")
+    before = _hashes(old_data_repo / "workspaces")
+    ask = _scripted("chuyen")
+    with pytest.raises(station.ContractError, match="không rỗng"):
+        station.do_init(ask=ask)
+    assert len(ask.prompts) == 1                           # KHÔNG có câu y/N
+    assert _local(old_data_repo)["mode"] == "embedded"
+    after = _hashes(old_data_repo / "workspaces")
+    assert _kept(before, after)
+    assert sorted(os.listdir(oc)) == ["co-san.txt"]
+
+
+def test_init_old_station_dry_run_with_chuyen_prints_the_plan_and_writes_nothing(old_data_repo, tmp_path, capsys):
+    """Ô CL58: `--dry-run` + chuyển ⇒ in "sẽ dời", 0 byte dời, không ghi studio.local.json."""
+    snap = _hashes(old_data_repo)
+    ask = _scripted("chuyen")
+    res = station.do_init(ask=ask, dry_run=True)
+    station._print_init(res)
+    err = capsys.readouterr().err
+    assert len(ask.prompts) == 1
+    assert "sẽ dời" in err and str(tmp_path / "opcos-ws" / "voice") in err
+    assert not (old_data_repo / "studio.local.json").exists()
+    assert not (tmp_path / "opcos-ws" / "voice").exists()
+    assert _hashes(old_data_repo) == snap
+
+
+def test_init_old_station_ctrl_c_at_the_y_n_question_propagates_and_moves_nothing(old_data_repo, tmp_path):
+    """FR1.6.4: Ctrl+C ở y/N ⇒ lan ra (contract.run đổi thành mã 2); embedded đã ghi, 0 byte dời."""
+    before = _hashes(old_data_repo / "workspaces")
+    with pytest.raises(KeyboardInterrupt):
+        station.do_init(ask=_scripted("chuyen", KeyboardInterrupt))
+    assert _local(old_data_repo)["mode"] == "embedded"
+    assert _kept(before, _hashes(old_data_repo / "workspaces"))
+    assert not (tmp_path / "opcos-ws" / "voice").exists()
+
+
+def test_init_old_station_yes_keeps_it_and_the_second_run_is_silent_and_never_asks(old_data_repo, capsys):
+    """Ô CL51 + CL63: `--yes` giữ trạm cũ (ghi embedded); init lần hai: 0 câu, không dòng `migrate`."""
+    res = station.do_init(yes=True)
+    err = capsys.readouterr().err
+    assert res["mode"] == "embedded" and _local(old_data_repo)["mode"] == "embedded"
+    assert "migrate --to separate" in err
+    assert not (old_data_repo.parent / "opcos-ws" / "voice").exists()
+    res2 = station.do_init(ask=_scripted())
+    assert res2["mode"] == "embedded"
+    assert "migrate --to separate" not in capsys.readouterr().err

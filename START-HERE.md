@@ -38,7 +38,7 @@ cd "$HOME/agent-voice-studio"
 
 Rồi, với `voice-studio` là lệnh ở dòng cuối bảng:
 
-1. `voice-studio init` — trình bảng hai chỗ đặt trạm; Enter = `embedded` (trong repo, khuyến nghị).
+1. `voice-studio init` — trình bảng hai chỗ đặt trạm; Enter = `embedded` (trong repo, khuyến nghị). Máy đã đặt `OPCOS_WORKSPACES`: chỉ hỏi một câu xác nhận `<biến>/voice`.
 2. `voice-studio doctor` — đọc từng dòng. Chưa cài engine thì `[FAIL] torch/omnivoice` là đúng;
    dòng `[PASS] samples` xác nhận bài mẫu ([samples/README.md](samples/README.md)).
 3. Engine (torch: CUDA ~2,5 GB, macOS arm64 ~130 MB · weights ~3,3 GB, giấy phép weights **không thương mại**): làm đúng các lệnh

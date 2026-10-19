@@ -23,12 +23,19 @@ và có dòng nhắc. `init` mới không bao giờ tạo tên số ít, và kh�
 
 `voice-studio init` ghi lựa chọn vào `<repo>/studio.local.json`:
 
-- Có `OPCOS_WORKSPACES` và có người trả lời: một câu xác nhận/đổi — Enter ra `<biến>/voice`.
+- Có `OPCOS_WORKSPACES` và có người trả lời: một câu xác nhận/đổi — Enter ra `<biến>/voice` (cả khi
+  trạm đó đã có sẵn; gõ `1`/`2`/`embedded`/`separate` là mã 2, câu này nhận ĐƯỜNG; hết dữ liệu ở câu
+  này — Windows `< NUL` — được coi là không có người).
+  Ngoại lệ: trạm nhúng trong repo đã có dữ liệu mà chưa ghi lựa chọn thì hỏi một câu giữ/chuyển thay
+  cho câu này (Enter = giữ, `chuyen` = dời vào `<biến>/voice`, vẫn hỏi y/N trước khi dời).
 - Không có biến, có người trả lời: câu hỏi hai đường (Enter = `embedded`, `<repo>/workspaces/`);
   chọn `separate` thì hỏi tiếp đường dẫn — không có đường mặc định.
-- `--yes` không bao giờ hỏi (có hay không có terminal): dùng trạm nhúng `<repo>/workspaces/`, không tự
-  đặt vào thư mục dùng chung. Vậy khi có `OPCOS_WORKSPACES`: Enter/xác nhận ra `<biến>/voice`, còn
-  `--yes` ra `<repo>/workspaces/`.
+- `--yes` không bao giờ hỏi (có hay không có terminal). Máy có `OPCOS_WORKSPACES`: ra `<biến>/voice` (đã
+  mang dấu thì dùng thẳng; chưa thì dựng ở đó và in một dòng nêu đường cùng cách đổi `--station`) —
+  trừ khi `<repo>/workspaces/` (hay `workspace/` tên cũ) đã là một trạm có dữ liệu mà chưa ghi lựa chọn:
+  khi đó **giữ trạm cũ** (ghi `embedded`, in cách dời sau bằng `migrate --to separate`), không dựng trạm
+  rỗng cạnh dữ liệu. Máy không có biến: ra `<repo>/workspaces/`. Muốn trạm trong repo dù máy có biến:
+  `--mode embedded --yes`.
 - `--station DIR` — bạn chỉ thẳng trạm ⇒ `separate`.
 - Máy **đã đặt trạm ngoài**: biến `VOICE_STATION` (hoặc tên cũ `OMNIVOICE_DIR`) ⇒ tự `separate`,
   **không bao giờ** tạo `workspaces/` (hai trạm cho một repo = hai nguồn sự thật).
@@ -39,11 +46,12 @@ và có dòng nhắc. `init` mới không bao giờ tạo tên số ít, và kh�
   biến: có người thì hỏi đường, không thì dừng mã 2 (cần `--station DIR`).
 
 Chạy không có người trả lời (`--non-interactive`, hoặc không có terminal) mà thiếu cả `--yes` lẫn
-`--mode` ⇒ `init` in bảng lựa chọn rồi thoát mã 2 (không đoán chế độ). Hành vi theo từng cách gọi nằm
-trong bảng quyết định `tests/test_init_decision_table.py`.
+`--mode`: máy **không** đặt `OPCOS_WORKSPACES` ⇒ `init` in bảng lựa chọn rồi thoát mã 2 (không đoán
+chế độ); máy **có** `OPCOS_WORKSPACES` ⇒ như `--yes` (trạm `<biến>/voice`, hoặc giữ trạm cũ có dữ
+liệu). Hành vi theo từng cách gọi nằm trong bảng quyết định `tests/test_init_decision_table.py`.
 **Agent cài phải trình bảng đó cho người dùng và chờ họ chọn** — không tự chọn im lặng. Tự
-khai `--non-interactive` cũng vậy: nó nói "không có ai ngồi đây", KHÔNG nói "đoán hộ tôi", nên
-thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2.
+khai `--non-interactive` cũng vậy: nó nói "không có ai ngồi đây", KHÔNG nói "đoán hộ tôi", nên khi máy
+chưa đặt `OPCOS_WORKSPACES`, thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2.
 
 Agent cài nên **phân tích rồi khuyến nghị**, không hỏi trống: người không rành kỹ thuật, một
 máy ⇒ `embedded`; người nhiều máy, rành hơn, hoặc repo này là bản public của chính họ ⇒
@@ -79,8 +87,8 @@ git mà đường dẫn trong `.env` trỏ tới (ở `separate`: `~/.secret/voi
 **Không đặt gì thì trạm là thư mục trong repo** (`<repo>/workspaces/`, bị git bỏ qua) — không
 bao giờ là một thư mục ẩn dưới thư mục cá nhân. Muốn dùng trạm ở nơi khác thì chỉ rõ: biến,
 `--station`, hoặc câu trả lời khi `init` hỏi (ghi vào `studio.local.json`). Nếu máy có biến
-`OPCOS_WORKSPACES`, `init` đề xuất `<biến>/voice` (không tự đặt vào đó khi `--yes`) và `doctor` nhắc —
-resolver không đọc biến này.
+`OPCOS_WORKSPACES`, `init` dùng `<biến>/voice` (`--yes` và chạy không người cũng đặt vào đó; Enter ở câu hỏi nhận đề xuất) và
+`doctor` nhắc — resolver không đọc biến này.
 
 `<repo>` là bản clone đã `pip install -e` (hoặc đặt `VOICE_STUDIO_REPO` — cách bản sao của máy
 chạy lịch tìm về bản clone, xem [`INSTALL.md`](INSTALL.md) mục 3). Cài dạng wheel không đặt biến thì
