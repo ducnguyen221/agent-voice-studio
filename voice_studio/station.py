@@ -441,11 +441,11 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
         return Choice("embedded", _env.embedded_station(repo)[0], why)
     if from_prev:
         raise ContractError(NEED_STATION)
+    suggest = _opcos_target()            # kiểm biến trước khi nhận `<biến>/voice` đã mang dấu
     oc = _env.opcos_station()
     if oc:
         return Choice("separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm")
     ask_path = _ask_path_console if default_ask else ask
-    suggest = _opcos_target()            # `<OPCOS_WORKSPACES>/voice` tuyệt đối, dù chưa mang dấu trạm
     if suggest:
         typed = ""
         if interactive:

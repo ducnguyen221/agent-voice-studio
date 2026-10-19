@@ -816,6 +816,94 @@ def opcos_ws(tmp_path, monkeypatch, marked=True):
     return ws
 
 
+@pytest.mark.parametrize("target_state", ["missing", "empty", "marked"])
+def test_init_rejects_marked_opcos_base_before_accepting_a_target(
+        target_state, bare_repo, tmp_path, monkeypatch, capsys):
+    """A marked OPCOS_WORKSPACES base is invalid whether voice is absent or already marked."""
+    base = tmp_path / "marked-opcos-base"
+    base.mkdir()
+    (base / "station.json").write_text("{}", encoding="utf-8")
+    target = base / "voice"
+    if target_state != "missing":
+        target.mkdir()
+    if target_state == "marked":
+        (target / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(base))
+    before_repo = _hashes(bare_repo)
+    before_base = _hashes(base)
+
+    rc = cli.main(["init", "--yes", "--json"])
+
+    out, _err = capsys.readouterr()
+    error = last_json(out).get("error", "")
+    assert rc == 2 and "OPCOS_WORKSPACES" in error and "chính một trạm" in error
+    assert _hashes(bare_repo) == before_repo
+    assert _hashes(base) == before_base
+    assert target.exists() is (target_state != "missing")
+
+
+def test_init_rejects_marked_opcos_base_through_junction(
+        bare_repo, tmp_path, monkeypatch, capsys):
+    base = tmp_path / "marked-opcos-base"
+    base.mkdir()
+    (base / "station.json").write_text("{}", encoding="utf-8")
+    (base / "voice").mkdir()
+    (base / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    alias = tmp_path / "opcos-alias"
+    _junction(alias, base)
+    if not (alias / "station.json").is_file() or not (alias / "voice" / "station.json").is_file():
+        pytest.skip("junction traversal is unavailable here")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(alias))
+    assert _env.has_marker(str(alias))
+    assert _env.opcos_station() == str(alias / "voice")
+    before_repo = _hashes(bare_repo)
+    before_base = _hashes(base)
+
+    rc = cli.main(["init", "--yes", "--json"])
+
+    out, _err = capsys.readouterr()
+    error = last_json(out).get("error", "")
+    assert rc == 2 and "OPCOS_WORKSPACES" in error and "chính một trạm" in error
+    assert _hashes(bare_repo) == before_repo
+    assert _hashes(base) == before_base
+
+
+def test_init_uses_marked_voice_child_when_opcos_base_is_ordinary(
+        bare_repo, tmp_path, monkeypatch, capsys):
+    base = opcos_ws(tmp_path, monkeypatch, marked=True)
+    target = base / "voice"
+    keep = target / "keep.txt"
+    keep.write_text("existing target data", encoding="utf-8")
+    before_keep = keep.read_bytes()
+
+    rc = cli.main(["init", "--yes", "--json"])
+
+    out, _err = capsys.readouterr()
+    result = last_json(out)
+    assert rc == 0 and result["ok"]
+    assert result["mode"] == "separate"
+    assert os.path.normcase(result["station"]) == os.path.normcase(str(target))
+    assert keep.read_bytes() == before_keep
+
+
+def test_init_explicit_station_does_not_validate_unused_marked_opcos_base(
+        bare_repo, tmp_path, monkeypatch, capsys):
+    base = tmp_path / "marked-opcos-base"
+    base.mkdir()
+    (base / "station.json").write_text("{}", encoding="utf-8")
+    (base / "voice").mkdir()
+    (base / "voice" / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(base))
+    explicit = tmp_path / "explicit-station"
+
+    rc = cli.main(["init", "--station", str(explicit), "--json"])
+
+    out, _err = capsys.readouterr()
+    result = last_json(out)
+    assert rc == 0 and result["ok"]
+    assert os.path.normcase(result["station"]) == os.path.normcase(str(explicit))
+
+
 def test_doctor_hints_init_when_opcos_station_unused(bare_repo, tmp_path, monkeypatch):
     ws = opcos_ws(tmp_path, monkeypatch)
     c = by_name(doctor.run_checks())["opcos-station"]
