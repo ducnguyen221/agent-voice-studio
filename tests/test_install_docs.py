@@ -218,7 +218,8 @@ def test_docs_and_help_do_not_say_yes_means_embedded_unconditionally(capsys):
 
 def test_enter_means_embedded_is_always_qualified_by_the_variable():
     """"Enter = embedded" / "bấm Enter là xong" is only true when OPCOS_WORKSPACES is not set; say so on the same line."""
-    for rel in ("README.vi.md", "docs/INSTALL.md", "skills/voice-routing/references/install-omnivoice.md"):
+    for rel in ("README.md", "README.vi.md", "docs/INSTALL.md", "docs/index.html",
+                "skills/voice-routing/references/install-omnivoice.md"):
         for ln in read(rel).splitlines():
-            if re.search(r"Enter = embedded|Enter là xong", ln):
+            if re.search(r"Enter = embedded|Enter là xong|press Enter and you are done", ln):
                 assert "OPCOS_WORKSPACES" in ln, f"{rel}: {ln.strip()}"

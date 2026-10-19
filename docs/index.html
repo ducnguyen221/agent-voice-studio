@@ -627,7 +627,8 @@
       <span class="eyebrow"><span class="dot"></span>Cài đặt</span>
       <h2>Hai chế độ, và lệnh <code>init</code> trình bảng trước khi làm</h2>
       <p>Không có câu hỏi trống. <code>init</code> đưa ra bảng hai lựa chọn rồi chờ bạn chọn; không
-        có ai trả lời (CI, lịch chạy) thì nó in bảng đó ra và <b>thoát mã 2 mà chưa ghi byte nào</b>.</p>
+        có ai trả lời (CI, lịch chạy) và máy chưa đặt <code>OPCOS_WORKSPACES</code> thì nó in bảng đó ra và
+        <b>thoát mã 2 mà chưa ghi byte nào</b>. Máy đã đặt biến thì chỗ đặt đã biết: <code>--yes</code> dựng <code>&lt;biến&gt;/voice</code>.</p>
     </div>
 
     <div class="note plain reveal">
@@ -654,7 +655,7 @@
           <tr>
             <td class="lbl">embedded<br><span style="font-family:var(--font);font-size:11.5px;color:var(--ok)">mặc định · khuyến nghị</span></td>
             <td><code>&lt;repo&gt;/workspaces/</code>, cấu hình ở <code>&lt;repo&gt;/.env</code></td>
-            <td>Bấm Enter là xong, không phải đặt biến môi trường nào. <code>init</code> dựng sẵn cây
+            <td>Khi máy chưa đặt <code>OPCOS_WORKSPACES</code>, bấm Enter là xong, không phải đặt biến nào. <code>init</code> dựng sẵn cây
               trạm và chép <code>.env.example</code> thành <code>.env</code> cho bạn điền. Cả
               <code>workspaces/</code> lẫn <code>.env</code> bị <code>.gitignore</code> chặn và hook
               <code>pre-commit</code> chặn lần nữa.</td>
