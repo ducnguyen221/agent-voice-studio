@@ -15,7 +15,7 @@ Trong JSON của `speak` / `narrate` / `doctor`: khoá `voice_studio` LUÔN là 
 để ghim), khoá `version` là `__version__` (bản phát hành, để truy lỗi). Không bao giờ đảo nghĩa.
 """
 
-__version__ = "0.4.0"
+__version__ = "0.5.0"
 API_VERSION = "1.1.0"
 
 __all__ = ["API_VERSION", "__version__"]
