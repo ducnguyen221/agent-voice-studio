@@ -1089,28 +1089,190 @@ def migrate_to_separate(target=None):
     plan = _migrate_plan(target)                 # không đếm file: đã có đích rõ thì khỏi đi cả cây
     repo, ws, target = plan["repo"], plan["ws"], plan["target"]
     env_file, sec, moved_env = plan["env_file"], plan["sec"], plan["moved_env"]
+
+    def identity(st):
+        return st.st_dev, st.st_ino
+
+    def snapshot(path):
+        try:
+            with open(path, "rb") as f:
+                return {"path": path, "bytes": f.read(), "id": identity(os.fstat(f.fileno())),
+                        "written": False}
+        except FileNotFoundError:
+            return {"path": path, "bytes": None, "id": None, "written": False}
+
+    def unchanged(record):
+        current = snapshot(record["path"])
+        if current["id"] != record["id"] or current["bytes"] != record["bytes"]:
+            raise ContractError(f"{record['path']} đã có dữ liệu mới — không ghi đè")
+
+    def write_metadata(record, data):
+        payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        mode = "x+b" if record["bytes"] is None else "r+b"
+        with open(record["path"], mode, buffering=0) as f:
+            current_id, current = identity(os.fstat(f.fileno())), f.read()
+            if record["bytes"] is None:
+                record["id"] = current_id
+            elif current_id != record["id"] or current != record["bytes"]:
+                raise ContractError(f"{record['path']} đã có dữ liệu mới — không ghi đè")
+            record.update(written=True, owned=current)
+            f.seek(0)
+            offset = 0
+            try:
+                while offset < len(payload):
+                    remaining = len(payload) - offset
+                    count = f.write(payload[offset:])
+                    if not isinstance(count, int) or not 0 < count <= len(payload) - offset:
+                        record["owned"] = None
+                        raise OSError("metadata write không trả số bytes hợp lệ")
+                    offset += count
+                    record["owned"] = payload[:offset] + current[offset:]
+                    if count != remaining:
+                        raise OSError("metadata short write")
+                f.truncate(len(payload))
+                record["owned"] = payload
+                f.flush()
+            except BaseException:
+                # A failed call may have changed bytes without returning a count. Never infer
+                # ownership from a prefix or from arbitrary contents read after the failure.
+                try:
+                    f.seek(0)
+                    known = f.read() == record["owned"]
+                except BaseException:
+                    known = False
+                if not known:
+                    record["owned"] = None
+                raise
+            if identity(os.stat(record["path"])) != record["id"]:
+                raise ContractError(f"{record['path']} đã có file mới — giữ nguyên")
+
+    def restore_metadata(record):
+        if not record["written"]:
+            unchanged(record)
+            return
+        if record["bytes"] is None:
+            # No handle-bound delete is available here. A path-based unlink could delete
+            # a replacement, so retain the created file and report incomplete recovery.
+            raise ContractError(f"{record['path']} vốn vắng — giữ file, cần phục hồi thủ công")
+        with open(record["path"], "r+b") as f:
+            if (identity(os.fstat(f.fileno())) != record["id"]
+                    or record.get("owned") is None or f.read() != record["owned"]):
+                raise ContractError(f"{record['path']} có dữ liệu mới hoặc ownership không rõ — giữ nguyên")
+            if record["bytes"] is not None:
+                f.seek(0)
+                if f.write(record["bytes"]) != len(record["bytes"]):
+                    raise OSError("metadata rollback short write")
+                f.truncate()
+                f.flush()
+
+    def json_object(record):
+        if record["bytes"] is None:
+            return {}
+        try:
+            data = json.loads(record["bytes"].decode("utf-8"))
+        except (ValueError, UnicodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    local_record = snapshot(os.path.join(repo, _env.LOCAL_CONFIG))
+    marker_record = snapshot(os.path.join(ws, _env.STATION_FILE))
+    env_record = snapshot(env_file) if moved_env else None
+    local, info = json_object(local_record), json_object(marker_record)
     had_empty_dir = os.path.isdir(target)
     if had_empty_dir:
         os.rmdir(target)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     try:
         _move_tree(ws, target)
-    except BaseException:                        # mọi lỗi dời/chép (OSError, shutil.Error, ContractError…)
+    except BaseException as original:            # preserve the existing pre-move failure contract
         if had_empty_dir and not os.path.exists(target):
-            os.makedirs(target)                  # trả lại thư mục rỗng của người dùng
-        raise                                    # rồi ném lại đúng lỗi gốc
-    if moved_env:
-        os.makedirs(sec, exist_ok=True)
-        _move_file(env_file, moved_env)
-    local_path = os.path.join(repo, _env.LOCAL_CONFIG)
-    local = _env.read_json(local_path)[0]
-    local.update({"mode": "separate", "station_path": target, "secrets": SECRET_STORE})
-    _write_json(local_path, local)
-    sj = os.path.join(target, _env.STATION_FILE)
-    info, err = _env.read_json(sj)
-    if not err and info:
-        info["mode"] = "separate"
-        _write_json(sj, info)
+            try:
+                os.makedirs(target)
+            except BaseException as rollback:
+                raise ContractError(
+                    f"migrate thất bại: {type(original).__name__}: {original}; hoàn tác thư mục đích "
+                    f"không trọn: {type(rollback).__name__}: {rollback}") from original
+        raise
+
+    tree_id = None
+    env_ids = set()
+    marker_record["path"] = os.path.join(target, _env.STATION_FILE)
+
+    def restore_env():
+        if not env_record:
+            return
+        if os.path.lexists(env_file):
+            unchanged(env_record)               # original file still there: a move failed before unlink
+            if env_ids and os.path.lexists(moved_env):
+                # _move_file exposes no exact write-state on failure. Even an empty file
+                # or matching prefix cannot prove ownership; retain both copies.
+                raise ContractError(f"{moved_env} không rõ trạng thái ghi — giữ cả hai bản, "
+                                    "cần phục hồi thủ công")
+            return
+        if not env_ids or identity(os.stat(moved_env)) not in env_ids:
+            raise ContractError(f"không xác nhận được file đã dời tại {moved_env} — giữ nguyên")
+        if snapshot(moved_env)["bytes"] != env_record["bytes"]:
+            raise ContractError(f"file đã dời tại {moved_env} không còn nguyên — giữ nguyên")
+        # _move_file may replace its destination; reserve it so a pre-existing new file is refused.
+        with open(env_file, "xb"):
+            pass
+        _move_file(moved_env, env_file)           # on failure, retain both paths for manual recovery
+
+    try:
+        tree_id = identity(os.stat(target))
+        if marker_record["bytes"] is not None:
+            marker_record["id"] = identity(os.stat(marker_record["path"]))
+        unchanged(marker_record)
+        if moved_env:
+            unchanged(env_record)
+            os.makedirs(sec, exist_ok=True)
+            try:
+                with open(moved_env, "xb") as f:
+                    env_ids = {identity(os.fstat(f.fileno())), env_record["id"]}
+            except FileExistsError as e:
+                raise ContractError(f"{moved_env} đã có — không ghi đè") from e
+            _move_file(env_file, moved_env)
+        local.update({"mode": "separate", "station_path": target, "secrets": SECRET_STORE})
+        write_metadata(local_record, local)
+        if info:
+            info["mode"] = "separate"
+            write_metadata(marker_record, info)
+    except BaseException as original:
+        errors = []
+        # Restore the marker first. If metadata cannot be restored, retain the moved tree
+        # and env together rather than moving data away from an un-restorable config.
+        for record in (marker_record, local_record):
+            try:
+                restore_metadata(record)
+            except BaseException as e:
+                errors.append(f"{record['path']}: {type(e).__name__}: {e}")
+                break
+        try:
+            if errors:
+                raise ContractError("metadata chưa hoàn tác — giữ .env tại vị trí hiện có")
+            restore_env()
+        except BaseException as e:
+            errors.append(f".env: {type(e).__name__}: {e}")
+        try:
+            if errors:
+                raise ContractError("hoàn tác phụ thuộc chưa xong — giữ cây trạm tại đích")
+            if os.path.lexists(ws):
+                raise ContractError(f"nguồn {ws} đã xuất hiện trở lại — không ghi đè")
+            if tree_id is None or identity(os.stat(target)) != tree_id:
+                raise ContractError(f"đích {target} đã đổi — không dời dữ liệu mới")
+            _move_tree(target, ws)
+        except BaseException as e:
+            errors.append(f"cây trạm: {type(e).__name__}: {e}")
+        if had_empty_dir and not os.path.lexists(target) and os.path.isdir(ws):
+            try:
+                os.mkdir(target)
+            except BaseException as e:
+                errors.append(f"thư mục đích: {type(e).__name__}: {e}")
+        if errors:
+            raise ContractError(
+                f"migrate thất bại: {type(original).__name__}: {original}; hoàn tác không trọn: "
+                + "; ".join(errors) + f". Giữ dữ liệu tại {ws} / {target}; không chạy lại trước khi kiểm tra.") from original
+        raise
     return {"mode": "separate", "station": target, "env_moved_to": moved_env}
 
 

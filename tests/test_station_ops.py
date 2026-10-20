@@ -4,6 +4,7 @@
 Không có mạng: `update` chạy trên một "origin" là repo git trần trong thư mục tạm.
 """
 import contextlib
+import hashlib
 import json
 import ntpath
 import os
@@ -270,18 +271,50 @@ def test_backup_zips_workspace_without_env_by_default(embedded_repo, tmp_path):
     assert ".env" in zipfile.ZipFile(z2).namelist()
 
 
-def test_migrate_to_separate_moves_workspace_and_env(embedded_repo, tmp_path):
+@pytest.mark.parametrize("env_present", [False, True], ids=["without-env", "with-env"])
+@pytest.mark.parametrize("empty_target", [False, True], ids=["absent-target", "empty-target"])
+def test_migrate_to_separate_moves_workspace_and_env(
+        embedded_repo, tmp_path, env_present, empty_target):
+    source = embedded_repo / "workspaces"
+    marker = {"contract": "1.0.0", "mode": "embedded", "custom": {"keep": True}}
+    (source / "station.json").write_text(json.dumps(marker), encoding="utf-8")
+    (source / "nested" / "empty").mkdir(parents=True)
+    (source / "nested" / "dữ-liệu.bin").write_bytes(bytes(range(256)))
+    before = _hashes(source)
+    before_dirs = sorted(p.relative_to(source).as_posix() for p in source.rglob("*") if p.is_dir())
+    source_env = embedded_repo / ".env"
+    if not env_present:
+        source_env.unlink()
+    env_digest = hashlib.sha256(source_env.read_bytes()).hexdigest() if env_present else None
+    local_path = embedded_repo / "studio.local.json"
+    local_before = json.loads(local_path.read_text(encoding="utf-8"))
+    local_before["custom"] = {"keep": True}
+    local_path.write_text(json.dumps(local_before), encoding="utf-8")
     target = tmp_path / "home" / "dich"
+    if empty_target:
+        target.mkdir(parents=True)
+
     res = station.migrate_to_separate(str(target))
-    assert not (embedded_repo / "workspaces").exists()
-    assert (target / "omnivoice" / "voices" / "demo.wav").is_file()
-    assert not (embedded_repo / ".env").exists()
+
+    after = _hashes(target)
+    assert set(after) == set(before)
+    assert {k: v for k, v in after.items() if k != "station.json"} == {
+        k: v for k, v in before.items() if k != "station.json"}
+    assert sorted(p.relative_to(target).as_posix() for p in target.rglob("*") if p.is_dir()) == before_dirs
+    assert json.loads((target / "station.json").read_text(encoding="utf-8")) == {
+        **marker, "mode": "separate"}
+    assert not source.exists()
+    assert not source_env.exists()
     moved_env = tmp_path / "home" / ".secret" / "voice-studio" / ".env"
-    assert moved_env.read_text(encoding="utf-8") == "HF_TOKEN=gia\n"
-    local = json.loads((embedded_repo / "studio.local.json").read_text(encoding="utf-8"))
-    assert local["mode"] == "separate"
-    assert os.path.normcase(local["station_path"]) == os.path.normcase(str(target))
+    assert moved_env.exists() is env_present
+    if env_present:
+        assert hashlib.sha256(moved_env.read_bytes()).hexdigest() == env_digest
+    local = json.loads(local_path.read_text(encoding="utf-8"))
+    assert local == {**local_before, "mode": "separate", "station_path": str(target),
+                     "secrets": station.SECRET_STORE}
     assert res["mode"] == "separate"
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(target))
+    assert res["env_moved_to"] == (str(moved_env) if env_present else None)
     assert os.path.normcase(_env.station_dir()) == os.path.normcase(str(target))
 
 
@@ -1237,3 +1270,401 @@ def test_a_failed_move_leaves_the_recorded_choice_untouched(embedded_repo, tmp_p
         station.migrate_to_separate(str(tmp_path / "dich"))
     assert local.read_bytes() == before and json.loads(before)["mode"] == "embedded"
     assert (embedded_repo / "workspaces" / "station.json").is_file()
+
+
+# ── migrate: an exception after moving the tree restores the previous installation ─────
+
+def _migration_file_state(repo):
+    """Synthetic fixture state; compare .env by digest without printing its contents."""
+    dirs = sorted(str(p.relative_to(repo)) for p in repo.rglob("*") if p.is_dir())
+    return _hashes(repo), dirs
+
+
+def _migration_writer_fault(monkeypatch, path, phase, action):
+    """Inject at a real file handle; keep all other opens and writes real."""
+    real_open = open
+    fired = []
+
+    class Writer:
+        def __init__(self, handle):
+            self.handle = handle
+
+        def __getattr__(self, name):
+            return getattr(self.handle, name)
+
+        def __enter__(self):
+            self.handle.__enter__()
+            return self
+
+        def __exit__(self, *args):
+            return self.handle.__exit__(*args)
+
+        def write(self, data):
+            if not fired:
+                if phase == "before":
+                    fired.append(True)
+                    action()
+                elif phase == "partial":
+                    fired.append(True)
+                    return self.handle.write(data[:7])
+                elif phase == "unknown":
+                    self.handle.write(data[:7])
+                    self.handle.flush()
+                    fired.append(True)
+                    action()
+            result = self.handle.write(data)
+            return result
+
+        def truncate(self, *args):
+            if not fired and phase == "truncate":
+                fired.append(True)
+                action()
+            return self.handle.truncate(*args)
+
+        def flush(self):
+            result = self.handle.flush()
+            if not fired and phase in ("after", "flush"):
+                fired.append(True)
+                action()
+            return result
+
+    def instrumented(name, mode="r", *args, **kwargs):
+        if (phase == "open" and not fired and Path(name) == path
+                and ("w" in mode or "+" in mode)):
+            fired.append(True)
+            action()
+        handle = real_open(name, mode, *args, **kwargs)
+        if Path(name) == path and ("w" in mode or "+" in mode):
+            return Writer(handle)
+        return handle
+
+    monkeypatch.setattr(station, "open", instrumented, raising=False)
+    return fired
+
+
+def test_migrate_post_move_preserves_same_inode_edit(embedded_repo, tmp_path, monkeypatch):
+    local = embedded_repo / "studio.local.json"
+    target = tmp_path / "destination"
+    foreign = b"concurrent synthetic config edit"
+    original_id = local.stat().st_ino
+
+    def edit_then_fail():
+        local.write_bytes(foreign)
+        assert local.stat().st_ino == original_id
+        raise OSError("same-inode-fault")
+
+    fired = _migration_writer_fault(monkeypatch, target / "station.json", "before", edit_then_fail)
+    with pytest.raises(station.ContractError, match="same-inode-fault"):
+        station.migrate_to_separate(str(target))
+    assert fired
+    assert local.read_bytes() == foreign
+    assert target.is_dir()  # retain the data referenced by the un-restorable config
+
+
+@pytest.mark.parametrize("absent", [False, True], ids=["replacement", "create-race"])
+def test_migrate_post_move_refuses_metadata_race_at_open(
+        absent, embedded_repo, tmp_path, monkeypatch):
+    local = embedded_repo / "studio.local.json"
+    if absent:
+        local.unlink()
+    foreign = b"concurrent synthetic replacement"
+    real_open = open
+    fired = []
+
+    def replace_at_open(path, mode="r", *args, **kwargs):
+        if Path(path) == local and ("w" in mode or "+" in mode) and not fired:
+            replacement = tmp_path / "replacement"
+            replacement.write_bytes(foreign)
+            os.replace(replacement, local)
+            fired.append(True)  # a completed replacement, not a Windows sharing violation
+        return real_open(path, mode, *args, **kwargs)
+
+    monkeypatch.setattr(station, "open", replace_at_open, raising=False)
+    target = tmp_path / "destination"
+    with pytest.raises(station.ContractError):
+        station.migrate_to_separate(str(target))
+    assert fired
+    assert local.read_bytes() == foreign
+    assert target.is_dir()
+
+
+@pytest.mark.parametrize("phase", ["partial", "truncate", "flush", "unknown"])
+def test_migrate_post_move_real_writer_failure(phase, embedded_repo, tmp_path, monkeypatch):
+    before = _migration_file_state(embedded_repo)
+    partial_digest = []
+
+    def fail():
+        if phase == "unknown":
+            partial_digest.append(station._sha256(embedded_repo / "studio.local.json"))
+        raise OSError("real-writer-fault")
+
+    fired = _migration_writer_fault(monkeypatch, embedded_repo / "studio.local.json", phase, fail)
+    target = tmp_path / "destination"
+    error_type = station.ContractError if phase == "unknown" else OSError
+    with pytest.raises(error_type, match="short write" if phase == "partial" else "real-writer-fault"):
+        station.migrate_to_separate(str(target))
+    assert fired
+    if phase == "unknown":
+        assert station._sha256(embedded_repo / "studio.local.json") == partial_digest[0]
+        assert target.is_dir()
+        return
+    assert _migration_file_state(embedded_repo) == before
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("empty_target", [False, True], ids=["absent-target", "empty-target"])
+@pytest.mark.parametrize("point", ["env-before", "env-after", "env-partial", "config-before",
+                                   "config-after", "config-partial", "marker-before", "marker-after", "marker-partial"])
+def test_migrate_post_move_failure_restores_or_preserves_ambiguous_data(
+        point, empty_target, embedded_repo, tmp_path, monkeypatch):
+    target = tmp_path / "destination"
+    if empty_target:
+        target.mkdir()
+    local = embedded_repo / "studio.local.json"
+    local.write_bytes(b'{"mode":"embedded","station_path":"workspaces","custom":"kept"}\r\n')
+    marker = embedded_repo / "workspaces" / "station.json"
+    marker.write_bytes(b'{ "contract":"1.0.0", "mode":"embedded", "custom":true }\r\n')
+    before = _migration_file_state(embedded_repo)
+    original_tree = _hashes(embedded_repo / "workspaces")
+    destination_env = tmp_path / "home" / ".secret" / "voice-studio" / ".env"
+    failure = OSError("primary-post-move-failure")
+    move_file = station._move_file
+
+    def fail():
+        raise failure
+
+    fired = []
+    if point.startswith(("config", "marker")):
+        path = local if point.startswith("config") else target / "station.json"
+        fired = _migration_writer_fault(monkeypatch, path, point.split("-")[1], fail)
+
+    def move(src, dst):
+        if point == "env-before":
+            fired.append(True)
+            raise failure
+        if point == "env-partial":
+            Path(dst).write_bytes(Path(src).read_bytes()[:7])
+            fired.append(True)
+            raise failure
+        move_file(src, dst)
+        if point == "env-after" and Path(src) == embedded_repo / ".env":
+            fired.append(True)
+            raise failure
+
+    monkeypatch.setattr(station, "_move_file", move)
+    ambiguous = point in ("env-before", "env-partial")
+    error_type = station.ContractError if ambiguous else OSError
+    with pytest.raises(error_type) as got:
+        station.migrate_to_separate(str(target))
+    assert fired
+    if ambiguous:
+        assert "primary-post-move-failure" in str(got.value)
+        assert "hoàn tác không trọn" in str(got.value)
+        assert str(destination_env) in str(got.value)
+        assert _hashes(embedded_repo)[".env"] == before[0][".env"]
+        assert destination_env.is_file()
+        assert destination_env.stat().st_size == (7 if point == "env-partial" else 0)
+        if point == "env-partial":
+            fixture_prefix = (embedded_repo / ".env").read_bytes()[:7]
+            assert station._sha256(destination_env) == hashlib.sha256(fixture_prefix).hexdigest()
+        assert _hashes(target) == original_tree
+        assert not (embedded_repo / "workspaces").exists()
+        return
+    if point.endswith("partial") and not point.startswith("env"):
+        assert str(got.value) == "metadata short write"
+    else:
+        assert got.value is failure
+    assert _migration_file_state(embedded_repo) == before
+    assert not destination_env.exists()
+    assert target.is_dir() and not any(target.iterdir()) if empty_target else not target.exists()
+
+
+@pytest.mark.parametrize("env_present", [False, True], ids=["without-env", "with-env"])
+@pytest.mark.parametrize("config_bytes,marker_bytes", [
+    (None, b'{"mode":"embedded","custom":true}\n'),
+    (b'{"mode":"embedded"}\n', None),
+    (b'not-json\r\n', b'not-json-marker\r\n'),
+    (b'', b''),
+], ids=["absent-config", "absent-marker", "malformed-json", "empty-files"])
+def test_migrate_post_move_failure_preserves_metadata_or_reports_incomplete_creation(
+        config_bytes, marker_bytes, env_present, embedded_repo, tmp_path, monkeypatch):
+    local = embedded_repo / "studio.local.json"
+    marker = embedded_repo / "workspaces" / "station.json"
+    for path, content in ((local, config_bytes), (marker, marker_bytes)):
+        if content is None:
+            path.unlink()
+        else:
+            path.write_bytes(content)
+    if not env_present:
+        (embedded_repo / ".env").unlink()
+    before = _migration_file_state(embedded_repo)
+    original_tree = _hashes(embedded_repo / "workspaces")
+    retained_config = []
+
+    def fail():
+        retained_config.append(station._sha256(local))
+        raise OSError("primary-config-failure")
+
+    fired = _migration_writer_fault(monkeypatch, local, "after", fail)
+    target = tmp_path / "destination"
+    error_type = station.ContractError if config_bytes is None else OSError
+    with pytest.raises(error_type, match="primary-config-failure") as got:
+        station.migrate_to_separate(str(target))
+    assert fired
+    if config_bytes is None:
+        assert "hoàn tác không trọn" in str(got.value)
+        assert str(local) in str(got.value)
+        assert station._sha256(local) == retained_config[0]
+        assert json.loads(local.read_bytes())["station_path"] == str(target)
+        assert _hashes(target) == original_tree
+        assert not (embedded_repo / "workspaces").exists()
+        moved_env = tmp_path / "home" / ".secret" / "voice-studio" / ".env"
+        assert moved_env.exists() is env_present
+        if env_present:
+            assert station._sha256(moved_env) == before[0][".env"]
+        return
+    assert _migration_file_state(embedded_repo) == before
+    assert not target.exists()
+    assert not (tmp_path / "home" / ".secret" / "voice-studio" / ".env").exists()
+
+
+@pytest.mark.parametrize("collision", ["source-tree", "source-env", "config", "marker"])
+def test_migrate_post_move_rollback_preserves_newly_appearing_data(
+        collision, embedded_repo, tmp_path, monkeypatch):
+    target = tmp_path / "destination"
+    ws = embedded_repo / "workspaces"
+    local = embedded_repo / "studio.local.json"
+    destination_env = tmp_path / "home" / ".secret" / "voice-studio" / ".env"
+    original_data = _hashes(ws)
+    foreign = b"new synthetic data must survive"
+    affected = None
+    def fail():
+        nonlocal affected
+        if collision == "source-tree":
+            ws.mkdir()
+            affected = ws / "new.txt"
+            affected.write_bytes(foreign)
+        elif collision == "source-env":
+            affected = embedded_repo / ".env"
+            affected.write_bytes(foreign)
+        else:
+            affected = local if collision == "config" else target / "station.json"
+            replacement = tmp_path / "replacement"
+            replacement.write_bytes(foreign)
+            os.replace(replacement, affected)
+        raise OSError("primary-config-failure")
+
+    phase = "open" if collision == "config" else "before"
+    fired = _migration_writer_fault(monkeypatch, local, phase, fail)
+    with pytest.raises(station.ContractError) as got:
+        station.migrate_to_separate(str(target))
+    assert "primary-config-failure" in str(got.value) and "hoàn tác" in str(got.value)
+    assert fired
+    if collision == "marker":
+        affected = ws / "station.json" if ws.exists() else target / "station.json"
+    assert station._sha256(affected) == hashlib.sha256(foreign).hexdigest()
+    data_home = target
+    assert _hashes(data_home)["omnivoice/voices/demo.wav"] == original_data["omnivoice/voices/demo.wav"]
+    if collision == "source-env":
+        assert destination_env.is_file()
+
+
+def test_migrate_post_move_refuses_a_new_secret_destination(embedded_repo, tmp_path, monkeypatch):
+    secret_dir = tmp_path / "home" / ".secret" / "voice-studio"
+    destination_env = secret_dir / ".env"
+    foreign = b"new synthetic secret fixture"
+    mkdir = station.os.makedirs
+
+    def create_foreign(path, *args, **kwargs):
+        result = mkdir(path, *args, **kwargs)
+        if Path(path) == secret_dir and not destination_env.exists():
+            destination_env.write_bytes(foreign)
+        return result
+
+    monkeypatch.setattr(station.os, "makedirs", create_foreign)
+    target = tmp_path / "destination"
+    before = _migration_file_state(embedded_repo)
+    with pytest.raises(station.ContractError, match="đã có"):
+        station.migrate_to_separate(str(target))
+    assert _migration_file_state(embedded_repo) == before
+    assert station._sha256(destination_env) == hashlib.sha256(foreign).hexdigest()
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("rollback_step", ["tree", "env"])
+def test_migrate_post_move_reports_original_and_rollback_errors(
+        rollback_step, embedded_repo, tmp_path, monkeypatch):
+    target = tmp_path / "destination"
+    local = embedded_repo / "studio.local.json"
+    original_tree = _hashes(embedded_repo / "workspaces")
+    move_tree, move_file = station._move_tree, station._move_file
+    calls = {"tree": 0, "env": 0}
+
+    def tree(src, dst):
+        calls["tree"] += 1
+        if rollback_step == "tree" and calls["tree"] == 2:
+            raise OSError("rollback-tree-failure")
+        move_tree(src, dst)
+
+    def env(src, dst):
+        calls["env"] += 1
+        if rollback_step == "env" and calls["env"] == 2:
+            raise OSError("rollback-env-failure")
+        move_file(src, dst)
+
+    def fail():
+        raise OSError("primary-config-failure")
+
+    monkeypatch.setattr(station, "_move_tree", tree)
+    monkeypatch.setattr(station, "_move_file", env)
+    fired = _migration_writer_fault(monkeypatch, local, "before", fail)
+    with pytest.raises(station.ContractError) as got:
+        station.migrate_to_separate(str(target))
+    message = str(got.value)
+    assert "primary-config-failure" in message and "rollback-" + rollback_step + "-failure" in message
+    assert fired
+    data_home = target
+    assert _hashes(data_home) == original_tree
+
+
+@pytest.mark.parametrize("error_type", [KeyboardInterrupt, SystemExit])
+def test_migrate_post_move_rolls_back_control_flow_exceptions(
+        error_type, embedded_repo, tmp_path, monkeypatch):
+    before = _migration_file_state(embedded_repo)
+    local = embedded_repo / "studio.local.json"
+    failure = error_type("synthetic interruption")
+
+    def fail():
+        raise failure
+
+    fired = _migration_writer_fault(monkeypatch, local, "after", fail)
+    target = tmp_path / "destination"
+    with pytest.raises(error_type) as got:
+        station.migrate_to_separate(str(target))
+    assert got.value is failure
+    assert fired
+    assert _migration_file_state(embedded_repo) == before
+    assert not target.exists()
+
+
+def test_migrate_post_move_reports_failure_restoring_an_empty_target(embedded_repo, tmp_path, monkeypatch):
+    target = tmp_path / "destination"
+    target.mkdir()
+    before = _migration_file_state(embedded_repo)
+    mkdir = station.os.makedirs
+
+    def fail_move(*_args):
+        raise OSError("primary-move-failure")
+
+    def fail_restore(path, *args, **kwargs):
+        if Path(path) == target:
+            raise OSError("rollback-empty-target-failure")
+        return mkdir(path, *args, **kwargs)
+
+    monkeypatch.setattr(station, "_move_tree", fail_move)
+    monkeypatch.setattr(station.os, "makedirs", fail_restore)
+    with pytest.raises(station.ContractError) as got:
+        station.migrate_to_separate(str(target))
+    assert "primary-move-failure" in str(got.value)
+    assert "rollback-empty-target-failure" in str(got.value)
+    assert _migration_file_state(embedded_repo) == before
