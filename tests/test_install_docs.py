@@ -199,3 +199,27 @@ def test_no_second_copy_of_the_editable_rule():
     # Đoạn "ngoại lệ có chủ đích" cũ từng sống ở 3 nơi với 3 lời khác nhau.
     for rel in POINTS_TO_CANONICAL + [CANONICAL_INSTALL, "docs/WORKSPACE.md"]:
         assert "Ngoại lệ có chủ đích" not in read(rel), rel
+
+
+def test_docs_and_help_do_not_say_yes_means_embedded_unconditionally(capsys):
+    """Máy có OPCOS_WORKSPACES thì `--yes` ra `<biến>/voice`; câu "`--yes` = embedded" vô điều kiện là sai."""
+    from voice_studio import station
+    unconditional = re.compile(r"--yes'?\s*=\s*(trạm )?(embedded|nhúng)|embedded:\s*'?`?voice-studio init --yes'?`?\s*$",
+                               re.IGNORECASE | re.MULTILINE)
+    for rel in ("AGENTS.md", "INSTALL.md", "docs/WORKSPACE.md"):
+        assert not unconditional.search(read(rel)), rel
+    assert "--mode embedded --yes" in read("INSTALL.md") and "--mode embedded --yes" in read("AGENTS.md")
+    assert station.init_main(["--help"]) == 0
+    help_text = capsys.readouterr().out
+    assert "OPCOS_WORKSPACES" in help_text and "(embedded) không hỏi" not in help_text
+    for msg in ("--yes = embedded", "--yes = trạm nhúng"):
+        assert msg not in (ROOT / "voice_studio" / "station.py").read_text(encoding="utf-8")
+
+
+def test_enter_means_embedded_is_always_qualified_by_the_variable():
+    """"Enter = embedded" / "bấm Enter là xong" is only true when OPCOS_WORKSPACES is not set; say so on the same line."""
+    for rel in ("README.md", "README.vi.md", "docs/INSTALL.md", "docs/index.html",
+                "skills/voice-routing/references/install-omnivoice.md"):
+        for ln in read(rel).splitlines():
+            if re.search(r"Enter = embedded|Enter là xong|press Enter and you are done", ln):
+                assert "OPCOS_WORKSPACES" in ln, f"{rel}: {ln.strip()}"

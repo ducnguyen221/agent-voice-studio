@@ -29,8 +29,11 @@ Người dùng nhờ cài: làm theo **[INSTALL.md](INSTALL.md)** từ mục 0 (
 Hai điều không được làm thay người dùng:
 
 - **Chọn chế độ trạm.** `voice-studio init` không có người trả lời thì in bảng hai lựa chọn rồi
-  thoát **mã 2, chưa ghi gì**. Trình nguyên bảng đó cho người dùng, chờ họ chọn, rồi chạy lại với
-  `--mode embedded|separate` (hoặc `--yes` = embedded, khuyến nghị).
+  thoát **mã 2, chưa ghi gì** (khi máy KHÔNG đặt `OPCOS_WORKSPACES`). Trình nguyên bảng đó cho người dùng,
+  chờ họ chọn, rồi chạy lại với `--mode embedded|separate` (hoặc `--mode embedded --yes` để lấy trạm
+  trong repo, khuyến nghị cho máy lẻ). Máy ĐÃ đặt `OPCOS_WORKSPACES` thì chỗ đặt đã biết: `--yes` (hay
+  chạy không có người) dựng trạm `<biến>/voice`; trạm nhúng cũ đã có dữ liệu thì được giữ, không dựng
+  trạm rỗng cạnh nó.
 - **Tải engine.** torch (CUDA ~2,5 GB, macOS arm64 ~130 MB) và weights (~3,3 GB, giấy phép
   **CC-BY-NC**) chỉ tải khi người dùng đồng ý. Khung (CLI, trạm, test) chạy được không cần chúng.
 

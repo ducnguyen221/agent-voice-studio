@@ -91,11 +91,12 @@ lives in
 
 `init` **presents a two-option table before doing anything**, rather than asking an open
 question. `embedded` — station at `<repo>/workspaces/`, configuration in `<repo>/.env` — is
-the **recommendation**: press Enter and you are done, with no environment variables to set.
+the **recommendation**: unless the machine sets `OPCOS_WORKSPACES`, press Enter and you are done, with no variables to set.
 Choose `separate` when you work across machines, are comfortable with the technical side, or
-this repository is your own public fork. With nobody to answer (CI, a scheduled task) `init`
+this repository is your own public fork. With nobody to answer (CI, a scheduled task) and `OPCOS_WORKSPACES` unset, `init`
 prints that table and **exits with code 2 without writing a byte** — an installing agent must
-show the table to the user instead of choosing silently.
+show the table to the user instead of choosing silently. When `OPCOS_WORKSPACES` is set the
+place is already known: `--yes` (or running unattended) builds `<variable>/voice`.
 
 `embedded` means clone-and-run: `init` lays down the station tree and copies `.env.example`
 to `<repo>/.env` for you to fill in. Both `workspaces/` and `.env` are blocked by

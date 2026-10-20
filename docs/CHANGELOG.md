@@ -19,11 +19,29 @@ plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệc
   trạm; có cả hai thì `workspaces` thắng và có nhắc). `init` embedded ghi lại `station_path: workspaces`.
   Cây mẫu của repo cũng đổi từ `templates/workspace/` sang `templates/workspaces/`.
 - Thư mục trạm cũ ẩn trong thư mục cá nhân không còn được tự nhận; trỏ vào bằng `--station <đường>`.
-- **Cảnh báo:** có `OPCOS_WORKSPACES` thì Enter/xác nhận ở câu hỏi của `init` ra `<biến>/voice`, còn
-  `--yes` ra `<repo>/workspaces/` (`--yes` không bao giờ hỏi và không tự đặt vào thư mục dùng chung).
-- `init`: có `OPCOS_WORKSPACES` và có người trả lời thì hỏi một câu xác nhận/đổi (Enter = `<biến>/voice`);
-  không có biến thì câu hỏi hai đường (Enter = `<repo>/workspaces/`, nhãn in đúng đường). `--non-interactive`
-  thiếu cả `--yes` lẫn `--mode` thì thoát mã 2, không đoán chế độ.
+- **Đổi hành vi — máy có `OPCOS_WORKSPACES`: `init --yes` và chạy không có người ra `<biến>/voice`** (trước
+  đây `--yes` ra `<repo>/workspaces/` và chạy không người thoát mã 2). Đã mang dấu thì dùng thẳng, không
+  in gì; chưa thì dựng ở đó và in một dòng nêu đường cùng cách đổi (`--station <đường>`). **Muốn giữ trạm
+  trong repo như trước: `init --mode embedded --yes`.** Windows `< NUL` hay pipe hết dữ liệu ở câu hỏi đường
+  khi máy có biến nay ra `<biến>/voice` (không còn mã 2); máy không có biến vẫn thoát mã 2, không đoán.
+- **Trạm nhúng cũ có dữ liệu được giữ, không bị biến đè.** Nếu `<repo>/workspaces/` (hay `workspace/` tên cũ)
+  đã là một trạm mà chưa ghi lựa chọn, `init` không dựng trạm rỗng cạnh nó: `--yes`, chạy không người, Enter
+  hay hết dữ liệu ⇒ giữ trạm cũ, ghi `embedded` và in một dòng cách dời sau (`migrate --to separate`); có
+  người ngồi đó thì được hỏi một câu giữ/chuyển — gõ `chuyen` (hay `chuyển`, `c`) để dời vào `<biến>/voice`
+  (vẫn hỏi y/N trước khi dời; đích không rỗng ⇒ mã 2 trước khi hỏi; `--dry-run` chỉ in kế hoạch). Bố cục có
+  cả `workspace/` đã có dữ liệu lẫn `workspaces/` mới chưa dấu: giữ `workspaces/` kèm dòng nhắc gộp, không hỏi.
+- `init`: có `OPCOS_WORKSPACES` và có người trả lời thì hỏi đúng một câu nhận đường (Enter = `<biến>/voice`,
+  kể cả khi trạm đó đã có sẵn); gõ `1`, `2`, `embedded` hay `separate` ở câu này là mã 2 (trước đây
+  tạo thư mục `<thư mục hiện tại>/1`). Không có biến thì câu hỏi hai đường (Enter = `<repo>/workspaces/`,
+  nhãn in đúng đường) và `--non-interactive` thiếu cả `--yes` lẫn `--mode` vẫn thoát mã 2.
+- `OPCOS_WORKSPACES` (hay `<biến>/voice`) trỏ vào một file giờ thoát mã 2 nêu tên biến, trước mọi thao tác
+  ghi (trước đây mã 1 kèm traceback).
+- `OPCOS_WORKSPACES` có dấu nháy dính vào giá trị (kiểu `setx` kèm nháy), có ký tự không hợp lệ trong đường
+  dẫn (Windows), hoặc trỏ vào chính một trạm (thay vì thư mục CHA chứa các trạm) giờ thoát mã 2 nêu tên biến,
+  chưa ghi gì — không còn mã 1 kèm traceback hay trạm lồng trong trạm. Gốc workspaces thông thường (không có
+  `station.json`/`omnivoice/voices/`) không bị chặn.
+- Ctrl+C ở bất kỳ lệnh `voice-studio` nào giờ thoát **mã 2** với đúng một dòng `đã huỷ (Ctrl+C)` (kèm dòng
+  JSON lỗi khi có `--json`), không còn traceback.
 - `separate` không còn đường mặc định ở thư mục cá nhân. `--mode separate` khi `OPCOS_WORKSPACES` đặt: đích là
   `<biến>/voice` (tuyệt đối, kể cả khi chưa là trạm) — nếu thư mục đó đã mang dấu trạm thì dùng thẳng,
   không hỏi; nếu chưa, có người thì hỏi xác nhận/đổi, không có người thì (kể cả `--yes`) dùng luôn và in

@@ -613,13 +613,6 @@ def test_init_interactive_with_opcos_var_asks_to_confirm_or_change(repo, opcos, 
     assert not (repo / "workspaces").exists()
 
 
-def test_init_yes_with_opcos_var_stays_embedded(repo, opcos, sandbox_home):
-    res = station.do_init(yes=True, ask=never_ask)
-    assert res["mode"] == "embedded"
-    assert read_local(repo)["station_path"] == "workspaces"
-    assert str(opcos) not in json.dumps(read_local(repo))
-
-
 def test_init_mode_embedded_allowed_with_opcos_var(repo, opcos, sandbox_home):
     res = station.do_init(mode="embedded", ask=never_ask)    # không ContractError
     assert res["mode"] == "embedded" and (repo / "workspaces" / "station.json").is_file()
@@ -629,14 +622,6 @@ def test_init_again_on_embedded_clone_is_not_flipped(repo, opcos, sandbox_home):
     (repo / "studio.local.json").write_text(json.dumps({"mode": "embedded"}), encoding="utf-8")
     res = station.do_init(ask=never_ask)
     assert res["mode"] == "embedded"
-    assert read_local(repo)["station_path"] == "workspaces"
-
-
-def test_init_yes_ignores_opcos_dir_without_marker(repo, tmp_path, monkeypatch, sandbox_home):
-    (tmp_path / "bare-ws" / "voice").mkdir(parents=True)     # thư mục có, không dấu trạm
-    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
-    res = station.do_init(yes=True, ask=never_ask)
-    assert res["mode"] == "embedded" and "station_path" in read_local(repo)
     assert read_local(repo)["station_path"] == "workspaces"
 
 
@@ -712,13 +697,6 @@ def test_init_without_opcos_var_asks_the_two_way_question_and_names_the_real_pat
     assert os.path.normcase(str(repo / "workspaces")) in os.path.normcase(prompts[0])
 
 
-def test_init_opcos_confirmation_non_interactive_without_yes_or_mode_is_code_2(repo, opcos, capsys):
-    rc = cli.main(["init", "--non-interactive", "--json"])
-    out, _err = capsys.readouterr()
-    assert rc == 2 and last_json(out)["ok"] is False
-    assert not (repo / "workspaces").exists() and not (repo / "studio.local.json").exists()
-
-
 def test_init_opcos_var_does_not_override_detected_external(repo, opcos, tmp_path, monkeypatch):
     monkeypatch.setenv("VOICE_STATION", str(tmp_path / "chon"))
     res = station.do_init(ask=never_ask)
@@ -728,3 +706,74 @@ def test_init_opcos_var_does_not_override_detected_external(repo, opcos, tmp_pat
 def test_venv_commands_weights_size_is_measured_value(tmp_path):
     cmds = "\n".join(station.venv_commands(str(tmp_path / "st"), windows=False))
     assert "3,3 GB" in cmds and "4 GB" not in cmds
+
+
+# ── thay ba test khoá hành vi cũ (`--yes`/không người có biến ra trạm OpcOS) ───────────────────────────
+
+def test_init_yes_with_opcos_var_builds_the_opcos_station(repo, opcos, sandbox_home, capsys):
+    """`--yes` + OPCOS_WORKSPACES ⇒ `<biến>/voice`, no question."""
+    res = station.do_init(yes=True, ask=never_ask)
+    assert res["mode"] == "separate"
+    assert os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
+    assert read_local(repo)["station_path"] == os.path.abspath(str(opcos))
+    assert not (repo / "workspaces").exists()
+    assert capsys.readouterr().err.count("OPCOS_WORKSPACES") == 0        # đã mang dấu ⇒ dùng thẳng, 0 dòng
+
+
+def test_init_yes_builds_the_opcos_station_even_when_the_dir_has_no_marker(repo, tmp_path, monkeypatch, sandbox_home, capsys):
+    """`--yes` with an unmarked `<biến>/voice` directory ⇒ the station is built there, plus one line."""
+    (tmp_path / "bare-ws" / "voice").mkdir(parents=True)
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "bare-ws"))
+    res = station.do_init(yes=True, ask=never_ask)
+    want = tmp_path / "bare-ws" / "voice"
+    assert res["mode"] == "separate" and os.path.normcase(res["station"]) == os.path.normcase(str(want))
+    assert (want / "station.json").is_file() and not (repo / "workspaces").exists()
+    err = capsys.readouterr().err
+    assert str(want) in err and "--station" in err
+
+
+def test_init_opcos_without_anyone_to_ask_builds_the_opcos_station(repo, opcos, capsys):
+    """Nobody to answer and the variable set ⇒ the OpcOS station, exit code 0."""
+    rc = cli.main(["init", "--non-interactive", "--json"])
+    out, _err = capsys.readouterr()
+    assert rc == 0 and last_json(out)["ok"] is True
+    assert os.path.normcase(last_json(out)["station"]) == os.path.normcase(str(opcos))
+    assert not (repo / "workspaces").exists()
+
+
+def test_init_stdin_at_eof_with_opcos_var_uses_the_opcos_station(repo, opcos, monkeypatch, capsys):
+    """End of input at the path question with the variable set = nobody there ⇒ the OpcOS station, exit code 0."""
+    def eof(_prompt):
+        raise EOFError
+    res = station.do_init(ask=eof)
+    assert res["mode"] == "separate" and os.path.normcase(res["station"]) == os.path.normcase(str(opcos))
+
+
+@pytest.mark.parametrize("typed", ["1", "2", "embedded", "separate", "Embedded"])
+def test_init_bare_choice_at_the_path_question_is_code_2_and_creates_nothing(typed, repo, opcos, tmp_path, monkeypatch):
+    """`1`/`2`/`embedded`/`separate` at the path question ⇒ exit code 2; no `<cwd>/1` is created."""
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(station.ContractError, match="--mode embedded"):
+        station.do_init(ask=lambda p: typed)
+    assert not (tmp_path / typed).exists() and not (repo / "studio.local.json").exists()
+
+
+def test_init_typed_path_that_is_a_file_is_code_2_and_writes_nothing(repo, opcos, tmp_path):
+    """A typed path that is a file ⇒ exit code 2, nothing written."""
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    with pytest.raises(station.ContractError, match="FILE"):
+        station.do_init(ask=lambda p: str(f))
+    assert not (repo / "studio.local.json").exists() and not (repo / "workspaces").exists()
+
+
+@pytest.mark.parametrize("how", ["eof-at-the-table", "nobody-to-answer"])
+def test_no_answer_and_no_variable_message_names_mode_station_and_yes(how, repo, home):
+    """Exit code 2 with no variable set: the message tells an agent every way forward."""
+    def eof(_prompt):
+        raise EOFError
+    with pytest.raises(station.ContractError) as e:
+        station.do_init(ask=eof) if how == "eof-at-the-table" else station.do_init(non_interactive=True)
+    msg = str(e.value)
+    assert "--mode" in msg and "--station <đường>" in msg and "--yes" in msg
+    assert not (repo / "studio.local.json").exists()

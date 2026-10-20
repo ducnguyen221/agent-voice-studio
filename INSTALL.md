@@ -22,8 +22,9 @@ Cài có **hai phần**, phần sau chỉ làm khi người dùng đồng ý:
   thư mục khác mặc định, **tải engine (phần B)**, đặt biến môi trường lâu dài: nêu rõ *cái gì, ở
   đâu, nặng bao nhiêu* rồi chờ người dùng đồng ý. Việc bên trong repo (`.venv/`, `workspaces/`)
   là bước bình thường.
-- **Không tự chọn chỗ đặt trạm giọng.** `voice-studio init --non-interactive` in bảng hai lựa
-  chọn rồi thoát **mã 2, chưa ghi gì**: trình nguyên bảng đó, chờ người dùng chọn (mục 6).
+- **Không tự chọn chỗ đặt trạm giọng.** Máy chưa đặt `OPCOS_WORKSPACES`: `voice-studio init --non-interactive`
+  in bảng hai lựa chọn rồi thoát **mã 2, chưa ghi gì**: trình nguyên bảng đó, chờ người dùng chọn (mục 6).
+  Máy đã đặt `OPCOS_WORKSPACES` (cài cạnh OpcOS) thì chỗ đặt đã biết — mục 6 nói rõ.
 - **Không đổi chính sách máy:** không đổi ExecutionPolicy, không tắt antivirus, không sửa
   registry hay sandbox của host.
 - **Không đụng bí mật:** không mở, in hay chép `.env`, token, mật khẩu hoặc file cấu hình host.
@@ -174,14 +175,20 @@ video, kể cả Mac chạy launchd) luôn `-e`. Hỏi người dùng máy này 
 voice-studio init --non-interactive
 ```
 
-- **Mã 2 kèm bảng hai lựa chọn** (máy mới): chép nguyên bảng cho người dùng. Khuyến nghị
-  `embedded` (trạm ở `<repo>/workspaces/`, git bỏ qua). Rồi chạy **một** trong hai:
-  - embedded: `voice-studio init --yes`
+- **Mã 2 kèm bảng hai lựa chọn** (máy mới, chưa đặt `OPCOS_WORKSPACES`): chép nguyên bảng cho người
+  dùng. Khuyến nghị `embedded` (trạm ở `<repo>/workspaces/`, git bỏ qua). Rồi chạy **một** trong hai:
+  - embedded: `voice-studio init --mode embedded --yes`
   - separate: `voice-studio init --station <thư mục người dùng chọn>` — thư mục cục bộ, không cloud.
     Sau đó **hỏi** người dùng có muốn đặt `VOICE_STATION=<thư mục đó>` lâu dài (cấp người dùng)
     để lịch chạy và phiên sau tìm thấy trạm không; đồng ý mới đặt.
 - **Mã 0 ngay**: máy đã có trạm (`VOICE_STATION` đã đặt, hoặc trạm cũ được nhận ra) — `init` tự
   dùng trạm đó, dòng `lý do` nói vì sao. Chép dòng đó vào báo cáo; **không** tạo trạm thứ hai.
+- **Máy đã đặt `OPCOS_WORKSPACES`** (cài cạnh OpcOS): không cần hỏi chỗ đặt. `voice-studio init --yes`
+  (hoặc `--non-interactive`) dựng trạm `<biến>/voice` rồi in một dòng nêu đường và cách đổi
+  (`--station <đường>`); chỉ muốn trạm trong repo thì `--mode embedded --yes`. Nếu `<repo>/workspaces/`
+  (hay `workspace/` tên cũ) đã là một trạm có dữ liệu mà chưa ghi lựa chọn, `init` **giữ** nó (không
+  dựng trạm rỗng cạnh) và in cách dời sau; có người ngồi đó thì hỏi một câu giữ/chuyển (`chuyen` =
+  dời vào `<biến>/voice`, vẫn hỏi y/N trước khi dời).
 
 `init` không tạo venv engine và không tải model; nó in các lệnh cho phần B.
 

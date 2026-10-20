@@ -250,3 +250,41 @@ def test_process_speak_exit_3_without_station(tmp_path):
                        env=_subprocess_env(tmp_path, tmp_path / "khong-co-tram"), timeout=120)
     assert r.returncode == 3
     assert json.loads(r.stdout.strip().splitlines()[-1])["code"] == 3
+
+
+# ── Ctrl+C = exit code 2 at the CLI boundary ───────────────────────────────────────────────────────
+
+def _interrupt(_args):
+    raise KeyboardInterrupt
+
+
+def _no_leak(fn, *a, **k):
+    """Gọi `fn`; nếu Ctrl+C lọt ra ngoài thì đó là lỗi test (không để nó giết cả phiên pytest)."""
+    try:
+        return fn(*a, **k)
+    except KeyboardInterrupt:
+        pytest.fail("KeyboardInterrupt lọt qua biên CLI — phải thành mã 2")
+
+
+def test_ctrl_c_is_code_2_with_one_line_and_no_traceback(capsys):
+    from voice_studio import contract
+    assert _no_leak(contract.run, _interrupt, None) == 2
+    out, err = capsys.readouterr()
+    assert out == "" and "đã huỷ (Ctrl+C)" in err and "Traceback" not in err
+    assert len([ln for ln in err.splitlines() if ln.strip()]) == 1
+
+
+def test_ctrl_c_with_json_emits_the_error_line(capsys):
+    from voice_studio import contract
+    assert _no_leak(contract.run, _interrupt, None, as_json=True) == 2
+    out, err = capsys.readouterr()
+    assert last_json(out) == {"ok": False, "code": 2, "error": "đã huỷ (Ctrl+C)"}
+    assert "Traceback" not in err
+
+
+def test_ctrl_c_in_a_real_command_is_code_2_not_a_traceback(monkeypatch, capsys):
+    from voice_studio import station
+    monkeypatch.setattr(station, "do_init", lambda **_kw: _interrupt(None))
+    rc = _no_leak(cli.main, ["init", "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 2 and last_json(out)["code"] == 2 and "Traceback" not in err

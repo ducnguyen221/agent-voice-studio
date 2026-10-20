@@ -8,19 +8,24 @@ Tên trạm luôn là `voice`, thư mục gốc luôn là `workspaces`:
     NHẬN (khi nó đã là trạm mà `workspaces` chưa có); `init` mới không bao giờ tạo nó.
 
 Luật chung:
-  · `--yes` KHÔNG BAO GIỜ hỏi (có hay không có terminal) và dùng trạm nhúng, không bao giờ đặt vào
-    thư mục dùng chung.
-  · `--non-interactive` thiếu cả `--yes` lẫn `--mode` ⇒ mã 2 (không đoán chế độ).
-  · Có người, biến đặt: một câu xác nhận/đổi — Enter ra `<biến>/voice`. Biến vắng: câu hỏi hai đường,
-    Enter = trạm nhúng.
+  · `--yes` KHÔNG BAO GIỜ hỏi (có hay không có terminal). Biến đặt ⇒ `<biến>/voice` (đã dấu: dùng thẳng,
+    chưa dấu: dựng + một dòng); biến vắng ⇒ trạm nhúng. Ngoại lệ: trạm nhúng đã mang dấu (có dữ liệu) mà
+    chưa ghi lựa chọn ⇒ GIỮ trạm cũ, không dựng trạm OpcOS rỗng cạnh nó.
+  · Không có người (`--non-interactive`, không terminal, hết dữ liệu): biến đặt ⇒ như `--yes`; biến vắng ⇒
+    mã 2 (không đoán chế độ).
+  · Có người, biến đặt: một câu nhận đường — Enter ra `<biến>/voice` (kể cả khi đã dấu); `1`/`2`/`embedded`/
+    `separate` ⇒ mã 2. Biến vắng: câu hỏi hai đường, Enter = trạm nhúng. Ctrl+C ở mọi câu ⇒ lan ra ngoài
+    (`contract.run` đổi thành mã 2).
   · `--mode separate`: biến đặt ⇒ `<biến>/voice`; biến vắng ⇒ hỏi đường (có người) hoặc mã 2.
 """
 import builtins
+import json
 import os
+from collections import namedtuple
 
 import pytest
 
-from voice_studio import station
+from voice_studio import cli, station
 from voice_studio.contract import ContractError
 
 
@@ -34,7 +39,7 @@ def _boom(*_a, **_k):
 
 @pytest.fixture
 def world(tmp_path, monkeypatch):
-    def build(layout, var):
+    def build(layout, var, recorded=None):
         repo = tmp_path / "repo"
         (repo / "voice_studio").mkdir(parents=True)
         (repo / "pyproject.toml").write_text("[project]\nname='x'\n", encoding="utf-8")
@@ -45,6 +50,8 @@ def world(tmp_path, monkeypatch):
             (old / "omnivoice" / "voices").mkdir(parents=True)
         if layout in ("new", "both"):
             new.mkdir(parents=True)
+        if layout == "marked":                       # trạm nhúng ĐÃ mang dấu ở tên mới
+            (new / "omnivoice" / "voices").mkdir(parents=True)
         ws = tmp_path / "ws"
         if var != "unset":
             (ws / "voice").mkdir(parents=True)
@@ -52,6 +59,9 @@ def world(tmp_path, monkeypatch):
             if var == "marked":
                 (ws / "voice" / "station.json").write_text("{}", encoding="utf-8")
         typed = tmp_path / "go-vao"
+        if recorded is not None:                     # lựa chọn đã ghi trong studio.local.json
+            rec = {k: (str(typed) if v == "@typed" else v) for k, v in recorded.items()}
+            (repo / "studio.local.json").write_text(json.dumps(rec), encoding="utf-8")
         return {"embedded": ("embedded", str(old if layout == "old" else new)),
                 "oc": ("separate", str(ws / "voice")),
                 "typed": ("separate", str(typed)),
@@ -60,78 +70,155 @@ def world(tmp_path, monkeypatch):
     return build
 
 
-def _answers(*items):
+def _choose(ask, kwargs):
+    """`choose_mode`, nhưng Ctrl+C lan ra ở ca KHÔNG mong đợi thì thành lỗi test (không giết cả phiên pytest)."""
+    try:
+        return station.choose_mode(ask=ask, **kwargs)
+    except KeyboardInterrupt:
+        raise Boom("Ctrl+C lan ra ở ca không mong đợi")
+
+
+def _answers(seen, *items):
+    """Câu trả lời giả. `seen` ghi lại MỌI lần hỏi (kể cả lần nổ vì hết câu trả lời)."""
     it = iter(items)
 
-    def ask(_prompt):
+    def ask(prompt):
+        seen.append(prompt)
         try:
-            return next(it)
+            val = next(it)
         except StopIteration:
             raise Boom("hỏi nhiều hơn dự kiến")
+        if isinstance(val, BaseException) or (isinstance(val, type) and issubclass(val, BaseException)):
+            raise val
+        return val
     return ask
 
 
 SKIP = "skip"
+KEEP_LAYOUTS = ("marked", "old", "both")      # embedded station already carries the marker, no recorded choice
+
+# kwargs cho choose_mode · cách dựng câu trả lời giả (typed_path -> list; phần tử là ngoại lệ thì ném) hoặc None
+# · mong đợi(var, layout) · SỐ CÂU HỎI mong đợi(var, layout) — test đếm bằng ĐÚNG số này (hỏi ít hơn cũng đỏ)
+# · tty (stdin có phải terminal) · recorded (nội dung studio.local.json đã ghi, "@typed" = đường gõ).
+Sc = namedtuple("Sc", "kwargs answers expect asks tty recorded")
 
 
-def _enter(var):
-    return "oc" if var != "unset" else "embedded"
+def sc(kwargs, answers, expect, asks=0, tty=True, recorded=None):
+    return Sc(kwargs, answers, expect, asks if callable(asks) else (lambda var, layout, _n=asks: _n),
+              tty, recorded)
 
 
-# tên -> (kwargs cho choose_mode, cách dựng câu trả lời giả (typed_path -> list) hoặc None, mong đợi(var))
+def _enter(var, layout):
+    return "oc" if var != "unset" and layout not in KEEP_LAYOUTS else "embedded"
+
+
+def _auto(var, layout):
+    """Không hỏi (--yes · không người): có biến ⇒ trạm OpcOS, trừ khi trạm nhúng mang dấu (giữ)."""
+    return "embedded" if var == "unset" or layout in KEEP_LAYOUTS else "oc"
+
+
+def _auto_or_exit2(var, layout):
+    return "exit2" if var == "unset" else _auto(var, layout)
+
+
+def _one_question(var, layout):
+    """Câu hỏi có người khi biến đặt: bố cục `both` không có câu nào (the layout with an old marked `workspace` and an unmarked `workspaces`); otherwise exactly one."""
+    return 0 if var != "unset" and layout == "both" else 1
+
+
+def _set_only(fn):
+    return lambda var, layout: SKIP if var == "unset" else fn(var, layout)
+
+
+def _bare_choice(var, layout):
+    return "exit2" if layout not in KEEP_LAYOUTS else "embedded"
+
+
 SCENARIOS = {
-    "tuong-tac Enter": (dict(), lambda t: [""], _enter),
-    "tuong-tac 1 (biến vắng)": (dict(), lambda t: ["1"],
-                                lambda var: SKIP if var != "unset" else "embedded"),
-    "tuong-tac 2 roi Enter": (dict(), lambda t: ["2", ""],
-                              lambda var: SKIP if var != "unset" else "exit2"),
-    "tuong-tac 2 roi go duong": (dict(), lambda t: ["2", t],
-                                 lambda var: SKIP if var != "unset" else "typed"),
-    "tuong-tac (biến đặt) go duong": (dict(), lambda t: [t],
-                                      lambda var: "typed" if var != "unset" else SKIP),
-    "tuong-tac 3": (dict(), lambda t: ["3"], lambda var: SKIP if var != "unset" else "exit2"),
-    "--yes": (dict(yes=True), None, lambda var: "embedded"),
-    "--non-interactive": (dict(non_interactive=True), None, lambda var: "exit2"),
-    "--non-interactive --yes": (dict(non_interactive=True, yes=True), None, lambda var: "embedded"),
-    "--mode embedded": (dict(mode="embedded"), None, lambda var: "embedded"),
-    "--mode separate (co nguoi)": (dict(mode="separate"), lambda t: [""],
-                                   lambda var: "oc" if var != "unset" else "exit2"),
-    "--mode separate --non-interactive": (dict(mode="separate", non_interactive=True), None,
-                                          lambda var: "oc" if var != "unset" else "exit2"),
-    "--mode separate --yes": (dict(mode="separate", yes=True), None,
-                              lambda var: "oc" if var != "unset" else "exit2"),
+    "tuong-tac Enter": sc(dict(), lambda t: [""], _enter, _one_question),
+    "tuong-tac 1 (biến vắng)": sc(dict(), lambda t: ["1"],
+                                  lambda var, layout: SKIP if var != "unset" else "embedded", 1),
+    "tuong-tac 2 roi Enter": sc(dict(), lambda t: ["2", ""],
+                                lambda var, layout: SKIP if var != "unset" else "exit2", 2),
+    "tuong-tac 2 roi go duong": sc(dict(), lambda t: ["2", t],
+                                   lambda var, layout: SKIP if var != "unset" else "typed", 2),
+    "tuong-tac (biến đặt) go duong": sc(
+        dict(), lambda t: [t],
+        _set_only(lambda var, layout: "embedded" if layout in KEEP_LAYOUTS else "typed"), _one_question),
+    "tuong-tac 3": sc(dict(), lambda t: ["3"],
+                      lambda var, layout: SKIP if var != "unset" else "exit2", 1),
+    "--yes": sc(dict(yes=True), None, _auto),
+    "--non-interactive": sc(dict(non_interactive=True), None, _auto_or_exit2),
+    "--non-interactive --yes": sc(dict(non_interactive=True, yes=True), None, _auto),
+    "khong-tty khong co": sc(dict(), None, _auto_or_exit2, tty=False),
+    "--mode embedded": sc(dict(mode="embedded"), None, lambda var, layout: "embedded"),
+    "--mode separate (co nguoi)": sc(dict(mode="separate"), lambda t: [""],
+                                     lambda var, layout: "oc" if var != "unset" else "exit2",
+                                     lambda var, layout: 0 if var == "marked" else 1),
+    "--mode separate --non-interactive": sc(dict(mode="separate", non_interactive=True), None,
+                                            lambda var, layout: "oc" if var != "unset" else "exit2"),
+    "--mode separate --yes": sc(dict(mode="separate", yes=True), None,
+                                lambda var, layout: "oc" if var != "unset" else "exit2"),
+    # câu EOF / Ctrl+C
+    "EOF o bang (biến vắng)": sc(dict(), lambda t: [EOFError],
+                                 lambda var, layout: "exit2" if var == "unset" else SKIP, 1),
+    "EOF o cau duong (biến đặt)": sc(
+        dict(), lambda t: [EOFError],
+        _set_only(lambda var, layout: "embedded" if layout in KEEP_LAYOUTS else "oc"), _one_question),
+    "Ctrl+C o cau hoi": sc(
+        dict(), lambda t: [KeyboardInterrupt],
+        lambda var, layout: "embedded" if var != "unset" and layout == "both" else "interrupt",
+        _one_question),
+    # lựa chọn đã ghi thắng biến
+    "da ghi embedded + --yes": sc(dict(yes=True), None, lambda var, layout: "embedded",
+                                  recorded={"mode": "embedded"}),
+    "da ghi embedded + co nguoi": sc(dict(), lambda t: [], lambda var, layout: "embedded",
+                                     recorded={"mode": "embedded"}),
+    "da ghi separate co duong + --yes": sc(dict(yes=True), None, lambda var, layout: "typed",
+                                           recorded={"mode": "separate", "station_path": "@typed"}),
+    "da ghi separate thieu duong + --yes": sc(dict(yes=True), None, lambda var, layout: "exit2",
+                                              recorded={"mode": "separate"}),
 }
+# a bare choice typed at the path question: exit code 2; riêng bố cục mang dấu thì đó là câu giữ/chuyển, `1`… không phải từ khoá ⇒ giữ
+for _word in ("1", "2", "embedded", "separate"):
+    SCENARIOS[f"tuong-tac (biến đặt) go {_word}"] = sc(
+        dict(), (lambda t, _w=_word: [_w]), _set_only(_bare_choice), _one_question)
 
 
 CASES = [(name, layout, var)
          for name in sorted(SCENARIOS)
-         for layout in ("none", "old", "new", "both")
+         for layout in ("none", "old", "new", "both", "marked")
          for var in ("unset", "unmarked", "marked")
-         if SCENARIOS[name][2](var) != SKIP]            # câu hỏi không xuất hiện ở tổ hợp này thì không có ca
+         if SCENARIOS[name].expect(var, layout) != SKIP]   # câu hỏi không xuất hiện ở tổ hợp này thì không có ca
 
 
 @pytest.mark.parametrize("name,layout,var", CASES, ids=[f"{n}|{l}|{v}" for n, l, v in CASES])
 def test_decision_table(name, layout, var, world, monkeypatch, capsys):
-    kwargs, build_answers, expect = SCENARIOS[name]
-    table = world(layout, var)
-    key = expect(var)
-    # Có terminal nhưng KHÔNG ai ngồi đó: mọi đường không-hỏi mà gọi input() là lỗi.
-    monkeypatch.setattr(station, "_stdin_is_tty", lambda: True)
+    s = SCENARIOS[name]
+    table = world(layout, var, recorded=s.recorded)
+    key = s.expect(var, layout)
+    # `tty` của từng ca: mọi đường không-hỏi mà gọi input() là lỗi.
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: s.tty)
     monkeypatch.setattr(builtins, "input", _boom)
-    ask = _answers(*build_answers(table["typed_path"])) if build_answers else None
-    want = table[key]
-    if want is None:
+    seen = []
+    ask = _answers(seen, *s.answers(table["typed_path"])) if s.answers else None
+    want = None if key == "interrupt" else table[key]
+    if key == "interrupt":
+        with pytest.raises(KeyboardInterrupt):        # choose_mode must not catch Ctrl+C
+            station.choose_mode(ask=ask, **s.kwargs)
+    elif want is None:
         with pytest.raises(ContractError):
-            station.choose_mode(ask=ask, **kwargs)
+            _choose(ask, s.kwargs)
     else:
-        mode, st, _why = station.choose_mode(ask=ask, **kwargs)
+        mode, st, _why = _choose(ask, s.kwargs)
         assert (mode, os.path.normcase(st)) == (want[0], os.path.normcase(want[1]))
+    assert len(seen) == s.asks(var, layout), f"số câu hỏi: {len(seen)} ≠ {s.asks(var, layout)}"
     _out, err = capsys.readouterr()
     # không bao giờ nhắc tới thư mục ẩn dưới home: không còn khái niệm đó
     assert "." + "voice" not in err
 
 
-@pytest.mark.parametrize("layout", ["none", "old", "new", "both"])
+@pytest.mark.parametrize("layout", ["none", "old", "new", "both", "marked"])
 def test_embedded_layout_rules(layout, world, capsys):
     table = world(layout, "unset")
     mode, st, _ = station.choose_mode(yes=True)
@@ -156,3 +243,371 @@ def test_label_names_the_real_path(var, world):
     assert os.path.normcase(st) in os.path.normcase(prompts[0])
     want = table["oc"] if var != "unset" else table["embedded"]
     assert (mode, os.path.normcase(st)) == (want[0], os.path.normcase(want[1]))
+
+
+# ── an embedded station that already holds data wins over the variable (no recorded choice) ─────────────────────────
+
+def _tree_state(*roots):
+    """Ảnh chụp cây (đường → nội dung) để chứng minh KHÔNG byte nào bị dời/ghi."""
+    out = {}
+    for root in roots:
+        for dp, dn, fn in os.walk(root):
+            for n in dn:
+                out[os.path.join(dp, n)] = None
+            for n in fn:
+                p = os.path.join(dp, n)
+                with open(p, "rb") as f:
+                    out[p] = f.read()
+    return out
+
+
+KEEP_CALLS = {
+    # tên ca → (kwargs, answers(t) | None, tty, số câu hỏi)
+    "yes": (dict(yes=True), None, True, 0),
+    "non-interactive": (dict(non_interactive=True), None, True, 0),
+    "khong-tty": (dict(), None, False, 0),
+    "Enter": (dict(), lambda t: [""], True, 1),
+    "go duong": (dict(), lambda t: [t], True, 1),
+    "EOF": (dict(), lambda t: [EOFError], True, 1),
+}
+
+
+@pytest.mark.parametrize("layout", ["marked", "old"])
+@pytest.mark.parametrize("var", ["unmarked", "marked"])
+@pytest.mark.parametrize("call", sorted(KEEP_CALLS))
+def test_old_station_with_data_is_kept_and_says_how_to_move(call, var, layout, world, monkeypatch, capsys):
+    """Keep the old embedded station, 1 dòng chỉ cách dời; không bao giờ dựng trạm OpcOS rỗng."""
+    kwargs, build, tty, n_asks = KEEP_CALLS[call]
+    table = world(layout, var)
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: tty)
+    monkeypatch.setattr(builtins, "input", _boom)
+    seen = []
+    ask = _answers(seen, *build(table["typed_path"])) if build else None
+    choice = station.choose_mode(ask=ask, **kwargs)
+    mode, st, _why = choice
+    assert (mode, os.path.normcase(st)) == (table["embedded"][0], os.path.normcase(table["embedded"][1]))
+    assert choice.then_migrate is None
+    assert len(seen) == n_asks
+    oc = table["oc"][1]
+    err = capsys.readouterr().err
+    if var == "unmarked":
+        assert f"migrate --to separate --station {oc}" in err
+    else:                                          # <biến>/voice is a station too
+        assert "hai trạm" in err and "migrate --to separate" not in err
+        assert f"--station {oc}" in err
+
+
+@pytest.mark.parametrize("word", ["chuyen", "chuyển", "c", "C", "Chuyen", "  chuyen  "])
+@pytest.mark.parametrize("layout", ["marked", "old"])
+@pytest.mark.parametrize("var", ["unmarked", "marked"])
+def test_old_station_choosing_to_move_returns_a_flag_and_moves_nothing(word, var, layout, world, monkeypatch, capsys):
+    """choose_mode never moves anything — nó trả `then_migrate`; `do_init` mới dời sau cổng dry-run."""
+    table = world(layout, var)
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: True)
+    monkeypatch.setattr(builtins, "input", _boom)
+    before = _tree_state(tmp_root(table), )
+    seen = []
+    choice = station.choose_mode(ask=_answers(seen, word))
+    mode, st, _why = choice
+    assert (mode, os.path.normcase(st)) == (table["embedded"][0], os.path.normcase(table["embedded"][1]))
+    assert os.path.normcase(choice.then_migrate) == os.path.normcase(table["oc"][1])
+    assert len(seen) == 1 and "chuyen" in seen[0] and table["oc"][1] in seen[0]
+    assert _tree_state(tmp_root(table)) == before          # 0 byte đổi
+
+
+def tmp_root(table):
+    return os.path.dirname(table["typed_path"])
+
+
+@pytest.mark.parametrize("call", ["yes", "non-interactive", "khong-tty", "Enter"])
+@pytest.mark.parametrize("var", ["unmarked", "marked"])
+def test_both_layout_keeps_without_any_question_or_migrate_line(call, var, world, monkeypatch, capsys):
+    """Layout `both`: the old `workspace` mang dấu + `workspaces` mới chưa dấu ⇒ giữ, 0 câu ở mọi cách
+    gọi (kể cả có người), nhắc gộp có sẵn, KHÔNG gợi `migrate` (dời thư mục rỗng là vô nghĩa)."""
+    kwargs, build, tty, _n = KEEP_CALLS[call]
+    table = world("both", var)
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: tty)
+    monkeypatch.setattr(builtins, "input", _boom)
+    seen = []
+    ask = _answers(seen, *(build(table["typed_path"]) if build else [])) if call == "Enter" else None
+    choice = station.choose_mode(ask=ask, **kwargs)
+    mode, st, _why = choice
+    assert (mode, os.path.normcase(st)) == (table["embedded"][0], os.path.normcase(table["embedded"][1]))
+    assert choice.then_migrate is None and seen == []
+    err = capsys.readouterr().err
+    assert "tên cũ" in err and "migrate --to separate" not in err
+
+
+# ── odd OPCOS_WORKSPACES values ───────────────────────────────────────────────────
+
+@pytest.mark.parametrize("flags", [["--yes"], ["--non-interactive"], ["--mode", "separate", "--yes"]])
+def test_opcos_workspaces_pointing_at_a_file_is_code_2_naming_the_variable(flags, world, tmp_path, monkeypatch, capsys):
+    """A caller error: ⇒ mã 2 nêu TÊN BIẾN, không traceback (trước: mã 1)."""
+    world("none", "unset")
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    rc = cli.main(["init", "--json", *flags])
+    out, err = capsys.readouterr()
+    assert rc == 2, err
+    last = json.loads(out.strip().splitlines()[-1])
+    assert last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"] and "FILE" in last["error"]
+    assert "Traceback" not in err
+    assert not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+def test_opcos_workspaces_voice_entry_being_a_file_is_code_2_naming_the_variable(world, tmp_path, monkeypatch, capsys):
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "voice").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    # the ERROR itself must name the variable (not just an earlier "[init] separate: dùng … OPCOS_WORKSPACES/voice" line)
+    assert rc == 2 and last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"] and "FILE" in last["error"]
+    assert "Traceback" not in err and "[init] separate: dùng" not in err
+
+
+def test_blank_opcos_workspaces_counts_as_unset(world, monkeypatch):
+    """Blank/khoảng trắng = vắng ⇒ `--yes` vẫn ra trạm nhúng."""
+    table = world("none", "unset")
+    monkeypatch.setenv("OPCOS_WORKSPACES", "   ")
+    mode, st, _ = station.choose_mode(yes=True)
+    assert (mode, os.path.normcase(st)) == (table["embedded"][0], os.path.normcase(table["embedded"][1]))
+
+
+def test_relative_opcos_workspaces_gives_an_absolute_station_with_yes(world, tmp_path, monkeypatch, capsys):
+    """A relative variable ⇒ đường ra là tuyệt đối theo cwd lúc gọi."""
+    world("none", "unset")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", "relws")
+    mode, st, _ = station.choose_mode(yes=True)
+    assert mode == "separate" and os.path.isabs(st)
+    assert os.path.normcase(st) == os.path.normcase(str(tmp_path / "relws" / "voice"))
+
+
+# ── dòng in khi dựng trạm OpcOS mới ────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("call", ["--yes", "--non-interactive", "khong-tty khong co"])
+def test_building_the_opcos_station_prints_one_line_with_the_path_and_how_to_change_it(call, world, monkeypatch, capsys):
+    table = world("none", "unmarked")
+    s = SCENARIOS[call]
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: s.tty)
+    monkeypatch.setattr(builtins, "input", _boom)
+    station.choose_mode(**s.kwargs)
+    err = capsys.readouterr().err
+    assert table["oc"][1] in err and "--station" in err
+    assert len([ln for ln in err.splitlines() if "OPCOS_WORKSPACES" in ln]) == 1
+
+
+def test_using_an_already_marked_opcos_station_prints_nothing(world, monkeypatch, capsys):
+    world("none", "marked")
+    station.choose_mode(yes=True)
+    assert capsys.readouterr().err == ""
+
+
+# ── thứ tự ưu tiên: --station và biến trạm RIÊNG thắng OPCOS_WORKSPACES ──────
+
+OWN_VARS = ("VOICE_STATION", "OMNIVOICE_DIR")
+OWN_CALLS = {
+    "yes": (dict(yes=True), None, True, 0),
+    "non-interactive": (dict(non_interactive=True), None, True, 0),
+    "khong-tty": (dict(), None, False, 0),
+    "co nguoi": (dict(), lambda t: ["khong-duoc-hoi"], True, 0),
+}
+
+
+@pytest.mark.parametrize("call", sorted(OWN_CALLS))
+@pytest.mark.parametrize("var", ["unset", "unmarked", "marked"])
+@pytest.mark.parametrize("own", OWN_VARS)
+def test_own_station_variable_beats_opcos_workspaces_and_is_never_asked_about(own, var, call, world, tmp_path,
+                                                                              monkeypatch):
+    """A station-specific variable (VOICE_STATION · OMNIVOICE_DIR) ⇒ separate tại trạm đó, 0 câu, không tạo workspaces/."""
+    world("marked", var)
+    st = tmp_path / "tram-rieng"
+    monkeypatch.setenv(own, str(st / "omnivoice") if own == "OMNIVOICE_DIR" else str(st))
+    kwargs, build, tty, _n = OWN_CALLS[call]
+    monkeypatch.setattr(station, "_stdin_is_tty", lambda: tty)
+    monkeypatch.setattr(builtins, "input", _boom)
+    seen = []
+    ask = _answers(seen, "khong-duoc-hoi") if build else None
+    mode, got, _why = station.choose_mode(ask=ask, **kwargs)
+    assert mode == "separate" and os.path.normcase(got) == os.path.normcase(str(st))
+    assert len(seen) == 0
+
+
+@pytest.mark.parametrize("own", OWN_VARS)
+@pytest.mark.parametrize("var", ["unset", "unmarked"])
+def test_explicit_embedded_with_an_own_station_variable_is_code_2(own, var, world, tmp_path, monkeypatch):
+    """`--mode embedded` + biến trạm riêng ⇒ mã 2 ('hai nguồn sự thật')."""
+    world("none", var)
+    monkeypatch.setenv(own, str(tmp_path / "tram-rieng"))
+    with pytest.raises(ContractError, match="hai nguồn sự thật"):
+        station.choose_mode(mode="embedded")
+
+
+@pytest.mark.parametrize("var", ["unset", "unmarked", "marked"])
+@pytest.mark.parametrize("layout", ["none", "marked", "old", "both"])
+def test_station_flag_beats_everything_and_is_made_absolute(layout, var, world, tmp_path, monkeypatch):
+    """`--station` ⇒ separate tại đường đó (tuyệt đối theo cwd), 0 câu, bất kể biến/bố cục."""
+    world(layout, var)
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(builtins, "input", _boom)
+    mode, got, why = station.choose_mode(station="tram-tuong-doi", yes=True)
+    assert (mode, why) == ("separate", "--station")
+    assert os.path.normcase(got) == os.path.normcase(str(tmp_path / "tram-tuong-doi"))
+
+
+# ── a malformed OPCOS_WORKSPACES value is the caller's error: exit code 2 naming it, nothing written ──────
+
+BAD_VALUES = {
+    "quoted": lambda tmp: '"' + str(tmp / "ws") + '"',          # `setx` style: the quotes stick to the value
+    "illegal-char": lambda tmp: str(tmp / "a<b"),
+}
+
+
+@pytest.mark.parametrize("call", ["yes", "non-interactive", "mode-separate-yes"])
+@pytest.mark.parametrize("kind", sorted(BAD_VALUES))
+def test_malformed_opcos_workspaces_is_code_2_naming_the_variable(kind, call, world, tmp_path, monkeypatch, capsys):
+    if kind == "illegal-char" and os.name != "nt":
+        pytest.skip("`<` is a legal file-name character outside Windows")
+    world("none", "unset")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", BAD_VALUES[kind](tmp_path))
+    argv = {"yes": ["--yes"], "non-interactive": ["--non-interactive"],
+            "mode-separate-yes": ["--mode", "separate", "--yes"]}[call]
+    before = sorted(os.listdir(tmp_path))
+    rc = cli.main(["init", "--json", *argv])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and last["code"] == 2 and "OPCOS_WORKSPACES" in last["error"], err
+    assert "Traceback" not in err and "[init] separate: dùng" not in err
+    assert sorted(os.listdir(tmp_path)) == before and not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+def test_malformed_opcos_workspaces_at_end_of_input_is_code_2(world, tmp_path, monkeypatch):
+    world("none", "unset")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("OPCOS_WORKSPACES", '"' + str(tmp_path / "ws") + '"')
+
+    def eof(_prompt):
+        raise EOFError
+    with pytest.raises(ContractError, match="OPCOS_WORKSPACES"):
+        station.do_init(ask=eof)
+    assert not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+# ── layout `both` + a variable that is a file: the broken variable still wins (exit code 2) ───────────────
+
+@pytest.mark.parametrize("person", [False, True])
+def test_both_layout_with_opcos_workspaces_pointing_at_a_file_is_code_2(person, world, tmp_path, monkeypatch):
+    world("both", "unset")
+    f = tmp_path / "la-file"
+    f.write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(f))
+    seen = []
+    with pytest.raises(ContractError, match="OPCOS_WORKSPACES"):
+        if person:
+            station.choose_mode(ask=_answers(seen, ""))
+        else:
+            station.choose_mode(yes=True)
+    assert seen == []
+
+
+# ── OPCOS_WORKSPACES that is itself a station: refused (the variable must be the PARENT of the stations) ────
+
+@pytest.mark.parametrize("flags", [["--yes"], ["--non-interactive"], ["--mode", "separate", "--yes"]])
+def test_opcos_workspaces_that_is_itself_a_station_is_code_2_and_nothing_is_nested(flags, world, tmp_path,
+                                                                                    monkeypatch, capsys):
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    (ws / "station.json").write_text("{}", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    rc = cli.main(["init", "--json", *flags])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and "OPCOS_WORKSPACES" in last["error"] and "Traceback" not in err
+    assert not (ws / "voice").exists() and not (tmp_path / "repo" / "studio.local.json").exists()
+
+
+def test_the_real_workspaces_root_layout_is_not_mistaken_for_a_station(world, tmp_path, monkeypatch):
+    """A workspaces root holds stations and other folders but has no marker of its own."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    for d in ("data", "marketing", "video", "writing"):
+        (ws / d).mkdir(parents=True)
+    (ws / "README.md").write_text("x", encoding="utf-8")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    mode, st, _ = station.choose_mode(yes=True)
+    assert mode == "separate" and os.path.normcase(st) == os.path.normcase(str(ws / "voice"))
+
+
+# ── the two cases that stay as they are, now pinned through the whole `init` (not just choose_mode) ─────────
+
+def test_opcos_workspaces_inside_the_repo_is_built_through_init(world, tmp_path, monkeypatch, capsys):
+    """Pinned as current behaviour, not a contract: whether this should be refused is still open."""
+    world("none", "unset")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(tmp_path / "repo" / "ws"))
+    rc = cli.main(["init", "--yes", "--json"])
+    assert rc == 0, capsys.readouterr().err
+    assert (tmp_path / "repo" / "ws" / "voice" / "station.json").is_file()
+
+
+def test_opcos_voice_dir_not_empty_without_marker_is_used_through_init(world, tmp_path, monkeypatch, capsys):
+    """Pinned as current behaviour, not a contract: the directory is used as is, nothing is deleted."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    (ws / "voice").mkdir(parents=True)
+    (ws / "voice" / "la.txt").write_bytes(b"x")
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    rc = cli.main(["init", "--yes", "--json"])
+    assert rc == 0, capsys.readouterr().err
+    assert (ws / "voice" / "la.txt").read_bytes() == b"x" and (ws / "voice" / "station.json").is_file()
+
+
+def test_extended_length_prefix_is_a_valid_value_not_an_illegal_character(world, tmp_path, monkeypatch, capsys):
+    """`\\\\?\\C:\\...` is a legal Windows path form; its `?` must not trip the illegal-character check."""
+    if os.name != "nt":
+        pytest.skip("extended-length prefixes are a Windows feature")
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("OPCOS_WORKSPACES", "\\\\?\\" + str(ws))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    assert rc == 0, err
+    assert (ws / "voice" / "station.json").is_file()
+
+
+def test_an_illegal_character_after_the_extended_length_prefix_is_still_refused(world, tmp_path, monkeypatch, capsys):
+    if os.name != "nt":
+        pytest.skip("Windows path rules")
+    world("none", "unset")
+    monkeypatch.setenv("OPCOS_WORKSPACES", "\\\\?\\" + str(tmp_path / "a<b"))
+    rc = cli.main(["init", "--yes", "--json"])
+    out, _err = capsys.readouterr()
+    assert rc == 2 and "OPCOS_WORKSPACES" in json.loads(out.strip().splitlines()[-1])["error"]
+
+
+def test_an_unreachable_variable_is_code_2_naming_the_variable_and_writes_nothing(world, tmp_path, monkeypatch, capsys):
+    """A path that cannot be created (network name not found…) is a configuration error, not exit code 1 + traceback."""
+    world("none", "unset")
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    monkeypatch.setenv("OPCOS_WORKSPACES", str(ws))
+    real = os.makedirs
+
+    def flaky(path, *a, **kw):
+        if str(ws) in str(path):
+            raise OSError(67, "Không tìm thấy tên mạng")
+        return real(path, *a, **kw)
+    monkeypatch.setattr(os, "makedirs", flaky)
+    rc = cli.main(["init", "--yes", "--json"])
+    out, err = capsys.readouterr()
+    last = json.loads(out.strip().splitlines()[-1])
+    assert rc == 2 and "Traceback" not in err
+    assert "OPCOS_WORKSPACES" in last["error"] and str(ws) in last["error"]
+    assert not (tmp_path / "repo" / "studio.local.json").exists()

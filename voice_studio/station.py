@@ -73,6 +73,29 @@ STATION_CONFIRM = ("Trạm sẽ đặt ở {path} (OPCOS_WORKSPACES/voice). "
                    "Enter để nhận, hoặc gõ đường khác: ")
 NEED_STATION = ("chế độ separate cần chỉ rõ nơi đặt trạm: chạy lại với --station DIR (hoặc đặt "
                 "OPCOS_WORKSPACES để dùng <biến>/voice).")
+# Gõ lựa chọn TRẦN ở câu nhận đường (câu này nhận ĐƯỜNG, không nhận "1"/"2") ⇒ mã 2, không tạo `<cwd>/1`.
+STATION_CONFIRM_REJECT = ("1", "2", "embedded", "separate")
+# Trạm nhúng cũ có dữ liệu, chưa ghi lựa chọn, máy có OPCOS_WORKSPACES: dữ liệu có sẵn thắng biến.
+OLD_STATION_PROMPT = ("Trạm cũ có dữ liệu ở {path}. Enter = giữ và dùng như cũ; "
+                      "gõ `chuyen` = dời vào {oc}: ")
+MOVE_WORDS = ("chuyen", "chuyển", "c")
+KEEP_OLD_LINE = ("[init] giữ trạm trong repo {path}; máy có OPCOS_WORKSPACES — dời sau bằng: "
+                 "voice-studio migrate --to separate --station {oc}")
+TWO_STATIONS_LINE = ("[init] giữ trạm trong repo {path}; {oc} cũng đã là một trạm — có hai trạm mang dấu: "
+                     "gộp bằng tay, hoặc chọn một bằng --station {oc}")
+
+
+class Choice(tuple):
+    """Kết quả của `choose_mode`: unpack được như `(chế độ, gốc trạm, lý do)` (3 giá trị, như trước).
+
+    `then_migrate` là cờ TƯỜNG MINH: không None ⇒ người dùng chọn dời trạm nhúng cũ vào đó. Hàm chọn chế
+    độ KHÔNG BAO GIỜ dời dữ liệu — `do_init` đọc cờ này, ghi `embedded` trước, rồi (không `--dry-run`) mới
+    gọi phần kiểm đích + xác nhận y/N của `migrate`.
+    """
+    def __new__(cls, mode, path, why, then_migrate=None):
+        self = tuple.__new__(cls, (mode, path, why))
+        self.then_migrate = then_migrate
+        return self
 
 
 def _unquote(text):
@@ -234,12 +257,100 @@ def _ask_path_console(prompt):
     return input()
 
 
-def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=False):
-    """-> (chế độ, gốc trạm, lý do). Ném ContractError khi cần người chọn mà không hỏi được.
+def _reject_bare_choice(typed):
+    """Câu nhận ĐƯỜNG mà người dùng gõ `1`/`2`/`embedded`/`separate` ⇒ mã 2 (không tạo thư mục `<cwd>/1`)."""
+    if typed.strip().lower() in STATION_CONFIRM_REJECT:
+        oc = _env.opcos_dir()
+        raise ContractError(
+            f"câu này nhận ĐƯỜNG DẪN, không nhận lựa chọn {typed.strip()!r}. Enter = {oc} "
+            "(OPCOS_WORKSPACES/voice); gõ đường khác để dùng nơi khác; muốn trạm trong repo: "
+            "chạy lại với --mode embedded. Chưa ghi gì.")
 
-    `non_interactive` = người gọi TỰ KHAI "không có ai ngồi đây". Nó KHÔNG có nghĩa là "cứ
-    đoán hộ tôi": thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2. Đoán ở đây là dựng
-    trạm sai chỗ, và người dùng chỉ phát hiện ra sau khi đã dựng vài giọng.
+
+def _after_drive(path):
+    """Phần đường dẫn SAU ổ đĩa/tiền tố (ổ `C:`, tiền tố mở rộng của Windows kèm ổ, hoặc đường mạng UNC): chỗ
+    kiểm ký tự cấm. `?` của tiền tố mở rộng và dấu `:` của ổ đĩa không phải ký tự cấm (`splitdrive` đã tách chúng)."""
+    return os.path.splitdrive(path)[1]
+
+
+def _opcos_target():
+    """`<OPCOS_WORKSPACES>/voice` tuyệt đối, hoặc None khi biến vắng. Biến (hay một thư mục cha của nó) hoặc
+    `<biến>/voice` là một FILE ⇒ ContractError nêu TÊN BIẾN, trước mọi `makedirs` (lỗi hợp đồng của người gọi)."""
+    base = _env.opcos_base()
+    if not base:
+        return None
+    bad = '"' if '"' in base else (next((c for c in '<>|?*' if c in _after_drive(base)), None) if os.name == "nt" else None)
+    if bad:
+        raise ContractError(
+            f"OPCOS_WORKSPACES có ký tự không hợp lệ trong đường dẫn ({bad!r}): {base}. Đặt lại biến là một đường "
+            "thư mục thuần, không kèm dấu nháy, hoặc chạy lại với --station DIR. Chưa ghi gì.")
+    if _env.has_marker(base):
+        raise ContractError(
+            f"OPCOS_WORKSPACES trỏ vào chính một trạm ({base}); biến phải là thư mục CHA chứa các trạm. Đặt lại "
+            f"biến, hoặc dùng --station {base}. Chưa ghi gì.")
+    probe = base
+    while not os.path.exists(probe) and os.path.dirname(probe) != probe:
+        probe = os.path.dirname(probe)
+    if os.path.exists(probe) and not os.path.isdir(probe):
+        raise ContractError(
+            f"OPCOS_WORKSPACES trỏ vào một FILE, không phải thư mục: {probe}. Đặt lại biến trỏ vào một "
+            "thư mục (hoặc bỏ biến), hoặc chạy lại với --station DIR. Chưa ghi gì.")
+    oc = os.path.join(base, "voice")
+    if os.path.exists(oc) and not os.path.isdir(oc):
+        raise ContractError(
+            f"OPCOS_WORKSPACES/voice là một FILE, không phải thư mục: {oc}. Đổi tên/xoá file đó (hoặc "
+            "đặt lại OPCOS_WORKSPACES), hoặc chạy lại với --station DIR. Chưa ghi gì.")
+    return oc
+
+
+def _keep_old_station(repo, ask, default_ask, interactive):
+    """Dữ liệu có sẵn thắng biến (chưa ghi lựa chọn, máy có OPCOS_WORKSPACES): trạm nhúng trong repo đã
+    MANG DẤU (xét cả hai tên) ⇒ GIỮ, không bao giờ dựng trạm OpcOS rỗng cạnh dữ liệu cũ. -> Choice | None.
+
+    · `both` mới chưa dấu (`workspace` cũ mang dấu + `workspaces` chưa dấu): giữ `workspaces`, 0 câu, dòng nhắc
+      gộp có sẵn (từ `_env.embedded_station`), KHÔNG gợi `migrate` (dời thư mục rỗng là vô nghĩa).
+    · còn lại: có người ⇒ MỘT câu giữ/chuyển (Enter/EOF/chữ khác = giữ); `--yes`/không người ⇒ giữ + 1 dòng.
+    Ctrl+C không bị bắt. Hàm này không dời gì: chọn chuyển chỉ đặt cờ `then_migrate`.
+    """
+    new_m = _env.has_marker(os.path.join(repo, _env.WORKSPACE))
+    old_m = _env.has_marker(os.path.join(repo, _env.LEGACY_WORKSPACE))
+    if not (new_m or old_m):
+        return None
+    oc = _opcos_target()                 # biến trỏ vào file ⇒ mã 2 nêu tên biến, trước mọi câu hỏi
+    path = _env.embedded_station(repo)[0]
+    why = f"trạm nhúng trong repo đã có dữ liệu ({path}); máy có OPCOS_WORKSPACES"
+    if not new_m and os.path.isdir(os.path.join(repo, _env.WORKSPACE)):
+        return Choice("embedded", path, why)                    # `both`: nhắc gộp đã in, không hỏi
+    if interactive:
+        try:
+            typed = _unquote((_ask_path_console if default_ask else ask)(
+                OLD_STATION_PROMPT.format(path=path, oc=oc)))
+        except EOFError:                                        # hết dữ liệu = không có người = giữ
+            typed = ""
+        if typed.lower() in MOVE_WORDS:
+            return Choice("embedded", path, why, then_migrate=oc)
+    contract.log((TWO_STATIONS_LINE if _env.has_marker(oc) else KEEP_OLD_LINE).format(path=path, oc=oc))
+    return Choice("embedded", path, why)
+
+
+def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=False):
+    """-> Choice (unpack được `(chế độ, gốc trạm, lý do)`). Ném ContractError khi cần người chọn mà không hỏi được.
+
+    Thứ tự ưu tiên:
+
+        --station → biến trạm riêng → lựa chọn đã ghi → --mode (embedded: trạm nhúng; separate: đã dấu ? dùng :
+        có người ? 1 câu : dựng + 1 dòng) → máy có OPCOS_WORKSPACES?
+            không ─ có người ? bảng [1]/[2] : (--yes ? trạm nhúng : mã 2)
+            có ──── trạm nhúng đã mang dấu, chưa ghi lựa chọn ⇒ GIỮ (--yes/không người/Enter/EOF) hoặc, có người
+                    gõ `chuyen`, trả cờ `then_migrate` (hàm này không dời gì)
+                    · `--yes` / không người / không terminal ⇒ `<biến>/voice` (đã dấu ? dùng thẳng : dựng + 1 dòng)
+                    · có người ⇒ 1 câu nhận đường: Enter = `<biến>/voice`; đường ⇒ dùng đường đó; `1`/`2`/
+                      `embedded`/`separate` ⇒ mã 2; EOF ⇒ như `--yes` (không có người); Ctrl+C ⇒ lan ra
+                      (`contract.run` đổi thành mã 2)
+
+    `non_interactive` = người gọi TỰ KHAI "không có ai ngồi đây". Nó KHÔNG có nghĩa là "cứ đoán hộ tôi":
+    khi máy KHÔNG đặt OPCOS_WORKSPACES, thiếu `--yes`/`--mode`/`--station` thì vẫn là mã 2 (đoán ở đây là dựng
+    trạm sai chỗ). Khi máy có OPCOS_WORKSPACES thì chỗ đặt đã biết — trạm OpcOS `<biến>/voice`.
     """
     repo = _env.repo_root()
     from_prev = False                    # chế độ lấy từ studio.local.json — không đề xuất trạm OpcOS
@@ -247,65 +358,79 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
     # `--yes` là "đừng hỏi gì cả" (có terminal hay không): không đường nào dưới đây được gọi input().
     interactive = not yes and (ask is not None or (not non_interactive and _stdin_is_tty()))
     if station:
-        return "separate", _path(station), "--station"
+        return Choice("separate", _path(station), "--station")
     ext = detect_external()
     if ext:
         if mode == "embedded":
             raise ContractError(
                 f"máy đã có trạm giọng ngoài ({ext[1]}: {ext[0]}); tạo thêm workspaces/ sẽ thành "
                 "hai nguồn sự thật. Dùng trạm đó (bỏ --mode) hoặc gỡ biến/trạm cũ trước.")
-        return "separate", ext[0], f"nhận diện trạm có sẵn — {ext[1]}"
+        return Choice("separate", ext[0], f"nhận diện trạm có sẵn — {ext[1]}")
     if not mode:
         local = _env.local_config(repo) if repo else {}
         prev = local.get("mode")
         if prev == "separate" and local.get("station_path"):
             st, _src = _env.resolve_station()          # đọc station_path của lần chọn trước
-            return "separate", st, "studio.local.json (lần chọn trước)"
+            return Choice("separate", st, "studio.local.json (lần chọn trước)")
         if prev in MODES:
             mode, why = prev, "studio.local.json (lần chọn trước)"
             from_prev = True
-        elif yes:
-            mode, why = "embedded", "--yes (nhận khuyến nghị)"
         else:
-            if ask is None:
-                if non_interactive or not _stdin_is_tty():
+            if repo and _env.opcos_base():
+                kept = _keep_old_station(repo, ask, default_ask, interactive)
+                if kept is not None:
+                    return kept
+            if yes:
+                if _env.opcos_base():
+                    mode, why = "separate", "--yes + OPCOS_WORKSPACES"
+                else:
+                    mode, why = "embedded", "--yes (nhận khuyến nghị)"
+            elif ask is None and (non_interactive or not _stdin_is_tty()):
+                if not _env.opcos_base():
                     contract.log(CHOICE_TABLE)
                     raise ContractError(
                         "cần người dùng chọn chế độ cài. Agent: trình bảng trên cho người dùng, "
-                        "rồi chạy lại với --mode embedded|separate (hoặc --yes = embedded).")
-                ask = _ask_console
-            oc = _env.opcos_dir()        # cài cạnh OpcOS: `<OPCOS_WORKSPACES>/voice`, dù chưa là trạm
-            if oc:
-                # Một câu duy nhất: Enter nhận `<biến>/voice`, hoặc gõ đường khác. (`--yes` không bao
-                # giờ tới đây: nó dùng trạm nhúng, không tự đặt vào thư mục dùng chung.)
-                try:
-                    typed = _unquote((_ask_path_console if default_ask else ask)(
-                        STATION_CONFIRM.format(path=oc)))
-                except EOFError:
-                    raise ContractError(
-                        "không đọc được lựa chọn (stdin không có người). Agent: hỏi người dùng, rồi chạy "
-                        f"lại với --station DIR (hoặc --mode separate để dùng {oc}, hoặc --yes = "
-                        "trạm nhúng trong repo).")
-                if typed:
-                    return "separate", _env._expand(typed), "người dùng chỉ đường trạm"
-                return "separate", oc, f"người dùng nhận OPCOS_WORKSPACES/voice: {oc}"
-            # [1] in ĐƯỜNG THẬT sẽ dùng (không để người đọc tự đoán `<repo>`)
-            table = CHOICE_TABLE.replace(
-                "<repo>/workspaces/", (_env.embedded_station(repo)[0] + "/") if repo else "<repo>/workspaces/")
-            try:
-                ans = (ask(table) or "").strip().lower()
-            except EOFError:
-                # Windows: stdin là NUL vẫn báo isatty() = True — hết dữ liệu nghĩa là không có người.
-                raise ContractError(
-                    "không đọc được lựa chọn (stdin không có người). Agent: trình bảng lựa chọn cho "
-                    "người dùng, rồi chạy lại với --mode embedded|separate (hoặc --yes = embedded).")
-            if ans in ("", "1", "embedded"):
-                mode = "embedded"
-            elif ans in ("2", "separate"):
-                mode = "separate"
+                        "rồi chạy lại với --mode embedded|separate, hoặc --station <đường> (trạm ngoài repo), "
+                        "hoặc --yes (nhận trạm nhúng khi máy không đặt OPCOS_WORKSPACES).")
+                mode, why = "separate", "không có người trả lời + OPCOS_WORKSPACES"
             else:
-                raise ContractError(f"lựa chọn không hợp lệ: {ans!r} (1 = embedded, 2 = separate)")
-            why = "người dùng chọn"
+                ask = ask or _ask_console
+                oc = _opcos_target()     # cài cạnh OpcOS: `<OPCOS_WORKSPACES>/voice`, dù chưa là trạm
+                if oc:
+                    # Một câu duy nhất: Enter nhận `<biến>/voice`, hoặc gõ đường khác.
+                    eof = False
+                    try:
+                        typed = _unquote((_ask_path_console if default_ask else ask)(
+                            STATION_CONFIRM.format(path=oc)))
+                    except EOFError:     # Windows `< NUL`: isatty() = True nhưng hết dữ liệu = không có người
+                        typed, eof = "", True
+                    if typed:
+                        _reject_bare_choice(typed)
+                        return Choice("separate", _env._expand(typed), "người dùng chỉ đường trạm")
+                    if eof:
+                        contract.log(f"[init] separate: dùng {oc} (OPCOS_WORKSPACES/voice). "
+                                     "Muốn nơi khác: --station <đường>.")
+                        return Choice("separate", oc, f"hết dữ liệu ở câu hỏi (không có người): {oc}")
+                    return Choice("separate", oc, f"người dùng nhận OPCOS_WORKSPACES/voice: {oc}")
+                # [1] in ĐƯỜNG THẬT sẽ dùng (không để người đọc tự đoán `<repo>`)
+                table = CHOICE_TABLE.replace(
+                    "<repo>/workspaces/",
+                    (_env.embedded_station(repo)[0] + "/") if repo else "<repo>/workspaces/")
+                try:
+                    ans = (ask(table) or "").strip().lower()
+                except EOFError:
+                    # Windows: stdin là NUL vẫn báo isatty() = True — hết dữ liệu nghĩa là không có người.
+                    raise ContractError(
+                        "không đọc được lựa chọn (stdin không có người). Agent: trình bảng lựa chọn cho "
+                        "người dùng, rồi chạy lại với --mode embedded|separate, hoặc --station <đường> (trạm "
+                        "ngoài repo), hoặc --yes (nhận trạm nhúng khi máy không đặt OPCOS_WORKSPACES).")
+                if ans in ("", "1", "embedded"):
+                    mode = "embedded"
+                elif ans in ("2", "separate"):
+                    mode = "separate"
+                else:
+                    raise ContractError(f"lựa chọn không hợp lệ: {ans!r} (1 = embedded, 2 = separate)")
+                why = "người dùng chọn"
     else:
         why = "--mode"
     if mode == "embedded":
@@ -313,14 +438,14 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
             raise ContractError("chế độ embedded cần biết bản clone repo: cài `pip install -e <repo>`, "
                                 "hoặc bản sao kèm biến VOICE_STUDIO_REPO=<repo> (docs/INSTALL.md "
                                 "mục 3); không thì chỉ dùng được separate (--station DIR).")
-        return "embedded", _env.embedded_station(repo)[0], why
+        return Choice("embedded", _env.embedded_station(repo)[0], why)
     if from_prev:
         raise ContractError(NEED_STATION)
+    suggest = _opcos_target()            # kiểm biến trước khi nhận `<biến>/voice` đã mang dấu
     oc = _env.opcos_station()
     if oc:
-        return "separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm"
+        return Choice("separate", oc, f"trạm OpcOS: OPCOS_WORKSPACES đã đặt và {oc} là một trạm")
     ask_path = _ask_path_console if default_ask else ask
-    suggest = _env.opcos_dir()           # `<OPCOS_WORKSPACES>/voice` tuyệt đối, dù chưa mang dấu trạm
     if suggest:
         typed = ""
         if interactive:
@@ -329,17 +454,18 @@ def choose_mode(station=None, mode=None, yes=False, ask=None, non_interactive=Fa
             except EOFError:
                 typed = ""
         if typed:
-            return "separate", _env._expand(typed), "người dùng chỉ đường trạm"
+            _reject_bare_choice(typed)
+            return Choice("separate", _env._expand(typed), "người dùng chỉ đường trạm")
         contract.log(f"[init] separate: dùng {suggest} (OPCOS_WORKSPACES/voice). "
                      "Muốn nơi khác: --station <đường>.")
-        return "separate", suggest, f"OPCOS_WORKSPACES đã đặt: {suggest}"
+        return Choice("separate", suggest, f"OPCOS_WORKSPACES đã đặt: {suggest}")
     if interactive:
         try:
             typed = _unquote(ask_path(STATION_ASK_PATH))
         except EOFError:
             typed = ""
         if typed:
-            return "separate", _env._expand(typed), "người dùng chỉ đường trạm"
+            return Choice("separate", _env._expand(typed), "người dùng chỉ đường trạm")
     raise ContractError(NEED_STATION)
 
 
@@ -448,8 +574,9 @@ def _install_hook(repo):
 
 def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, ask=None,
             non_interactive=False):
-    mode, st, why = choose_mode(station=station, mode=mode, yes=yes, ask=ask,
-                                non_interactive=non_interactive)
+    choice = choose_mode(station=station, mode=mode, yes=yes, ask=ask, non_interactive=non_interactive)
+    mode, st, why = choice
+    then_migrate = choice.then_migrate           # explicit flag: the user chose to move the old embedded station
     repo = _env.repo_root()
     res = {"mode": mode, "station": st, "reason": why, "dry_run": bool(dry_run),
            "repo": repo, "created": [], "hook": None}
@@ -461,6 +588,8 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
     res["profiles"] = (len([n for n in os.listdir(voices) if n.endswith(".wav")
                             and not n.startswith("_")]) if os.path.isdir(voices) else 0)
     if dry_run:
+        if then_migrate:                         # xem trước: chưa dời, chưa ghi gì
+            res["would_migrate"] = {"from": st, "to": then_migrate}
         return res
     created = res["created"]
     if existing:
@@ -471,7 +600,14 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
         for sub in ("omnivoice/voices", "assets/bgm", "out", "cache"):
             d = os.path.join(st, *sub.split("/"))
             if not os.path.isdir(d):
-                os.makedirs(d)
+                try:
+                    os.makedirs(d)
+                except OSError as e:           # đường không dựng được (ổ không có, tên sai…) là lỗi cấu hình, không phải lỗi máy
+                    base = _env.opcos_base()
+                    from_var = bool(base) and os.path.normcase(st).startswith(os.path.normcase(base))
+                    raise ContractError(
+                        f"không tạo được thư mục trạm {st}: {e}." +
+                        (" Kiểm giá trị OPCOS_WORKSPACES." if from_var else " Kiểm đường dẫn trạm."))
                 created.append(sub + "/")
         bgm.init_library(os.path.join(st, "assets", "bgm"))
         _copy_template(st, created)
@@ -497,7 +633,22 @@ def do_init(station=None, mode=None, existing=False, yes=False, dry_run=False, a
             # còn trả None và một `.env` vừa chép ra sẽ không được ai đọc.
             _copy_env(repo, created)
             res["hook"] = _install_hook(repo)
+    if then_migrate:
+        _migrate_after_init(res, then_migrate, ask)
     return res
+
+
+def _migrate_after_init(res, target, ask):
+    """`init` chose to move the old embedded station: the station đã được dựng + ghi `embedded`. Kiểm đích TRƯỚC (không rỗng ⇒
+    mã 2, trạm cũ vẫn dùng được), rồi đúng câu tóm tắt + y/N của `migrate`. `n`/Enter/EOF ⇒ giữ, mã 0."""
+    plan = _migrate_plan(target, count=True)
+    if not _confirm_move(plan, ask or _ask_line):
+        res["moved"] = False
+        contract.log(f"[init] giữ trạm trong repo {res['station']}; dời sau bằng: "
+                     f"voice-studio migrate --to separate --station {target}")
+        return
+    moved = migrate_to_separate(plan["target"])
+    res.update(mode="separate", station=moved["station"], moved=True, env_moved_to=moved["env_moved_to"])
 
 
 def _print_init(res):
@@ -506,6 +657,9 @@ def _print_init(res):
     log(f"[init] {tag}chế độ: {res['mode']} · trạm: {res['station']}")
     log(f"[init] lý do: {res['reason']}")
     if res["dry_run"]:
+        if res.get("would_migrate"):
+            log(f"[init] sẽ dời {res['would_migrate']['from']} → {res['would_migrate']['to']} "
+                "(khi chạy thật: hỏi y/N trước khi dời)")
         return
     for c in res["created"]:
         log(f"  + {c}")
@@ -546,10 +700,12 @@ def init_main(argv=None):
         description="Dựng cây trạm giọng + station.json. Không tạo venv, không tải model.")
     ap.add_argument("--station", help="trạm ngoài repo (chọn separate, không hỏi)")
     ap.add_argument("--mode", choices=MODES, help="chọn chế độ không cần hỏi")
-    ap.add_argument("--yes", action="store_true", help="nhận khuyến nghị (embedded) không hỏi")
+    ap.add_argument("--yes", action="store_true",
+                    help="nhận khuyến nghị, không hỏi: <OPCOS_WORKSPACES>/voice nếu máy đặt biến này "
+                         "(trừ khi đã có trạm nhúng cũ có dữ liệu: giữ), không thì trạm nhúng trong repo")
     ap.add_argument("--non-interactive", action="store_true",
-                    help="không có ai trả lời: KHÔNG hỏi và KHÔNG đoán — thiếu "
-                         "--yes/--mode/--station thì dừng với mã 2")
+                    help="không có ai trả lời: KHÔNG hỏi — máy có OPCOS_WORKSPACES thì dùng <biến>/voice; "
+                         "không có thì KHÔNG đoán: thiếu --yes/--mode/--station dừng với mã 2")
     ap.add_argument("--existing", action="store_true",
                     help="nhận một trạm đang chạy: chỉ ghi station.json, không rải file mẫu")
     ap.add_argument("--dry-run", action="store_true", help="chỉ báo sẽ làm gì, không ghi")
@@ -900,7 +1056,7 @@ def do_migrate(station=None, ask=None, non_interactive=False):
         raise ContractError(MIGRATE_NEED_STATION)
     ask = ask or _ask_line
     _repo, ws = _migrate_source()
-    suggest = _env.opcos_dir()           # gợi ý duy nhất: `<OPCOS_WORKSPACES>/voice`; không có thì không gợi ý
+    suggest = _opcos_target()            # gợi ý duy nhất: `<OPCOS_WORKSPACES>/voice`; không có thì không gợi ý
     hint = (f"Gợi ý (Enter để nhận): {suggest}" if suggest
             else "Không có gợi ý sẵn (OPCOS_WORKSPACES chưa đặt). Enter để thôi.")
     try:
@@ -911,46 +1067,212 @@ def do_migrate(station=None, ask=None, non_interactive=False):
     if not target:
         raise ContractError("đã huỷ: chưa chọn nơi dời. Chưa dời gì.")
     plan = _migrate_plan(target, count=True)
+    if not _confirm_move(plan, ask):
+        raise ContractError("đã huỷ theo lựa chọn: chưa dời gì.")
+    return migrate_to_separate(target)
+
+
+def _confirm_move(plan, ask):
+    """Hiện tóm tắt (đường tuyệt đối, số file, dung lượng) và xin y/N. EOF = không."""
     summary = (f"Sẽ dời {plan['ws']} → {plan['target']}\n"
                f"  {plan['files']} file, {_human_size(plan['bytes'])}"
                + (f" (gồm .env → {plan['moved_env']})" if plan["moved_env"] else "") + "\n"
                "Sau khi dời, repo trỏ vào đích qua studio.local.json. Dời xong khó quay lại bằng một lệnh.\n"
                "Dời? [y/N]: ")
     try:
-        ok = (ask(summary) or "").strip().lower() in ("y", "yes")
+        return (ask(summary) or "").strip().lower() in ("y", "yes")
     except EOFError:
-        ok = False
-    if not ok:
-        raise ContractError("đã huỷ theo lựa chọn: chưa dời gì.")
-    return migrate_to_separate(target)
+        return False
 
 
 def migrate_to_separate(target=None):
     plan = _migrate_plan(target)                 # không đếm file: đã có đích rõ thì khỏi đi cả cây
     repo, ws, target = plan["repo"], plan["ws"], plan["target"]
     env_file, sec, moved_env = plan["env_file"], plan["sec"], plan["moved_env"]
+
+    def identity(st):
+        return st.st_dev, st.st_ino
+
+    def snapshot(path):
+        try:
+            with open(path, "rb") as f:
+                return {"path": path, "bytes": f.read(), "id": identity(os.fstat(f.fileno())),
+                        "written": False}
+        except FileNotFoundError:
+            return {"path": path, "bytes": None, "id": None, "written": False}
+
+    def unchanged(record):
+        current = snapshot(record["path"])
+        if current["id"] != record["id"] or current["bytes"] != record["bytes"]:
+            raise ContractError(f"{record['path']} đã có dữ liệu mới — không ghi đè")
+
+    def write_metadata(record, data):
+        payload = json.dumps(data, ensure_ascii=False, indent=2).encode("utf-8")
+        mode = "x+b" if record["bytes"] is None else "r+b"
+        with open(record["path"], mode, buffering=0) as f:
+            current_id, current = identity(os.fstat(f.fileno())), f.read()
+            if record["bytes"] is None:
+                record["id"] = current_id
+            elif current_id != record["id"] or current != record["bytes"]:
+                raise ContractError(f"{record['path']} đã có dữ liệu mới — không ghi đè")
+            record.update(written=True, owned=current)
+            f.seek(0)
+            offset = 0
+            try:
+                while offset < len(payload):
+                    remaining = len(payload) - offset
+                    count = f.write(payload[offset:])
+                    if not isinstance(count, int) or not 0 < count <= len(payload) - offset:
+                        record["owned"] = None
+                        raise OSError("metadata write không trả số bytes hợp lệ")
+                    offset += count
+                    record["owned"] = payload[:offset] + current[offset:]
+                    if count != remaining:
+                        raise OSError("metadata short write")
+                f.truncate(len(payload))
+                record["owned"] = payload
+                f.flush()
+            except BaseException:
+                # A failed call may have changed bytes without returning a count. Never infer
+                # ownership from a prefix or from arbitrary contents read after the failure.
+                try:
+                    f.seek(0)
+                    known = f.read() == record["owned"]
+                except BaseException:
+                    known = False
+                if not known:
+                    record["owned"] = None
+                raise
+            if identity(os.stat(record["path"])) != record["id"]:
+                raise ContractError(f"{record['path']} đã có file mới — giữ nguyên")
+
+    def restore_metadata(record):
+        if not record["written"]:
+            unchanged(record)
+            return
+        if record["bytes"] is None:
+            # No handle-bound delete is available here. A path-based unlink could delete
+            # a replacement, so retain the created file and report incomplete recovery.
+            raise ContractError(f"{record['path']} vốn vắng — giữ file, cần phục hồi thủ công")
+        with open(record["path"], "r+b") as f:
+            if (identity(os.fstat(f.fileno())) != record["id"]
+                    or record.get("owned") is None or f.read() != record["owned"]):
+                raise ContractError(f"{record['path']} có dữ liệu mới hoặc ownership không rõ — giữ nguyên")
+            if record["bytes"] is not None:
+                f.seek(0)
+                if f.write(record["bytes"]) != len(record["bytes"]):
+                    raise OSError("metadata rollback short write")
+                f.truncate()
+                f.flush()
+
+    def json_object(record):
+        if record["bytes"] is None:
+            return {}
+        try:
+            data = json.loads(record["bytes"].decode("utf-8"))
+        except (ValueError, UnicodeError):
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    local_record = snapshot(os.path.join(repo, _env.LOCAL_CONFIG))
+    marker_record = snapshot(os.path.join(ws, _env.STATION_FILE))
+    env_record = snapshot(env_file) if moved_env else None
+    local, info = json_object(local_record), json_object(marker_record)
     had_empty_dir = os.path.isdir(target)
     if had_empty_dir:
         os.rmdir(target)
     os.makedirs(os.path.dirname(target), exist_ok=True)
     try:
         _move_tree(ws, target)
-    except BaseException:                        # mọi lỗi dời/chép (OSError, shutil.Error, ContractError…)
+    except BaseException as original:            # preserve the existing pre-move failure contract
         if had_empty_dir and not os.path.exists(target):
-            os.makedirs(target)                  # trả lại thư mục rỗng của người dùng
-        raise                                    # rồi ném lại đúng lỗi gốc
-    if moved_env:
-        os.makedirs(sec, exist_ok=True)
-        _move_file(env_file, moved_env)
-    local_path = os.path.join(repo, _env.LOCAL_CONFIG)
-    local = _env.read_json(local_path)[0]
-    local.update({"mode": "separate", "station_path": target, "secrets": SECRET_STORE})
-    _write_json(local_path, local)
-    sj = os.path.join(target, _env.STATION_FILE)
-    info, err = _env.read_json(sj)
-    if not err and info:
-        info["mode"] = "separate"
-        _write_json(sj, info)
+            try:
+                os.makedirs(target)
+            except BaseException as rollback:
+                raise ContractError(
+                    f"migrate thất bại: {type(original).__name__}: {original}; hoàn tác thư mục đích "
+                    f"không trọn: {type(rollback).__name__}: {rollback}") from original
+        raise
+
+    tree_id = None
+    env_ids = set()
+    marker_record["path"] = os.path.join(target, _env.STATION_FILE)
+
+    def restore_env():
+        if not env_record:
+            return
+        if os.path.lexists(env_file):
+            unchanged(env_record)               # original file still there: a move failed before unlink
+            if env_ids and os.path.lexists(moved_env):
+                # _move_file exposes no exact write-state on failure. Even an empty file
+                # or matching prefix cannot prove ownership; retain both copies.
+                raise ContractError(f"{moved_env} không rõ trạng thái ghi — giữ cả hai bản, "
+                                    "cần phục hồi thủ công")
+            return
+        if not env_ids or identity(os.stat(moved_env)) not in env_ids:
+            raise ContractError(f"không xác nhận được file đã dời tại {moved_env} — giữ nguyên")
+        if snapshot(moved_env)["bytes"] != env_record["bytes"]:
+            raise ContractError(f"file đã dời tại {moved_env} không còn nguyên — giữ nguyên")
+        # _move_file may replace its destination; reserve it so a pre-existing new file is refused.
+        with open(env_file, "xb"):
+            pass
+        _move_file(moved_env, env_file)           # on failure, retain both paths for manual recovery
+
+    try:
+        tree_id = identity(os.stat(target))
+        if marker_record["bytes"] is not None:
+            marker_record["id"] = identity(os.stat(marker_record["path"]))
+        unchanged(marker_record)
+        if moved_env:
+            unchanged(env_record)
+            os.makedirs(sec, exist_ok=True)
+            try:
+                with open(moved_env, "xb") as f:
+                    env_ids = {identity(os.fstat(f.fileno())), env_record["id"]}
+            except FileExistsError as e:
+                raise ContractError(f"{moved_env} đã có — không ghi đè") from e
+            _move_file(env_file, moved_env)
+        local.update({"mode": "separate", "station_path": target, "secrets": SECRET_STORE})
+        write_metadata(local_record, local)
+        if info:
+            info["mode"] = "separate"
+            write_metadata(marker_record, info)
+    except BaseException as original:
+        errors = []
+        # Restore the marker first. If metadata cannot be restored, retain the moved tree
+        # and env together rather than moving data away from an un-restorable config.
+        for record in (marker_record, local_record):
+            try:
+                restore_metadata(record)
+            except BaseException as e:
+                errors.append(f"{record['path']}: {type(e).__name__}: {e}")
+                break
+        try:
+            if errors:
+                raise ContractError("metadata chưa hoàn tác — giữ .env tại vị trí hiện có")
+            restore_env()
+        except BaseException as e:
+            errors.append(f".env: {type(e).__name__}: {e}")
+        try:
+            if errors:
+                raise ContractError("hoàn tác phụ thuộc chưa xong — giữ cây trạm tại đích")
+            if os.path.lexists(ws):
+                raise ContractError(f"nguồn {ws} đã xuất hiện trở lại — không ghi đè")
+            if tree_id is None or identity(os.stat(target)) != tree_id:
+                raise ContractError(f"đích {target} đã đổi — không dời dữ liệu mới")
+            _move_tree(target, ws)
+        except BaseException as e:
+            errors.append(f"cây trạm: {type(e).__name__}: {e}")
+        if had_empty_dir and not os.path.lexists(target) and os.path.isdir(ws):
+            try:
+                os.mkdir(target)
+            except BaseException as e:
+                errors.append(f"thư mục đích: {type(e).__name__}: {e}")
+        if errors:
+            raise ContractError(
+                f"migrate thất bại: {type(original).__name__}: {original}; hoàn tác không trọn: "
+                + "; ".join(errors) + f". Giữ dữ liệu tại {ws} / {target}; không chạy lại trước khi kiểm tra.") from original
+        raise
     return {"mode": "separate", "station": target, "env_moved_to": moved_env}
 
 
