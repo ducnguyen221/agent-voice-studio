@@ -23,7 +23,8 @@ dependencies = [
 # (Windows cài sạch, Mac) đều chạy. omnivoice 0.2.1 chỉ đòi >=5.3.0 nên không tự chặn bản mới
 # chưa ai thử. Nới khoảng = đo trên máy thật trước, rồi sửa cùng lúc doctor.TRANSFORMERS_TESTED
 # (tests/test_repo_gates.py đỏ nếu hai chỗ lệch).
-engine = ["omnivoice==0.2.1", "transformers>=5.10.2,<5.18"]
+# imageio-ffmpeg: đường lùi ffmpeg của `_env.ffmpeg_exe` (ghi mp3/ghép video) khi máy không có ffmpeg trên PATH.
+engine = ["omnivoice==0.2.1", "transformers>=5.10.2,<5.18", "imageio-ffmpeg"]
 mcp = ["mcp"]
 ui = ["gradio"]
 # faster-whisper + av ghim THEO CẶP đã đo: faster-whisper truyền `metadata_errors` cho `av.open`,

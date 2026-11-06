@@ -139,7 +139,8 @@ def test_needs_file_schema():
         assert lock == [f"locks/{key}-windows.txt"]
         assert (ROOT / lock[0]).is_file()
     omni = _need(doc, "venvs", "omnivoice")
-    assert omni["install"]["package"] == ".[engine]" and omni["python"] == "3.12"
+    # TK5.1/L6: extra `mcp` — MCP `omnivoice-tts` chạy từ chính venv engine (parity với venv cũ)
+    assert omni["install"]["package"] == ".[engine,mcp]" and omni["python"] == "3.12"
     assert _need(doc, "venvs", "sep")["install"]["requirements"] == ["voice_studio/clean/requirements-sep.txt"]
     assert _need(doc, "venvs", "cv")["install"]["requirements"] == ["voice_studio/clean/requirements-cv.txt"]
     clean = _need(doc, "engines", "clean")
@@ -155,8 +156,35 @@ def _lines(rel):
             if ln.strip() and not ln.lstrip().startswith("#")]
 
 
+def test_engine_extra_declares_imageio_ffmpeg():
+    """TK5.1/L6: `_env.ffmpeg_exe` dùng `imageio_ffmpeg` làm đường lùi — phải được khai, không trông vào venv cài tay."""
+    import tomllib
+    extras = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["optional-dependencies"]
+    assert any(re.match(r"imageio-ffmpeg(?![a-z0-9-])", d) for d in extras["engine"])
+    assert any(ln.startswith("imageio_ffmpeg==") for ln in _lines("locks/omnivoice-windows.txt"))
+
+
+def test_voice_never_runs_opcos_runtime_cli(opcos, tmp_path, monkeypatch):
+    """TK5.1/L7 không áp dụng: voice chỉ IN lệnh `ensure` (init không cài thay) nên không có chỗ gọi CLI để
+    PowerShell biến stderr thành lỗi. Khoá điều đó: dựng lệnh không chạy tiến trình con nào."""
+    import subprocess
+    def boom(*a, **k):
+        raise AssertionError("venv_commands không được chạy tiến trình con")
+    for name in ("run", "Popen", "call", "check_call", "check_output"):
+        monkeypatch.setattr(subprocess, name, boom)
+    _add_cli(opcos)
+    cmds = station.venv_commands(str(tmp_path / "st"), windows=False)
+    assert any(" ensure --repo-dir " in c for c in cmds)
+
+
 def test_requirements_and_lock_contents():
-    assert _lines("voice_studio/clean/requirements-sep.txt") == ["audio-separator[cpu]", "soundfile", "librosa==0.11.0"]
+    # TK5.1/L6b: venv cũ dùng onnxruntime-gpu; `[cpu]` kéo onnxruntime CPU. Dấu môi trường giữ macOS cài được.
+    assert _lines("voice_studio/clean/requirements-sep.txt") == [
+        "audio-separator", 'onnxruntime-gpu; sys_platform == "win32"', 'onnxruntime; sys_platform != "win32"',
+        "soundfile", "librosa==0.11.0"]
+    sep_lock = _lines("locks/sep-windows.txt")
+    assert any(ln.startswith("onnxruntime_gpu==") for ln in sep_lock)
+    assert not any(re.match(r"onnxruntime==", ln) for ln in sep_lock)   # khoá Windows khớp yêu cầu win32
     assert _lines("voice_studio/clean/requirements-cv.txt") == ["clearvoice", "soundfile", "numpy<2"]
     for key in ("omnivoice", "sep", "cv"):
         lines = _lines(f"locks/{key}-windows.txt")
@@ -283,7 +311,7 @@ def test_venv_commands_without_cli(opcos, tmp_path):
     assert cmds[0] == f"python -m venv \"{venv}\""
     assert "pip install torch" in joined and "download.pytorch.org" in joined
     repo = _env.repo_root()
-    assert f"pip install \"{repo}[engine]\"" in joined
+    assert f"pip install \"{repo}[engine,mcp]\"" in joined          # cùng bộ gói với `ensure` (TK5.1/L6)
     assert not _is_editable(cmds) and "opcos-runtime" not in joined
 
 

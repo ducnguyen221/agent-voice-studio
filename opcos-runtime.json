@@ -8,7 +8,7 @@
       "key": "omnivoice",
       "python": "3.12",
       "install": {
-        "package": ".[engine]",
+        "package": ".[engine,mcp]",
         "torch": true,
         "requirements": [],
         "constraints": {

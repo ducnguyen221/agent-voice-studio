@@ -155,7 +155,7 @@ def venv_commands(st, windows=None):
     Ba nhánh theo `runtime/` của OpcOS (`_env.runtime_root()`):
     · có R và CLI `opcos-runtime` ⇒ `opcos-runtime ensure --repo-dir <repo> --only venvs/omnivoice` (tạo
       `R/venvs/agent-voice-studio/omnivoice`, đủ gói theo `opcos-runtime.json`);
-    · có R, chưa có CLI ⇒ `python -m venv` + torch + `pip install "<repo>[engine]"` vào chính đích đó;
+    · có R, chưa có CLI ⇒ `python -m venv` + torch + `pip install "<repo>[engine,mcp]"` vào chính đích đó (cùng bộ gói với `ensure`);
     · không có R ⇒ lệnh cũ nguyên văn (venv trong trạm, cài `-e`).
     Hai nhánh đầu cài gói dạng BẢN SAO (không `-e`): sửa mã repo xong phải chạy lại `ensure --upgrade`.
     """
@@ -186,7 +186,7 @@ def venv_commands(st, windows=None):
             f"python -m venv \"{venv}\"",
             f"{run} -m {torch}",
             # Bản sao (không -e): sửa mã repo xong phải cài lại.
-            f"{run} -m pip install \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio (bản sao)",
+            f"{run} -m pip install \"{repo}[engine,mcp]\"   # omnivoice==0.2.1 + MCP + lệnh voice-studio (bản sao)",
             check,
             first_run,
         ]
