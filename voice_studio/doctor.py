@@ -321,13 +321,15 @@ def win_path_check(venv, windows=None, dir_rel=None, file_rel=None):
     """Cảnh báo đường venv engine quá dài trên Windows; hệ khác ⇒ None.
 
     Đo trên venv THẬT đang dùng (`_env.engine_venv()`), theo hai ngưỡng. `dir_rel`/`file_rel` mặc định
-    đọc từ `opcos-runtime.json` của repo (không có thì số đo của venv engine).
+    theo `_env.engine_path_budget(venv)`: venv có `.opcos-resource.json` (cài theo khoá, torch 2.12) dùng số
+    khai trong `opcos-runtime.json` (109/150); venv KHÔNG có tệp khai sinh (torch cài không ghim, >= 2.13) dùng
+    186/197 — nếu dùng 109/150 thì doctor báo xanh sai (phép đo PV-T22: gốc > ~88 ký tự gãy WinError 206).
     """
     windows = (os.name == "nt") if windows is None else windows
     if not windows:
         return None
     if dir_rel is None or file_rel is None:
-        d, f = _env.venv_path_budget("omnivoice")
+        d, f = _env.engine_path_budget(venv)
         dir_rel = d if dir_rel is None else dir_rel
         file_rel = f if file_rel is None else file_rel
     n = len(os.path.abspath(venv)) if os.name == "nt" else len(venv)

@@ -356,9 +356,11 @@ RESOURCE_MANIFEST = ".opcos-resource.json"
 _SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 _WIN_RESERVED = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$", re.IGNORECASE)
 _SLUG_MAX = 64
-# Số đo `paths` của venv engine (omnivoice) — dùng khi không đọc được `opcos-runtime.json`
-# (cài dạng wheel không mang tệp đó theo).
-DEFAULT_PATH_BUDGET = (109, 150)
+# Ngân sách đường dài (`dir_rel`, `file_rel`) khi venv engine KHÔNG cài theo khoá: `pip install torch` không ghim
+# kéo torch >= 2.13, thư mục giấy phép lồng sâu ~160 ký tự (phép đo PV-T22: gốc > ~88 ký tự là gãy WinError 206)
+# ⇒ dùng số đo PLAN TK5 cho venv torch 2.13 (sep/cv): 186/197. Số 109/150 của `opcos-runtime.json` chỉ đúng với
+# torch 2.12 mà khoá `locks/omnivoice-windows.txt` ghim, tức venv do `opcos-runtime` dựng (có tệp khai sinh).
+DEFAULT_PATH_BUDGET = (186, 197)
 
 
 def _bad_key(what, value, why):
@@ -432,8 +434,8 @@ def opcos_runtime_cli(windows=None, env=None, home=None, isfile=None):
 
 
 def venv_path_budget(key="omnivoice", repo=None):
-    """(`dir_rel`, `file_rel`) của venv `key` khai trong `<repo>/opcos-runtime.json`; không có thì số đo
-    của venv engine (`DEFAULT_PATH_BUDGET`). Dùng cho phép kiểm đường dài của `doctor` (FR3.8)."""
+    """(`dir_rel`, `file_rel`) của venv `key` khai trong `<repo>/opcos-runtime.json`; không khai/không có tệp
+    thì `DEFAULT_PATH_BUDGET` (186/197). Dùng cho phép kiểm đường dài của `doctor` (FR3.8)."""
     repo = repo or repo_root()
     doc = read_json(os.path.join(repo, NEEDS_FILE))[0] if repo else {}
     for n in doc.get("needs") or []:
@@ -441,6 +443,15 @@ def venv_path_budget(key="omnivoice", repo=None):
             p = n.get("paths") or {}
             if isinstance(p.get("dir_rel"), int) and isinstance(p.get("file_rel"), int):
                 return p["dir_rel"], p["file_rel"]
+    return DEFAULT_PATH_BUDGET
+
+
+def engine_path_budget(venv, repo=None):
+    """Ngân sách đường dài của venv engine `venv`: có `.opcos-resource.json` (cài theo khoá, torch ghim) ⇒ số
+    khai trong `opcos-runtime.json` (109/150); không có (venv tự dựng, torch không ghim) ⇒ 186/197 — xem
+    `DEFAULT_PATH_BUDGET`."""
+    if venv and (Path(venv) / RESOURCE_MANIFEST).is_file():
+        return venv_path_budget("omnivoice", repo)
     return DEFAULT_PATH_BUDGET
 
 

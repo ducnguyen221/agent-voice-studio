@@ -813,12 +813,12 @@ def test_doctor_json_keeps_old_level_names(tmp_path, monkeypatch, capsys):
     assert by_name(res)["station"]["ok"] is True and by_name(res)["synthesis"]["level"] == "not_checked"
 
 
-# Ngưỡng theo số đo venv engine 109/150 (opcos-runtime.json): thư mục 248, tệp 260 ⇒ gốc dài hơn 139 ký tự là WARN.
+# Venv không có tệp khai sinh (torch cài không ghim): ngân sách 186/197 — thư mục 248, tệp 260 ⇒ gốc dài hơn
+# 62 ký tự là WARN (ca 87 ký tự = ca gãy WinError 206 đã đo). Có tệp khai sinh: 109/150, xem test_runtime_resource_voice.
 @pytest.mark.parametrize("venv,level", [
     ("C:\\st\\omnivoice\\.venv", "ok"),
     ("C:\\Users\\someone\\AppData\\Local\\Temp\\vs-t22\\agent-voice-studio\\workspace\\omnivoice\\.venv",
-     "ok"),
-    ("C:\\" + "x" * 150 + "\\omnivoice\\.venv", "warn"),
+     "warn"),
 ])
 def test_doctor_warns_long_engine_venv_path_on_windows(venv, level):
     c = doctor.win_path_check(venv, windows=True)

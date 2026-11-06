@@ -32,7 +32,7 @@ Trạm nằm ở đâu khi không đặt gì: `<repo>/workspaces/`. Thứ tự t
 |---|---|---|
 | `[WARN] runtime` — `RT_NO_OPCOS` | máy không có OpcOS (không `OPCOS_RUNTIME`, `OPCOS_ROOT`, `~/OpcOS/paths.json`) | không sao nếu plugin cài lẻ: venv ở trong trạm như trước; có OpcOS thì đặt `OPCOS_RUNTIME` rồi `opcos-runtime ensure --repo-dir <repo>` |
 | `[WARN] runtime` — `RT_ORPHAN` | venv engine nằm dưới `$OPCOS_RUNTIME/venvs/agent-voice-studio/` nhưng thiếu `.opcos-resource.json` (dựng tay, không qua `opcos-runtime`) | dựng lại bằng `opcos-runtime ensure --repo-dir <repo>`; đừng tạo venv trong `workspaces/` trên máy có OpcOS (`opcos-runtime audit` báo đỏ) |
-| `[WARN] win-path` | gốc venv quá dài: gốc + 109 > 248 (thư mục) hoặc gốc + 150 > 260 (tệp) khi Windows chưa bật đường dài | đặt runtime/trạm ở đường ngắn; `LongPathsEnabled` là việc của quản trị máy |
+| `[WARN] win-path` | gốc venv quá dài khi Windows chưa bật đường dài: gốc + `dir_rel` > 248 (thư mục) hoặc gốc + `file_rel` > 260 (tệp); venv có `.opcos-resource.json` dùng 109/150, venv dựng tay (torch không ghim) dùng 186/197 | đặt runtime/trạm ở đường ngắn; `LongPathsEnabled` là việc của quản trị máy |
 
 ## Tên biến cũ — `[WARN] env-name`
 

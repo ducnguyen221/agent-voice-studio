@@ -174,8 +174,8 @@ def test_needs_path_budget_read_by_doctor():
     assert _env.venv_path_budget("omnivoice", repo=str(ROOT)) == (109, 150)
     assert _env.venv_path_budget("sep", repo=str(ROOT)) == (186, 197)
     assert _env.venv_path_budget("cv", repo=str(ROOT)) == (186, 197)
-    assert _env.venv_path_budget("không-có", repo=str(ROOT)) == (109, 150)   # không khai ⇒ số đo của venv engine
-    assert _env.venv_path_budget("sep") == (109, 150)                         # không có repo/tệp ⇒ số đo mặc định
+    assert _env.venv_path_budget("không-có", repo=str(ROOT)) == (186, 197)   # không khai ⇒ ngân sách venv torch không ghim
+    assert _env.venv_path_budget("sep") == (186, 197)                         # không có repo/tệp ⇒ ngân sách mặc định
 
 
 # ── cây runtime giả ─────────────────────────────────────────────────────────────────────
@@ -517,3 +517,80 @@ def test_clean_resolvers_agree_with_package_resolver(opcos):
 
 def test_clean_resolver_none_without_opcos():
     assert clean_voice._runtime_resource("venvs", "sep") is None
+
+
+# ── ngân sách đường dài: có / không có tệp khai sinh (review vòng 1) ───────────────────────
+
+def _venv_len(p):
+    return len(os.path.abspath(p)) if os.name == "nt" else len(str(p))
+
+
+def test_win_path_budget_without_manifest_is_186_197(tmp_path):
+    """Venv KHÔNG có `.opcos-resource.json` (torch cài không ghim, >= 2.13) ⇒ 186/197, không phải 109/150."""
+    venv = tmp_path / "venv"
+    venv.mkdir()
+    n = _venv_len(venv)
+    assert _env.engine_path_budget(venv, repo=str(ROOT)) == (186, 197)
+    c = doctor.win_path_check(str(venv), windows=True)
+    assert f"thư mục sâu nhất {n + 186}/248" in c["detail"] and f"tệp dài nhất {n + 197}/260" in c["detail"]
+
+
+def test_win_path_budget_with_manifest_uses_declared_numbers(tmp_path, monkeypatch):
+    """Có tệp khai sinh (cài theo khoá, torch 2.12) ⇒ `dir_rel`/`file_rel` khai trong opcos-runtime.json (109/150)."""
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(ROOT))
+    venv = tmp_path / "venv"
+    venv.mkdir()
+    (venv / ".opcos-resource.json").write_text("{}", encoding="utf-8")
+    n = _venv_len(venv)
+    assert _env.engine_path_budget(venv) == (109, 150)
+    c = doctor.win_path_check(str(venv), windows=True)
+    assert f"thư mục sâu nhất {n + 109}/248" in c["detail"] and f"tệp dài nhất {n + 150}/260" in c["detail"]
+
+
+def test_win_path_budget_differs_at_the_boundary(tmp_path, monkeypatch):
+    """Gốc 64..110 ký tự: không tệp khai sinh ⇒ WARN (186 + n > 248); có tệp khai sinh ⇒ PASS (109/150 vừa)."""
+    monkeypatch.setenv("VOICE_STUDIO_REPO", str(ROOT))
+    n = _venv_len(tmp_path / "v")
+    if n > 110:
+        pytest.skip("tmp_path quá dài cho ca biên")
+    venv = tmp_path / ("p" * max(0, 64 - n) + "v")
+    venv.mkdir()
+    assert 64 <= _venv_len(venv) <= 110
+    assert doctor.win_path_check(str(venv), windows=True)["level"] == "warn"
+    (venv / ".opcos-resource.json").write_text("{}", encoding="utf-8")
+    assert doctor.win_path_check(str(venv), windows=True)["level"] == "ok"
+
+
+# ── clean_voice: tiến trình cha chạy lại trong venv `sep` ──────────────────────────────────
+
+def test_clean_reexec_passes_chosen_values_and_exit_code(opcos, tmp_path, monkeypatch):
+    station_dir = tmp_path / "st"
+    clean_dir = station_dir / "voice-clean"
+    monkeypatch.setenv("VOICE_STATION", str(station_dir))
+    rt_sep = _make_venv(opcos / "runtime" / "venvs" / REPO_KEY / "sep")
+    rt_cv = _make_venv(opcos / "runtime" / "venvs" / REPO_KEY / "cv")
+    models = opcos / "runtime" / "engines" / REPO_KEY / "clean"
+    models.mkdir(parents=True)
+    calls = []
+
+    class Done:
+        returncode = 7
+
+    monkeypatch.setattr(clean_voice, "_need_reexec", lambda args: True)
+    monkeypatch.setattr(clean_voice.subprocess, "run", lambda argv, *a, **k: (calls.append(argv), Done())[1])
+    rc = clean_voice.main(["in.mp3", "--no-enhance"])
+    assert rc == 7                                              # mã thoát của tiến trình con chuyển nguyên
+    assert len(calls) == 1
+    argv = calls[0]
+    assert _same(argv[0], rt_sep) and _same(argv[1], clean_voice.__file__)
+    rest = argv[2:]
+    assert rest[:2] == ["in.mp3", "--no-enhance"]
+    assert _same(rest[rest.index("--clean-dir") + 1], clean_dir)
+    assert _same(rest[rest.index("--cv-python") + 1], rt_cv)
+    assert _same(rest[rest.index("--models-dir") + 1], models)
+    # người dùng đã truyền --clean-dir ⇒ không thêm lần nữa, và venv tầng 1 theo đường tường minh
+    old_sep = _make_venv(clean_dir / ".venv-sep")
+    calls.clear()
+    rc = clean_voice.main(["in.mp3", "--clean-dir", str(clean_dir)])
+    argv = calls[0]
+    assert argv.count("--clean-dir") == 1 and _same(argv[0], old_sep)
