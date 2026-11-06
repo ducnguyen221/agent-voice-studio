@@ -813,10 +813,12 @@ def test_doctor_json_keeps_old_level_names(tmp_path, monkeypatch, capsys):
     assert by_name(res)["station"]["ok"] is True and by_name(res)["synthesis"]["level"] == "not_checked"
 
 
+# Ngưỡng theo số đo venv engine 109/150 (opcos-runtime.json): thư mục 248, tệp 260 ⇒ gốc dài hơn 139 ký tự là WARN.
 @pytest.mark.parametrize("venv,level", [
     ("C:\\st\\omnivoice\\.venv", "ok"),
     ("C:\\Users\\someone\\AppData\\Local\\Temp\\vs-t22\\agent-voice-studio\\workspace\\omnivoice\\.venv",
-     "warn"),
+     "ok"),
+    ("C:\\" + "x" * 150 + "\\omnivoice\\.venv", "warn"),
 ])
 def test_doctor_warns_long_engine_venv_path_on_windows(venv, level):
     c = doctor.win_path_check(venv, windows=True)

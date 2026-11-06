@@ -151,9 +151,17 @@ def venv_commands(st, windows=None):
     Cú pháp theo shell mặc định của hệ điều hành: PowerShell trên Windows (gọi exe có dấu nháy
     phải qua `&`, biến môi trường đặt bằng `$env:`), sh/zsh ở nơi khác. Một lệnh dán vào sai
     shell là lỗi cú pháp ngay dòng đầu — người mới không biết đó là lỗi của tài liệu.
+
+    Ba nhánh theo `runtime/` của OpcOS (`_env.runtime_root()`):
+    · có R và CLI `opcos-runtime` ⇒ `opcos-runtime ensure --repo-dir <repo> --only venvs/omnivoice` (tạo
+      `R/venvs/agent-voice-studio/omnivoice`, đủ gói theo `opcos-runtime.json`);
+    · có R, chưa có CLI ⇒ `python -m venv` + torch + `pip install "<repo>[engine]"` vào chính đích đó;
+    · không có R ⇒ lệnh cũ nguyên văn (venv trong trạm, cài `-e`).
+    Hai nhánh đầu cài gói dạng BẢN SAO (không `-e`): sửa mã repo xong phải chạy lại `ensure --upgrade`.
     """
     windows = (os.name == "nt") if windows is None else windows
-    venv = os.path.join(st, "omnivoice", ".venv")
+    rt = _env.runtime_resource("venvs", "omnivoice")
+    venv = str(rt) if rt is not None else os.path.join(st, "omnivoice", ".venv")
     py = os.path.join(venv, "Scripts", "python.exe") if windows else os.path.join(venv, "bin", "python")
     run = f"& \"{py}\"" if windows else f"\"{py}\""
     repo = _env.repo_root() or "<thư mục repo agent-voice-studio>"
@@ -165,14 +173,31 @@ def venv_commands(st, windows=None):
              f"--out \"{out_wav}\" --json")
     online = (f"$env:OMNIVOICE_ONLINE = \"1\"; {first}; Remove-Item Env:OMNIVOICE_ONLINE" if windows
               else f"OMNIVOICE_ONLINE=1 {first}")
+    check = f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)"
+    first_run = online + "   # lần tổng hợp đầu: tải weights (~3,3 GB)"
+    if rt is not None:
+        cli = _env.opcos_runtime_cli(windows=windows)
+        if cli:
+            head = " ".join(f"\"{a}\"" if os.sep in a or "/" in a else a for a in cli)
+            return [f"{head} ensure --repo-dir \"{repo}\" --only venvs/omnivoice --torch-index auto"
+                    "   # tạo venv engine ở runtime/ (gói cài dạng bản sao; sửa mã xong: thêm --upgrade)",
+                    check, first_run]
+        return [
+            f"python -m venv \"{venv}\"",
+            f"{run} -m {torch}",
+            # Bản sao (không -e): sửa mã repo xong phải cài lại.
+            f"{run} -m pip install \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio (bản sao)",
+            check,
+            first_run,
+        ]
     return [
         f"python -m venv \"{venv}\"",
         f"{run} -m {torch}",
         # Phần phụ `engine` = omnivoice==0.2.1 + transformers trong khoảng đã đo (pyproject.toml).
         f"{run} -m pip install -e \"{repo}[engine]\"   # omnivoice==0.2.1 + lệnh voice-studio; "
         "xưởng Windows chạy lịch có trạm riêng: bỏ -e (docs/INSTALL.md mục 3)",
-        f"{run} -m voice_studio doctor   # kiểm engine (không tải gì)",
-        online + "   # lần tổng hợp đầu: tải weights (~3,3 GB)",
+        check,
+        first_run,
     ]
 
 
@@ -212,6 +237,9 @@ def host_venv(st, repo=None, prefix=None, base_prefix=None, engine_ok=None):
     repo = repo if repo is not None else _env.repo_root()
     if _under(prefix, os.path.join(st, "omnivoice", ".venv")) or _under(prefix, repo):
         return None
+    rt = _env.runtime_root()
+    if rt is not None and _under(prefix, os.path.join(str(rt), "venvs", _env.RUNTIME_REPO_KEY)):
+        return None                   # venv engine do `opcos-runtime` dựng ở runtime/ (FR6.3)
     if engine_ok is None:
         import importlib.util
         engine_ok = all(importlib.util.find_spec(m) is not None for m in ("torch", "omnivoice"))
@@ -502,13 +530,19 @@ def _station_json(st, mode, existing):
     if os.path.isfile(dfile):
         with open(dfile, "r", encoding="utf-8") as f:
             default = f.read().strip() or None
-    venv_exists = os.path.isdir(os.path.join(st, "omnivoice", ".venv"))
+    # Venv engine: trạm ĐÃ có venv trong trạm (trạm cũ/đang chạy) giữ dạng tương đối như trước; trạm MỚI
+    # trên máy có OpcOS ghi đường TUYỆT ĐỐI tới `runtime/venvs/agent-voice-studio/omnivoice` (FR6.1);
+    # máy không có OpcOS: `omnivoice/.venv`. `data.update(cur)` bên dưới vẫn giữ giá trị đã có (FR6.2).
+    venv_exists = _env.engine_venv(st).is_dir()
+    rt = _env.runtime_resource("venvs", "omnivoice")
+    in_station = os.path.isdir(os.path.join(st, "omnivoice", ".venv"))
+    venv_value = str(rt) if (rt is not None and not in_station) else "omnivoice/.venv"
     computed = {
         "contract": API_VERSION,
         "mode": mode,
         "device": None,
         "default_profile": default,
-        "venv": "omnivoice/.venv",
+        "venv": venv_value,
         "engine_dir": "omnivoice",
         "bgm_dir": "assets/bgm",
     }

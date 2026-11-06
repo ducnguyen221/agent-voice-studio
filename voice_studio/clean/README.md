@@ -12,6 +12,17 @@ tách giọng người khỏi nhạc rồi khử tạp âm, ra một file WAV s�
 Hai tầng cần **hai venv riêng** vì xung đột numpy (tầng 1 cần numpy ≥ 2, tầng 2 cần numpy < 2).
 Không cài chung vào venv engine giọng.
 
+## Máy có OpcOS
+
+Hai venv và mô hình nằm ở `runtime/`, không phải trong trạm: `$OPCOS_RUNTIME/venvs/agent-voice-studio/sep`,
+`…/cv` và `$OPCOS_RUNTIME/engines/agent-voice-studio/clean` (gồm `models/`, `checkpoints/`). Tạo venv bằng
+`opcos-runtime ensure --repo-dir <repo> --only venvs/sep` rồi `--only venvs/cv`, theo `opcos-runtime.json` (danh sách gói:
+`requirements-sep.txt`, `requirements-cv.txt` cạnh file này; khoá phiên bản Windows ở `locks/`). Thứ tự tìm của
+`voice-studio clean`: `--clean-dir` / `VOICE_CLEAN_DIR` (đè) → venv ở runtime nếu có → `.venv-sep`, `.venv-cv` trong
+thư mục công cụ dưới đây; mô hình: `VOICE_CLEAN_MODELS` (đè) → `engines/agent-voice-studio/clean` nếu có → thư mục công cụ.
+`VOICE_STATION` chỉ chọn thư mục công cụ, không đè venv ở runtime. Đừng tạo venv trong `workspaces/` trên máy có OpcOS
+(`opcos-runtime audit` báo đỏ). Máy không có OpcOS: làm theo hai mục dưới.
+
 ## Thư mục công cụ
 
 Mọi thứ nặng nằm ở **trạm**, không nằm trong repo:

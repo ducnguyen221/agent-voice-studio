@@ -1,0 +1,5 @@
+# Tầng 1 của `voice-studio clean` (venv `sep`): tách giọng khỏi nhạc. Nguồn: voice_studio/clean/README.md.
+# `opcos-runtime ensure --only venvs/sep` cài từ tệp này; khoá phiên bản Windows ở locks/sep-windows.txt.
+audio-separator[cpu]
+soundfile
+librosa==0.11.0

@@ -1,0 +1,55 @@
+{
+  "schema": "opcos-runtime-needs/1",
+  "repoKey": "agent-voice-studio",
+  "needs": [
+    {
+      "scope": "own",
+      "category": "venvs",
+      "key": "omnivoice",
+      "python": "3.12",
+      "install": {
+        "package": ".[engine]",
+        "torch": true,
+        "requirements": [],
+        "constraints": {
+          "windows": ["locks/omnivoice-windows.txt"]
+        }
+      },
+      "paths": {"dir_rel": 109, "file_rel": 150}
+    },
+    {
+      "scope": "own",
+      "category": "venvs",
+      "key": "sep",
+      "python": "3.12",
+      "install": {
+        "torch": true,
+        "requirements": ["voice_studio/clean/requirements-sep.txt"],
+        "constraints": {
+          "windows": ["locks/sep-windows.txt"]
+        }
+      },
+      "paths": {"dir_rel": 186, "file_rel": 197}
+    },
+    {
+      "scope": "own",
+      "category": "venvs",
+      "key": "cv",
+      "python": "3.12",
+      "install": {
+        "torch": true,
+        "requirements": ["voice_studio/clean/requirements-cv.txt"],
+        "constraints": {
+          "windows": ["locks/cv-windows.txt"]
+        }
+      },
+      "paths": {"dir_rel": 186, "file_rel": 197}
+    },
+    {
+      "scope": "own",
+      "category": "engines",
+      "key": "clean",
+      "install": {"kind": "files"}
+    }
+  ]
+}

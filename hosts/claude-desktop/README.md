@@ -22,7 +22,9 @@ cho bạn. Muốn đủ quy trình (dựng profile, viết kịch bản, kiểm 
    ```
 
    `<python của venv engine>`: `<trạm>/omnivoice/.venv/Scripts/python.exe` trên Windows,
-   `<trạm>/omnivoice/.venv/bin/python` trên macOS. Đặt `VOICE_STATION` ngay trong mục vì Claude
+   `<trạm>/omnivoice/.venv/bin/python` trên macOS (máy có OpcOS: venv ở
+   `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice`, đường tuyệt đối — `init` ghi vào `station.json: venv`
+   của trạm mới). Đặt `VOICE_STATION` ngay trong mục vì Claude
    Desktop không chạy trong thư mục repo.
 3. Thoát hẳn Claude Desktop (khay hệ thống / menu ứng dụng) rồi mở lại; tìm `omnivoice-tts` trong
    danh sách công cụ, hỏi thử "gọi `get_status`".

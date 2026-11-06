@@ -26,7 +26,8 @@ có giấy phép rõ ràng.
 ## Cần gì
 
 - Một venv có `torch`, `transformers`, `soundfile` — có thể dùng luôn venv engine của trạm:
-  `pip install transformers` vào đó.
+  `pip install transformers` vào đó (máy có OpcOS: venv engine ở `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice`;
+  gói cài thêm tay không nằm trong `opcos-runtime.json` nên `opcos-runtime` không theo dõi).
 - `ffmpeg` (để đổi sang mp3 — thư viện đọc `<style>.mp3`).
 - GPU NVIDIA cho tốc độ dùng được; CPU chạy được nhưng chậm nhiều lần. Trên Apple Silicon
   script dùng CPU `[chưa kiểm MPS]`.

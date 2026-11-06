@@ -30,6 +30,16 @@ Hai chế độ cài (F17) dùng chung MỘT thứ tự phân giải trạm — 
 và thiếu cả biến lẫn cấu hình thì `station_dir()` báo mã 3 (không tự tạo thư mục nào ở thư mục cá nhân).
 `station.json` ở gốc trạm có thể khai `engine_dir`, `bgm_dir` (tương đối theo gốc trạm).
 
+Máy có OpcOS: venv engine và mô hình dọn giọng được cài ở `runtime/` (hợp đồng `runtime-resource-v1`):
+
+    $OPCOS_RUNTIME → $OPCOS_ROOT/runtime → (`~/OpcOS/paths.json` có ⇒ `~/OpcOS/runtime`) → không có
+
+    R/venvs/agent-voice-studio/omnivoice   venv engine           (`engine_venv()`)
+    R/venvs/agent-voice-studio/sep|cv      venv dọn giọng         (`clean/clean_voice.py`, tự chứa)
+    R/engines/agent-voice-studio/clean     mô hình dọn giọng      (`models/`, `checkpoints/`)
+
+Không có gốc nào (plugin cài lẻ, CI) thì dùng đích cũ trong trạm — không phải lỗi (`RT_NO_OPCOS`).
+
 Biến cấu hình đi theo thứ tự riêng: biến môi trường thật → `<repo>/.env` (**chỉ** khi
 `studio.local.json: mode = embedded`) → chưa đặt. Chế độ `separate` KHÔNG bao giờ tự nạp
 `.env`: ở đó repo có thể là bản public của chính người dùng, và tự nạp một file nằm trong
@@ -38,9 +48,11 @@ khuôn tên biến ở `<repo>/.env.example`.
 """
 import json
 import os
+import re
 import shutil
 import sys
 import warnings
+from pathlib import Path
 
 LOCAL_CONFIG = "studio.local.json"
 STATION_NAME = "voice"                   # tên trạm = thư mục con `voice` trong OPCOS_WORKSPACES khi cài cạnh OpcOS
@@ -331,6 +343,128 @@ def engine_dir():
     if src == "OMNIVOICE_DIR":
         return _expand(env("OMNIVOICE_DIR"))
     return _from_station("engine_dir", "omnivoice")
+
+
+# ── runtime/ của OpcOS (hợp đồng runtime-resource-v1 + runtime-layout-v2) ──────────────────────
+
+RUNTIME_REPO_KEY = "agent-voice-studio"
+RUNTIME_CATEGORIES = ("mcp", "engines", "tools", "venvs", "scripts", "bin", "maintenance", "state",
+                      "logs", "cache", "backups", "_archive")
+NEEDS_FILE = "opcos-runtime.json"
+RESOURCE_MANIFEST = ".opcos-resource.json"
+# slugPattern + windowsReservedPattern + slugMaxLength của runtime-layout-v2.json
+_SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_WIN_RESERVED = re.compile(r"^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\..*)?$", re.IGNORECASE)
+_SLUG_MAX = 64
+# Số đo `paths` của venv engine (omnivoice) — dùng khi không đọc được `opcos-runtime.json`
+# (cài dạng wheel không mang tệp đó theo).
+DEFAULT_PATH_BUDGET = (109, 150)
+
+
+def _bad_key(what, value, why):
+    return ValueError(f"RT_BAD_KEY {what} {value!r}: {why}")
+
+
+def _check_slug(what, value):
+    if (not isinstance(value, str) or not _SLUG.match(value) or len(value) > _SLUG_MAX
+            or _WIN_RESERVED.match(value)):
+        raise _bad_key(what, value, f"phải khớp {_SLUG.pattern}, dài ≤ {_SLUG_MAX}, "
+                                    "không phải tên dành riêng của Windows")
+
+
+def runtime_root(env=None, home=None, isfile=None):
+    """Gốc runtime R theo hợp đồng, hoặc None khi máy không có OpcOS (`RT_NO_OPCOS` — không phải lỗi).
+
+        $OPCOS_RUNTIME → $OPCOS_ROOT/runtime → (`<home>/OpcOS/paths.json` có ⇒ `<home>/OpcOS/runtime`) → None
+
+    `env` (dict, mặc định `os.environ`), `home` (mặc định thư mục cá nhân) và `isfile` (mặc định
+    `os.path.isfile`) chỉ để test thuần. Biến rỗng/khoảng trắng coi như chưa đặt. Không tạo gì.
+    """
+    environ = os.environ if env is None else env
+
+    def get(name):
+        return (environ.get(name) or "").strip()
+
+    if get("OPCOS_RUNTIME"):
+        return Path(get("OPCOS_RUNTIME"))
+    if get("OPCOS_ROOT"):
+        return Path(get("OPCOS_ROOT")) / "runtime"
+    base = Path(home if home is not None else os.path.expanduser("~")) / "OpcOS"
+    if (isfile or os.path.isfile)(base / "paths.json"):
+        return base / "runtime"
+    return None
+
+
+def _resource_path(category, repo_key, resource_key, env=None, home=None, isfile=None):
+    """`R/<category>/<repoKey>/<resourceKey>` hoặc None (không có R). Khoá sai ⇒ ValueError("RT_BAD_KEY …")
+    — kiểm TRƯỚC khi tìm R, để khoá sai báo lỗi cả trên máy không có OpcOS."""
+    if category not in RUNTIME_CATEGORIES:
+        raise _bad_key("category", category, "không thuộc 12 category của runtime-layout-v2")
+    _check_slug("repoKey", repo_key)
+    if repo_key == "shared":
+        raise _bad_key("repoKey", repo_key, "`shared` dành riêng cho tài nguyên dùng chung")
+    _check_slug("resourceKey", resource_key)
+    root = runtime_root(env=env, home=home, isfile=isfile)
+    return None if root is None else root / category / repo_key / resource_key
+
+
+def runtime_resource(category, resource_key, env=None, home=None, isfile=None):
+    """Đích tài nguyên RIÊNG của repo này: `R/<category>/agent-voice-studio/<resource_key>`; None nếu máy
+    không có OpcOS (dùng đích cũ). Không kiểm tồn tại — chỗ gọi tự `is_dir()`."""
+    return _resource_path(category, RUNTIME_REPO_KEY, resource_key, env=env, home=home, isfile=isfile)
+
+
+def opcos_runtime_cli(windows=None, env=None, home=None, isfile=None):
+    """Lệnh gọi CLI `opcos-runtime` (dạng argv, chưa kèm lệnh con), hoặc None khi không có R hay không
+    có tệp vỏ — nghĩa là chưa cài công cụ, KHÔNG phải lỗi.
+
+    Tệp vỏ ở `<R>/../system/operations/runtime/opcos-runtime.ps1` (Windows, chạy qua PowerShell) hoặc `.sh`.
+    """
+    root = runtime_root(env=env, home=home, isfile=isfile)
+    if root is None:
+        return None
+    windows = (os.name == "nt") if windows is None else windows
+    name = "opcos-runtime.ps1" if windows else "opcos-runtime.sh"
+    script = root.parent / "system" / "operations" / "runtime" / name
+    if not (isfile or os.path.isfile)(script):
+        return None
+    return ["powershell", "-NoProfile", "-File", str(script)] if windows else ["bash", str(script)]
+
+
+def venv_path_budget(key="omnivoice", repo=None):
+    """(`dir_rel`, `file_rel`) của venv `key` khai trong `<repo>/opcos-runtime.json`; không có thì số đo
+    của venv engine (`DEFAULT_PATH_BUDGET`). Dùng cho phép kiểm đường dài của `doctor` (FR3.8)."""
+    repo = repo or repo_root()
+    doc = read_json(os.path.join(repo, NEEDS_FILE))[0] if repo else {}
+    for n in doc.get("needs") or []:
+        if isinstance(n, dict) and n.get("category") == "venvs" and n.get("key") == key:
+            p = n.get("paths") or {}
+            if isinstance(p.get("dir_rel"), int) and isinstance(p.get("file_rel"), int):
+                return p["dir_rel"], p["file_rel"]
+    return DEFAULT_PATH_BUDGET
+
+
+def engine_venv(st=None):
+    """Venv engine thật đang dùng (Path). Thứ tự:
+
+        `station.json: venv` tuyệt đối VÀ tồn tại → `R/venvs/agent-voice-studio/omnivoice` nếu tồn tại
+        → `<engine_dir>/.venv`
+
+    `venv` tương đối trong station.json (giá trị mẫu `omnivoice/.venv`) không tính: nó chỉ ghi lại đích
+    cũ. `st` = gốc trạm (mặc định trạm đang phân giải); engine dir của `st` lấy từ station.json của nó.
+    """
+    info = station_info(st) if st else station_info()
+    mine = os.path.expanduser(str(info.get("venv") or "").strip())
+    if mine and os.path.isabs(mine) and os.path.isdir(mine):
+        return Path(mine)
+    rt = runtime_resource("venvs", "omnivoice")
+    if rt is not None and rt.is_dir():
+        return rt
+    if st:
+        rel = os.path.expanduser(str(info.get("engine_dir") or "omnivoice"))
+        eng = rel if os.path.isabs(rel) else os.path.join(st, *rel.replace("\\", "/").split("/"))
+        return Path(eng) / ".venv"
+    return Path(engine_dir()) / ".venv"
 
 
 def voices_dir():
