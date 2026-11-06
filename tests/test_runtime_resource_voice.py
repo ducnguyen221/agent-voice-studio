@@ -547,6 +547,19 @@ def test_win_path_budget_with_manifest_uses_declared_numbers(tmp_path, monkeypat
     assert f"thư mục sâu nhất {n + 109}/248" in c["detail"] and f"tệp dài nhất {n + 150}/260" in c["detail"]
 
 
+def test_win_path_budget_with_manifest_when_package_is_a_copy(tmp_path, monkeypatch):
+    """RF4 (review vòng 2): `ensure` cài gói dạng BẢN SAO ⇒ `repo_root()` None, không đọc được
+    opcos-runtime.json — venv có tệp khai sinh vẫn phải dùng 109/150, không rơi về 186/197."""
+    monkeypatch.delenv("VOICE_STUDIO_REPO", raising=False)
+    monkeypatch.setattr(_env, "repo_root", lambda: None)
+    venv = tmp_path / "venv"
+    venv.mkdir()
+    (venv / ".opcos-resource.json").write_text("{}", encoding="utf-8")
+    assert _env.engine_path_budget(venv) == (109, 150)
+    # hằng số dự phòng phải trùng số khai trong opcos-runtime.json, không lệch âm thầm
+    assert _env.venv_path_budget("omnivoice", str(ROOT)) == _env.LOCKED_ENGINE_BUDGET
+
+
 def test_win_path_budget_differs_at_the_boundary(tmp_path, monkeypatch):
     """Gốc 64..110 ký tự: không tệp khai sinh ⇒ WARN (186 + n > 248); có tệp khai sinh ⇒ PASS (109/150 vừa)."""
     monkeypatch.setenv("VOICE_STUDIO_REPO", str(ROOT))

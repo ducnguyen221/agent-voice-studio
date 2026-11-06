@@ -361,6 +361,9 @@ _SLUG_MAX = 64
 # ⇒ dùng số đo PLAN TK5 cho venv torch 2.13 (sep/cv): 186/197. Số 109/150 của `opcos-runtime.json` chỉ đúng với
 # torch 2.12 mà khoá `locks/omnivoice-windows.txt` ghim, tức venv do `opcos-runtime` dựng (có tệp khai sinh).
 DEFAULT_PATH_BUDGET = (186, 197)
+# Số khai `paths` của venvs/omnivoice trong `opcos-runtime.json` (torch 2.12 theo khoá). Dùng cho venv có tệp khai
+# sinh khi không đọc được tệp nhu cầu — `ensure` cài gói dạng bản sao nên `repo_root()` thường là None (RF4).
+LOCKED_ENGINE_BUDGET = (109, 150)
 
 
 def _bad_key(what, value, why):
@@ -433,7 +436,7 @@ def opcos_runtime_cli(windows=None, env=None, home=None, isfile=None):
     return ["powershell", "-NoProfile", "-File", str(script)] if windows else ["bash", str(script)]
 
 
-def venv_path_budget(key="omnivoice", repo=None):
+def venv_path_budget(key="omnivoice", repo=None, default=DEFAULT_PATH_BUDGET):
     """(`dir_rel`, `file_rel`) của venv `key` khai trong `<repo>/opcos-runtime.json`; không khai/không có tệp
     thì `DEFAULT_PATH_BUDGET` (186/197). Dùng cho phép kiểm đường dài của `doctor` (FR3.8)."""
     repo = repo or repo_root()
@@ -443,15 +446,16 @@ def venv_path_budget(key="omnivoice", repo=None):
             p = n.get("paths") or {}
             if isinstance(p.get("dir_rel"), int) and isinstance(p.get("file_rel"), int):
                 return p["dir_rel"], p["file_rel"]
-    return DEFAULT_PATH_BUDGET
+    return default
 
 
 def engine_path_budget(venv, repo=None):
     """Ngân sách đường dài của venv engine `venv`: có `.opcos-resource.json` (cài theo khoá, torch ghim) ⇒ số
-    khai trong `opcos-runtime.json` (109/150); không có (venv tự dựng, torch không ghim) ⇒ 186/197 — xem
+    khai trong `opcos-runtime.json` (không đọc được tệp đó — gói cài dạng bản sao — thì `LOCKED_ENGINE_BUDGET`,
+    109/150); không có (venv tự dựng, torch không ghim) ⇒ 186/197 — xem
     `DEFAULT_PATH_BUDGET`."""
     if venv and (Path(venv) / RESOURCE_MANIFEST).is_file():
-        return venv_path_budget("omnivoice", repo)
+        return venv_path_budget("omnivoice", repo, default=LOCKED_ENGINE_BUDGET)
     return DEFAULT_PATH_BUDGET
 
 
