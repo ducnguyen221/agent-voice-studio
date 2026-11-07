@@ -1,5 +1,5 @@
 {
-  "_doc": "Mẫu station.json. `voice-studio init` tự viết bản thật ở gốc trạm (bỏ các khoá bắt đầu bằng _). Đường dẫn tương đối tính theo gốc trạm. Xem docs/WORKSPACE.md.",
+  "_doc": "Mẫu station.json. `voice-studio init` tự viết bản thật ở gốc trạm (bỏ các khoá bắt đầu bằng _). Đường dẫn tương đối tính theo gốc trạm. `venv`: `omnivoice/.venv` khi máy không có OpcOS; trạm MỚI trên máy có OpcOS được ghi đường tuyệt đối tới runtime/venvs/agent-voice-studio/omnivoice (giá trị đã có luôn được giữ). Xem docs/WORKSPACE.md.",
   "contract": "1.1.0",
   "mode": "embedded",
   "device": null,

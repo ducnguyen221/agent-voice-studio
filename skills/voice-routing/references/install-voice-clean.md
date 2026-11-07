@@ -44,6 +44,14 @@ gàng; đó là cách sắp xếp duy nhất chạy được. Không cài chung 
 | 1 — tách giọng | `.venv-sep` | `.venv-sep/Scripts/python.exe` | `.venv-sep/bin/python` |
 | 2 — tăng cường | `.venv-cv` | `.venv-cv/Scripts/python.exe` | `.venv-cv/bin/python` |
 
+Máy có OpcOS: hai venv này ở `$OPCOS_RUNTIME/venvs/agent-voice-studio/sep` và `…/cv`, mô hình ở
+`$OPCOS_RUNTIME/engines/agent-voice-studio/clean`; tạo bằng `opcos-runtime ensure --repo-dir <repo> --only venvs/sep`
+(và `--only venvs/cv`) theo `opcos-runtime.json` — không tự tạo `.venv-sep`, `.venv-cv` trong trạm. Thứ tự tìm của
+`voice-studio clean`: `--clean-dir` / `VOICE_CLEAN_DIR` (đè) → venv ở runtime nếu có → `<dir>/.venv-sep|.venv-cv`
+(`VOICE_STATION` chỉ chọn `<dir>`, không đè venv ở runtime). Mô hình: `VOICE_CLEAN_MODELS` (đè) → thư mục
+`engines/agent-voice-studio/clean` nếu có → `<dir>`. Đừng tạo venv trong `workspaces/` trên máy có OpcOS.
+Phần còn lại của mục này (lệnh `python -m venv`) là đường **không có OpcOS**.
+
 ```bash
 python -m venv <dir>/.venv-sep    # tách giọng
 python -m venv <dir>/.venv-cv     # tăng cường
@@ -64,7 +72,7 @@ không có bản dựng sẵn cho arm64 thì xem trang dự án của nó trư�
 ## Model không nằm trong repo
 
 Lần chạy đầu cần mạng: tầng 1 tải checkpoint vào `<dir>/models/`, tầng 2 tải vào
-`<dir>/checkpoints/`. Các lần sau chạy offline. Chuyển máy thì chép nguyên hai thư mục này
+`<dir>/checkpoints/` (máy có OpcOS: hai thư mục con đó nằm dưới `$OPCOS_RUNTIME/engines/agent-voice-studio/clean`). Các lần sau chạy offline. Chuyển máy thì chép nguyên hai thư mục này
 sang, không cần tải lại. Không bao giờ commit file model vào repo.
 
 ## Hai cái bẫy nữa, nên biết trước khi dính

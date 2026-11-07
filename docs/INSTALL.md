@@ -36,9 +36,18 @@ mức đổi cả cách làm việc.
 
 ## 2. Cài vào venv nào — câu hỏi quan trọng nhất của phần này
 
+Máy có OpcOS: venv engine ở `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice` (dọn giọng `…/sep`, `…/cv`; mô hình dọn giọng `$OPCOS_RUNTIME/engines/agent-voice-studio/clean`), tạo bằng `opcos-runtime ensure --repo-dir <repo>` theo tệp `opcos-runtime.json` (lệnh `voice-studio init` in sẵn). Gói được cài **sao chép**, không `-e`: sửa mã repo xong chạy lại `ensure --upgrade`. Không có OpcOS: venv ở trong trạm như trước (`<trạm>/omnivoice/.venv`). Đừng tạo venv trong `workspaces/` trên máy có OpcOS — `opcos-runtime audit` sẽ báo đỏ.
+
+`$OPCOS_RUNTIME` lấy theo thứ tự: biến `OPCOS_RUNTIME` → `$OPCOS_ROOT/runtime` → `~/OpcOS/runtime` (khi có
+`~/OpcOS/paths.json`) → không có (máy không có OpcOS; `doctor` chỉ cảnh báo `RT_NO_OPCOS`, không lỗi).
+Trạm **mới** ghi đường venv tuyệt đối vào `station.json`; trạm cũ giữ giá trị đang có. Venv, tệp khoá
+phiên bản Windows (`locks/*.txt`) và số đo đường dẫn khai ở `opcos-runtime.json`; Windows chưa bật
+`LongPathsEnabled` thì gốc runtime phải đủ ngắn (thư mục sâu nhất ≤ 248, tệp ≤ 260 ký tự — `doctor` đo trên venv
+thật).
+
 | Bạn định làm gì | Cài vào đâu |
 |---|---|
-| Tổng hợp giọng thật (mọi việc có tiếng) | **venv của engine**, đường chuẩn `<trạm>/omnivoice/.venv` — nơi đã cài torch |
+| Tổng hợp giọng thật (mọi việc có tiếng) | **venv của engine**, đường chuẩn `<trạm>/omnivoice/.venv` (máy có OpcOS: `runtime/venvs/agent-voice-studio/omnivoice`) — nơi đã cài torch |
 | Chỉ `init` / `doctor` / đọc tài liệu | venv nào cũng được |
 | Trạm **video** cũng phải lồng tiếng | **một** venv cho cả hai: engine giọng nằm trong venv của repo video (máy embedded) hoặc repo video cài vào venv engine này (xưởng Windows) — mục 3 |
 
@@ -55,7 +64,7 @@ chỉ trỏ về đây.
 |---|---|---|
 | **Máy phát triển** — bạn sửa repo, hoặc tự gọi lệnh bằng tay | `pip install -e` | sửa mã hay `git pull` là có hiệu lực ngay, không phải cài lại |
 | **Máy embedded** — giọng cài vào **venv của repo video** (repo giọng là bản clone cạnh repo video, trạm ở `<repo giọng>/workspaces/`), kể cả khi máy đó chạy lịch (vd Mac mini) | **`pip install -e`** vào venv của repo video | repo giọng tìm trạm của nó **qua bản clone**; bản sao không biết trạm nằm đâu và lượt render dừng mã 3. Trùng luật ở `agent-video-studio/INSTALL.md` mục 5b |
-| **Xưởng Windows chạy lịch** — trạm giọng **riêng** (`separate`, `VOICE_STATION`) với venv engine riêng `<trạm>/omnivoice/.venv`, scheduled task gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
+| **Xưởng Windows chạy lịch** — trạm giọng **riêng** (`separate`, `VOICE_STATION`) với venv engine riêng `<trạm>/omnivoice/.venv` (máy có OpcOS: venv ở `runtime/`, mục 2), scheduled task gọi `voice-studio` khi không có ai ngồi đó | **bản sao**: `pip install` không `-e` | lượt đang chạy dùng bản đã cài, không đọc mã bạn đang sửa dở hay vừa `git pull`; mã mới chỉ vào khi bạn **chủ động cài lại** |
 
 Bản sao **chỉ** dành cho dòng cuối. Không chắc thì dùng `-e`. Máy phát triển kiêm xưởng chạy lịch:
 cho lịch một venv engine riêng cài bản sao, đừng dùng chung venv `-e`.
@@ -77,7 +86,7 @@ voice-studio --version
 
 ### Máy chạy lịch (bản sao)
 
-Cài vào **python của venv engine** (`<trạm>/omnivoice/.venv`), kèm phần phụ `engine`.
+Cài vào **python của venv engine** (`<trạm>/omnivoice/.venv`), kèm phần phụ `engine`. Máy có OpcOS: `opcos-runtime ensure --repo-dir <repo>` làm đúng việc này và cài vào venv ở `runtime/` (mục 2).
 
 Windows (PowerShell):
 

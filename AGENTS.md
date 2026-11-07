@@ -11,11 +11,17 @@ chép skill hay engine sang trạm; không đưa giọng vào repo.
 | Ở đâu | Chứa gì |
 |---|---|
 | Repo (git theo dõi) | package `voice_studio`, lệnh `voice-studio`, skill `skills/voice-routing/`, tài liệu, test |
-| Trạm giọng (git bỏ qua) | venv engine, profile giọng (`omnivoice/voices/`), nhạc nền, output (`out/`), `station.json` |
+| Trạm giọng (git bỏ qua) | profile giọng (`omnivoice/voices/`), nhạc nền, output (`out/`), `station.json`; venv engine **chỉ khi máy không có OpcOS** |
+| Runtime OpcOS (máy có OpcOS) | venv engine `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice`, venv dọn giọng `…/sep`, `…/cv`; mô hình dọn giọng `$OPCOS_RUNTIME/engines/agent-voice-studio/clean` |
 
 Trạm nằm ở đâu — mọi lệnh dùng chung một thứ tự (chi tiết `docs/WORKSPACE.md`):
 `VOICE_STATION` → `studio.local.json` do `init` ghi → **mặc định `<repo>/workspaces/`** (bị git bỏ
 qua). Chưa biết trạm ở đâu thì chạy `voice-studio doctor`, dòng `station` ghi đường và nguồn.
+
+Máy có OpcOS: venv và mô hình engine do `opcos-runtime ensure --repo-dir <repo>` dựng theo
+`opcos-runtime.json`, cài **sao chép** (sửa mã repo xong chạy lại `ensure --upgrade`). **Không tạo venv
+trong `workspaces/`**: `opcos-runtime audit` báo đỏ. `$OPCOS_RUNTIME` lấy theo thứ tự trong
+`docs/INSTALL.md`; không tìm thấy thì `doctor` chỉ cảnh báo `RT_NO_OPCOS` và venv ở trong trạm như cũ.
 
 `workspaces/` là dữ liệu riêng dù nằm trong checkout: không commit, không đóng gói. Repo **không
 chứa audio nào**; `.gitignore`, hook `pre-commit` (chế độ embedded) và `tests/test_no_identity_leak.py`

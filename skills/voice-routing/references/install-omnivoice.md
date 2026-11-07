@@ -39,8 +39,7 @@ và lệnh Windows/macOS chỉ nằm ở `docs/INSTALL.md` mục 3 của repo; �
 **1. Chọn chỗ đặt trạm** — `voice-studio init` sẽ hỏi; đọc `docs/WORKSPACE.md` của repo nếu
 phân vân. Khuyến nghị cho người mới: **`embedded`** (trạm = `<repo>/workspaces/`).
 
-**2. Clone repo và tạo venv engine.** Đường venv chuẩn là `<trạm>/omnivoice/.venv`; `init` in đúng
-lệnh cho máy bạn — có thể chạy `init` trước (bước 5) rồi quay lại đây.
+**2. Clone repo và tạo venv engine.** Máy có OpcOS: venv engine ở `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice` (dọn giọng `…/sep`, `…/cv`; mô hình dọn giọng `$OPCOS_RUNTIME/engines/agent-voice-studio/clean`), tạo bằng `opcos-runtime ensure --repo-dir <repo>` theo tệp `opcos-runtime.json` (lệnh `voice-studio init` in sẵn) — lệnh đó làm luôn bước 3 và 4 dưới đây. Gói được cài **sao chép**, không `-e`: sửa mã repo xong chạy lại `ensure --upgrade`. Không có OpcOS: venv ở trong trạm như trước, đường chuẩn `<trạm>/omnivoice/.venv`; `init` in đúng lệnh cho máy bạn — có thể chạy `init` trước (bước 5) rồi quay lại đây. Đừng tạo venv trong `workspaces/` trên máy có OpcOS — `opcos-runtime audit` sẽ báo đỏ.
 
 ```bash
 git clone <địa chỉ repo agent-voice-studio>

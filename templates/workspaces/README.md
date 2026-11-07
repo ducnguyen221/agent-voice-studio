@@ -9,7 +9,7 @@ cái nào là nội dung, cái nào là quản lý, cái nào được sao lưu,
 
 ```
 station.json          cấu hình trạm (hợp đồng, venv, thư mục engine, thư viện nhạc nền)
-omnivoice/.venv/      venv engine — bạn tự tạo theo lệnh `init` in ra
+omnivoice/.venv/      venv engine (máy không có OpcOS) — bạn tự tạo theo lệnh `init` in ra; máy có OpcOS: ở runtime/
 omnivoice/voices/     kho profile giọng: <tên>.wav + <tên>.txt, _default.txt
 assets/bgm/           thư viện nhạc nền: bgm-library.json + <style>.mp3
 out/                  output và nháp (VOICE_STUDIO_WORK)

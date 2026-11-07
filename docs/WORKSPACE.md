@@ -101,7 +101,7 @@ với mã 3 kèm cách đặt.
 <trạm>/
 ├── station.json          QUẢN LÝ   cấu hình trạm
 ├── omnivoice/
-│   ├── .venv/            QUẢN LÝ   venv engine (torch, omnivoice, voice_studio)
+│   ├── .venv/            QUẢN LÝ   venv engine (torch, omnivoice, voice_studio) — máy không có OpcOS
 │   └── voices/           CONTENT   kho profile giọng
 │       ├── <tên>.wav     CONTENT   clip tham chiếu
 │       ├── <tên>.txt     CONTENT   lời của clip
@@ -118,12 +118,18 @@ Tuỳ chọn, bạn tự thêm khi cần: `voice-clean/` (công cụ làm sạch
 `voice_studio/clean/README.md`), `musicgen/` (nếu chạy sinh nhạc riêng), `data/`, `.raw/` (bản ghi
 gốc). Chúng không do `init` tạo.
 
+**Máy có OpcOS:** venv engine KHÔNG nằm trong trạm mà ở `$OPCOS_RUNTIME/venvs/agent-voice-studio/omnivoice`
+(dọn giọng `…/sep`, `…/cv`; mô hình dọn giọng `$OPCOS_RUNTIME/engines/agent-voice-studio/clean`, gồm `models/` và
+`checkpoints/`), tạo bằng `opcos-runtime ensure --repo-dir <repo>` theo `opcos-runtime.json`; `station.json: venv` của
+trạm mới ghi đường tuyệt đối tới đó, trạm cũ giữ giá trị đang có. Đừng tạo venv trong `workspaces/` trên máy có
+OpcOS — `opcos-runtime audit` sẽ báo đỏ. Máy không có OpcOS: venv trong trạm như bảng dưới.
+
 ## Từng thư mục
 
 | Thư mục / file | Loại | Mục đích | Ai / cái gì ghi | `export --personal` | `backup` | Nhạy cảm | Xoá được? |
 |---|---|---|---|---|---|---|---|
 | `station.json` | quản lý | hợp đồng (`contract`), chế độ, `venv`, `engine_dir`, `bgm_dir`, `device`, `default_profile` | `init`; bạn sửa tay được | có | có | không | xoá ⇒ `init --existing` dựng lại |
-| `omnivoice/.venv/` | quản lý | Python + torch + engine + package `voice_studio` | bạn, theo lệnh `init` in ra | **không** (cài lại ở máy mới) | **không** | không | được — tạo lại venv là xong |
+| `omnivoice/.venv/` (máy không có OpcOS) | quản lý | Python + torch + engine + package `voice_studio` | bạn, theo lệnh `init` in ra | **không** (cài lại ở máy mới) | **không** | không | được — tạo lại venv là xong |
 | `omnivoice/voices/*.wav, *.txt, *.profile.json` | **content** | giọng của bạn | `make-profile`, `clone`, `lab build`, `lab split` | có | có | **CÓ** — dữ liệu sinh trắc gần đúng | **không** — mất là phải dựng lại từ bản ghi |
 | `omnivoice/voices/_default.txt` | quản lý | profile mặc định | `make-profile --set-default`, bạn | có | có | không | được (mất mặc định: lệnh phải truyền `--profile`) |
 | `omnivoice/voices/*.prompt.pt` | quản lý | cache clone prompt, nhanh gấp ~50 lần lần gọi đầu | engine tự ghi | **không** | **không** | thấp | được — tự dựng lại |

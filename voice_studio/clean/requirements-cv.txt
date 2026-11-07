@@ -1,0 +1,5 @@
+# Tầng 2 của `voice-studio clean` (venv `cv`): khử tạp âm. numpy<2 vì clearvoice xung đột numpy 2 (tách khỏi venv sep).
+# `opcos-runtime ensure --only venvs/cv` cài từ tệp này; khoá phiên bản Windows ở locks/cv-windows.txt.
+clearvoice
+soundfile
+numpy<2

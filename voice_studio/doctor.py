@@ -7,7 +7,9 @@ Kiểm: python · trạm (`VOICE_STATION`, tên cũ `OMNIVOICE_DIR` bị nhắc 
 hai chế độ cài (F17: ĐỎ khi vừa có <repo>/workspaces/ vừa có trạm ngoài; embedded: workspaces/.env
 không bị git theo dõi, repo không nằm trong thư mục đồng bộ đám mây, quyền .env) · kho giọng + profile
 mặc định · thư viện nhạc nền (json + `<style>.mp3` của từng style khai) · ffmpeg · torch + thiết bị · engine `omnivoice` · weights đã có
-trong cache (chạy offline được). Không tải gì, không nạp model.
+trong cache (chạy offline được) · `runtime` (máy có OpcOS: venv engine ở `runtime/` có tệp khai sinh chưa, WARN `RT_ORPHAN`;
+không có OpcOS: WARN `RT_NO_OPCOS`, không lỗi) · `win-path` (đường venv thật so với ngưỡng 248/260 của Windows).
+Không tải gì, không nạp model.
 
 Bốn trạng thái mỗi dòng: `PASS` đã kiểm, đạt · `WARN` dùng được nhưng nên sửa · `FAIL` thiếu thứ
 bắt buộc · `NOT_CHECKED` doctor KHÔNG kiểm được điều này (chưa có trạm, chưa có engine, hoặc cần
@@ -24,6 +26,7 @@ import itertools
 import os
 import subprocess
 import sys
+from pathlib import Path
 
 from . import API_VERSION, __version__, _env, contract, engine
 
@@ -246,9 +249,11 @@ def run_checks():
 
     checks.append(samples_check())
     if st is not None:
-        wp = win_path_check(os.path.join(_env.engine_dir(), ".venv"))
+        venv = _env.engine_venv()
+        wp = win_path_check(venv)
         if wp:
             checks.append(wp)
+        checks.append(runtime_check(venv))
     if st is None:
         why = "chưa có trạm — kiểm lại sau khi đặt trạm"
         checks += [_not_checked(n, why) for n in ("voices", "default-profile", "bgm-library")]
@@ -303,24 +308,66 @@ def bgm_check(lib_dir):
     return _check("bgm-library", True, f"{lib.dir} ({len(names)} style, đủ file mp3)")
 
 
-# Windows chưa bật đường dài: thư mục sâu nhất tối đa 248 ký tự. Gói torch (bản CUDA 2.13) có
-# thư mục giấy phép lồng sâu ~160 ký tự tính từ gốc venv ⇒ gốc venv dài quá ~88 ký tự là `pip
-# install torch` gãy giữa chừng với WinError 206 và để lại một torch cài dở (đo 28/09 khi cài
-# sạch vào trạm embedded nằm trong %TEMP%). Chừa biên: cảnh báo từ 80 ký tự.
-WIN_VENV_PATH_WARN = 80
+# Windows chưa bật đường dài: thư mục tối đa 248 ký tự, đường tệp tối đa 260. Gói torch có thư mục
+# giấy phép lồng sâu nên `pip install torch` gãy giữa chừng với WinError 206 và để lại một torch cài
+# dở (đo 28/09 khi cài sạch vào trạm embedded nằm trong %TEMP%). Độ sâu tương đối (`dir_rel`,
+# `file_rel`) lấy từ số đo khai trong `opcos-runtime.json` (venv engine: 109/150); luật
+# `len(gốc) + dir_rel > 248 hoặc len(gốc) + file_rel > 260` trùng với `opcos-runtime` (FR3.8).
+WIN_DIR_LIMIT = 248
+WIN_FILE_LIMIT = 260
 
 
-def win_path_check(venv, windows=None):
-    """Cảnh báo đường venv engine quá dài trên Windows; hệ khác (hoặc đường ngắn) ⇒ None."""
+def win_path_check(venv, windows=None, dir_rel=None, file_rel=None):
+    """Cảnh báo đường venv engine quá dài trên Windows; hệ khác ⇒ None.
+
+    Đo trên venv THẬT đang dùng (`_env.engine_venv()`), theo hai ngưỡng. `dir_rel`/`file_rel` mặc định
+    theo `_env.engine_path_budget(venv)`: venv có `.opcos-resource.json` (cài theo khoá, torch 2.12) dùng số
+    khai trong `opcos-runtime.json` (109/150); venv KHÔNG có tệp khai sinh (torch cài không ghim, >= 2.13) dùng
+    186/197 — nếu dùng 109/150 thì doctor báo xanh sai (phép đo PV-T22: gốc > ~88 ký tự gãy WinError 206).
+    """
     windows = (os.name == "nt") if windows is None else windows
     if not windows:
         return None
+    if dir_rel is None or file_rel is None:
+        d, f = _env.engine_path_budget(venv)
+        dir_rel = d if dir_rel is None else dir_rel
+        file_rel = f if file_rel is None else file_rel
     n = len(os.path.abspath(venv)) if os.name == "nt" else len(venv)
-    return _check("win-path", n <= WIN_VENV_PATH_WARN, f"{venv} ({n} ký tự)", level="warn",
-                  hint=f"đường venv engine dài hơn {WIN_VENV_PATH_WARN} ký tự: cài torch có thể gãy "
-                       "(WinError 206) khi Windows chưa bật đường dài. Clone repo vào thư mục ngắn, "
-                       "hoặc đặt trạm ở đường ngắn (`voice-studio init --station <thư mục ngắn>`); "
-                       "bật LongPathsEnabled là việc của quản trị máy, không phải của agent")
+    dir_len, file_len = n + dir_rel, n + file_rel
+    ok = dir_len <= WIN_DIR_LIMIT and file_len <= WIN_FILE_LIMIT
+    return _check("win-path", ok,
+                  f"{venv} ({n} ký tự; thư mục sâu nhất {dir_len}/{WIN_DIR_LIMIT}, tệp dài nhất {file_len}/{WIN_FILE_LIMIT})",
+                  level="warn",
+                  hint="đường venv engine quá dài: cài torch có thể gãy (WinError 206) khi Windows chưa bật "
+                       "đường dài. Clone repo vào thư mục ngắn, hoặc đặt trạm/runtime ở đường ngắn "
+                       "(`voice-studio init --station <thư mục ngắn>`); bật LongPathsEnabled là việc của "
+                       "quản trị máy, không phải của agent")
+
+
+def runtime_check(venv):
+    """Trạng thái `runtime/` của OpcOS (FR1.3, FR6.4): không có OpcOS ⇒ WARN `RT_NO_OPCOS` (plugin vẫn dùng
+    đích cũ, KHÔNG lỗi); có OpcOS mà venv engine thật nằm dưới R lại thiếu `.opcos-resource.json` ⇒ WARN
+    `RT_ORPHAN` (dựng tay, không qua `opcos-runtime`); còn lại PASS."""
+    root = _env.runtime_root()
+    if root is None:
+        return _check("runtime", False,
+                      "RT_NO_OPCOS: máy không có OpcOS (không OPCOS_RUNTIME/OPCOS_ROOT/~/OpcOS/paths.json) — "
+                      "venv engine ở trong trạm như trước", level="warn",
+                      hint="không sao nếu plugin cài lẻ; có OpcOS thì đặt OPCOS_RUNTIME (hoặc OPCOS_ROOT) rồi "
+                           "`opcos-runtime ensure --repo-dir <repo>`")
+    venv = Path(venv)
+    try:
+        under = os.path.normcase(os.path.abspath(venv)).startswith(
+            os.path.normcase(os.path.abspath(root)) + os.sep)
+    except (OSError, ValueError):
+        under = False
+    if under and venv.is_dir() and not (venv / _env.RESOURCE_MANIFEST).is_file():
+        return _check("runtime", False,
+                      f"RT_ORPHAN: {venv} thiếu {_env.RESOURCE_MANIFEST} (không do opcos-runtime dựng)",
+                      level="warn",
+                      hint="dựng lại bằng `opcos-runtime ensure --repo-dir <repo>`; `opcos-runtime audit` sẽ "
+                           "báo đỏ cho tài nguyên không có tệp khai sinh")
+    return _check("runtime", True, f"{root} (venv engine: {venv})")
 
 
 def samples_check():
