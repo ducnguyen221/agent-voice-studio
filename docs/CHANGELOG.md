@@ -4,7 +4,11 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
-**Chưa phát hành (sau 0.5.0, chưa đổi version):** `CLAUDE.md` dời từ gốc sang `.claude/CLAUDE.md` (một dòng
+## 0.5.1 — 2026-11-08
+
+- **Engine/venv ở runtime OpcOS khi máy có OpcOS** (SPR-61 TK5): voice khai nhu cầu và tạo/tìm engine ở `runtime/`; máy không có OpcOS giữ hành vi cũ.
+
+ `CLAUDE.md` dời từ gốc sang `.claude/CLAUDE.md` (một dòng
 `@../AGENTS.md`), vì `claude plugin validate --strict` đỏ khi plugin có `CLAUDE.md` gốc; luật `AGENTS.md` nay được
 nạp thật khi mở repo trong Claude Code. `.gitignore` theo dõi riêng file này trong `/.claude/`.
 
