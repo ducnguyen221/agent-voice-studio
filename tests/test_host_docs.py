@@ -1,6 +1,6 @@
 """Cổng cho tài liệu agent và host: một nguồn (`AGENTS.md`), bốn trang host, không trôi khỏi mã.
 
-`CLAUDE.md` và `GEMINI.md` chỉ là con trỏ — một bản hướng dẫn thứ hai sẽ lệch khỏi bản đầu
+`.claude/CLAUDE.md` và `GEMINI.md` chỉ là con trỏ — một bản hướng dẫn thứ hai sẽ lệch khỏi bản đầu
 trong vài tuần. Mỗi trang host phải chỉ người đọc tới `voice-studio doctor`, vì đó là câu trả
 lời duy nhất đáng tin cho "đã cài xong chưa". Link tương đối gãy là đỏ.
 """
@@ -20,11 +20,17 @@ def read(rel):
     return (ROOT / rel).read_text(encoding="utf-8")
 
 
-@pytest.mark.parametrize("rel", ["CLAUDE.md", "GEMINI.md"])
+@pytest.mark.parametrize("rel", [".claude/CLAUDE.md", "GEMINI.md"])
 def test_pointer_files_only_point_to_agents_md(rel):
     text = read(rel)
     assert "AGENTS.md" in text
     assert len([ln for ln in text.splitlines() if ln.strip()]) <= 6, f"{rel} phải là con trỏ, không phải bản thứ hai"
+
+
+def test_claude_md_lives_in_dot_claude_and_imports_agents_md():
+    """`claude plugin validate --strict` đỏ khi có `CLAUDE.md` ở gốc plugin; `@import` tính đường từ file chứa nó."""
+    assert not (ROOT / "CLAUDE.md").exists()
+    assert "@../AGENTS.md" in read(".claude/CLAUDE.md").splitlines()
 
 
 @pytest.mark.parametrize("rel", HOST_PAGES)

@@ -67,8 +67,10 @@ desktop.ini
 node_modules/
 
 # ── thư mục công cụ agent + cache công cụ Python. Neo gốc (`/.claude/`) có chủ đích: manifest
-# plugin `.claude-plugin/`, `.codex-plugin/` vẫn được theo dõi (tests/test_repo_gates.py kiểm)
-/.claude/
+# plugin `.claude-plugin/`, `.codex-plugin/` vẫn được theo dõi (tests/test_repo_gates.py kiểm). Riêng
+# `.claude/CLAUDE.md` (một dòng `@../AGENTS.md`) được theo dõi: Claude Code nạp luật repo từ đó.
+/.claude/*
+!/.claude/CLAUDE.md
 /.codex/
 /.gemini/
 .mypy_cache/

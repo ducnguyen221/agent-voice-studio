@@ -6,8 +6,8 @@ Code. Tự cài: làm theo [START-HERE.md](../../START-HERE.md) (clone, venv, `v
 
 ## Hai cách để Claude thấy skill
 
-1. **Mở thư mục repo** trong Claude Code. Claude đọc `CLAUDE.md` → `AGENTS.md` → skill
-   `skills/voice-routing/SKILL.md`. Không cần đăng ký gì.
+1. **Mở thư mục repo** trong Claude Code. Claude đọc `.claude/CLAUDE.md` (dòng `@../AGENTS.md`) →
+   `AGENTS.md` → skill `skills/voice-routing/SKILL.md`. Không cần đăng ký gì.
 2. **Cài plugin** (tuỳ chọn — để skill có mặt cả khi bạn mở thư mục khác). Lệnh ghi vào cấu hình
    người dùng của Claude Code, nên hỏi người dùng trước:
 

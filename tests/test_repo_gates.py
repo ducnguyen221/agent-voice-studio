@@ -57,6 +57,8 @@ def _in_git():
     ("a.webm", True),
     # thư mục công cụ agent bị bỏ qua, nhưng manifest plugin cùng tiền tố thì KHÔNG
     (".claude/settings.local.json", True),
+    (".claude/worktrees/x/a.txt", True),
+    (".claude/CLAUDE.md", False),
     (".codex/config.toml", True),
     (".gemini/settings.json", True),
     (".claude-plugin/plugin.json", False),

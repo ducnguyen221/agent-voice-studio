@@ -4,6 +4,10 @@ Mới nhất trước. Mỗi mục là thứ **người dùng** thấy khác đi
 sử git. Số phiên bản ở đây, trong `pyproject.toml`, `voice_studio/__init__.py` và ba manifest
 plugin luôn cùng một số — `tests/test_version_sync.py` đỏ nếu lệch.
 
+**Chưa phát hành (sau 0.5.0, chưa đổi version):** `CLAUDE.md` dời từ gốc sang `.claude/CLAUDE.md` (một dòng
+`@../AGENTS.md`), vì `claude plugin validate --strict` đỏ khi plugin có `CLAUDE.md` gốc; luật `AGENTS.md` nay được
+nạp thật khi mở repo trong Claude Code. `.gitignore` theo dõi riêng file này trong `/.claude/`.
+
 ## 0.5.0 — 2026-10-20
 
 **Sửa lỗi dời trạm:** lỗi sau bước dời dữ liệu được hoàn tác theo trạng thái đã xác minh; nếu trạng thái không rõ hoặc phục hồi thất bại thì giữ dữ liệu và báo cách phục hồi, không dọn rộng.

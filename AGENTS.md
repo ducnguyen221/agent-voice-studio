@@ -1,7 +1,8 @@
 # AGENTS.md — Agent Voice Studio
 
-> File hướng dẫn CHUẨN cho mọi AI agent (Claude Code · Codex · Google Antigravity · bất kỳ công
-> cụ nào đọc AGENTS.md). `CLAUDE.md` và `GEMINI.md` chỉ là con trỏ về file này — sửa Ở ĐÂY.
+> File hướng dẫn CHUẨN cho mọi AI agent (Claude Code · Codex · Google Antigravity · bất kỳ công cụ nào
+> đọc AGENTS.md). `.claude/CLAUDE.md` (một dòng `@../AGENTS.md`) và `GEMINI.md` chỉ là con trỏ về file
+> này — sửa Ở ĐÂY.
 
 ## 0. Ranh giới: mã ở repo, giọng ở trạm
 
@@ -79,7 +80,7 @@ JSON, log ra stderr. Đổi khoá JSON hay mã thoát = tăng số đầu của 
 
 | Host | Đọc | Skill |
 |---|---|---|
-| Claude Code | `CLAUDE.md` → file này | plugin (`.claude-plugin/`) hoặc đọc thẳng `skills/voice-routing/SKILL.md` |
+| Claude Code | `.claude/CLAUDE.md` (`@../AGENTS.md`) → file này | plugin (`.claude-plugin/`) hoặc đọc thẳng `skills/voice-routing/SKILL.md` |
 | Codex | `AGENTS.md` | plugin (`.codex-plugin/`, khoá `skills`) hoặc đọc thẳng skill |
 | Antigravity | `GEMINI.md` → file này | đọc thẳng skill (thư mục skill riêng của host chưa kiểm) |
 | Claude Desktop (tab chat) | — | không có skill; chỉ công cụ MCP nếu người dùng tự đăng ký |
